@@ -949,7 +949,9 @@
 
     if (syncUI.step === 'code') {
       body.innerHTML = '<p class="chart-sub">ส่งอีเมลไปที่ <strong>' + esc(syncUI.email) + '</strong> แล้ว — ' +
-          'ใส่รหัส 6 หลักจากอีเมล หรือกดลิงก์ในอีเมลก็เข้าได้เลย</p>' + msg +
+          'ใส่รหัส 6 หลักจากอีเมลด้านล่าง หรือกดลิงก์ในอีเมลก็ได้</p>' + msg +
+        '<p class="budget-foot">ถ้ากดลิงก์แล้วไปที่ <code>localhost:3000</code> แปลว่ายังไม่ได้ตั้ง Site URL ใน Supabase ' +
+          'เป็น <code>' + esc(location.origin) + '</code> — ระหว่างนี้ใช้รหัส 6 หลักแทนได้เลย</p>' +
         '<label class="field" style="margin-top:12px;max-width:220px"><span class="field-label">รหัสจากอีเมล</span>' +
           '<input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" data-sf="code" placeholder="123456"></label>' +
         '<div class="row-actions" style="margin-top:14px">' +
