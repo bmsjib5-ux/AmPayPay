@@ -1,0 +1,20 @@
+# Render Blueprint — เว็บสแตติกล้วน ไม่ต้อง build
+# ใช้ได้ทั้งแบบ Blueprint (New + > Blueprint) และ New + > Static Site
+services:
+  - type: web
+    name: ampaypay-expense-book
+    runtime: static
+    buildCommand: "echo 'static site — no build step'"
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      # Tesseract.js ต้องสร้าง Web Worker และโหลด wasm — ห้ามใส่ CSP ที่บล็อก blob:/CDN
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=3600

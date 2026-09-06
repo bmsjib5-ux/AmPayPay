@@ -34,6 +34,20 @@ python3 -m http.server 8000     # หรือ npx http-server -p 8000
 > แนะนำให้เปิดผ่าน http(s) ไม่ใช่ดับเบิลคลิกไฟล์ (`file://`) เพราะตัวอ่าน OCR ทำงานผ่าน Web Worker
 > ถ้าจะเอาขึ้นออนไลน์ อัปโหลดทั้งโฟลเดอร์ขึ้น GitHub Pages / Netlify / Vercel ได้เลย
 
+### ขึ้นออนไลน์ด้วย Render (ฟรี)
+
+รีโปนี้มี [`render.yaml`](render.yaml) ให้แล้ว Render จะตั้งค่าเป็น Static Site ให้อัตโนมัติ
+
+1. ล็อกอิน [dashboard.render.com](https://dashboard.render.com) แล้วเชื่อมบัญชี GitHub
+2. กด **New +** → **Static Site** → เลือกรีโป `bmsjib5-ux/AmPayPay`
+3. เลือก Branch ที่ต้องการ deploy (เช่น `main` หรือ `claude/expense-tracker-app-ctofm0`)
+   - **Build Command:** เว้นว่างไว้ได้เลย
+   - **Publish Directory:** `.`
+4. กด **Create Static Site** รอสัก 1 นาที จะได้ URL หน้าตา `https://<ชื่อที่ตั้ง>.onrender.com`
+
+ทุกครั้งที่ push ขึ้นแบรนช์นั้น Render จะ deploy ใหม่ให้เอง
+(ทางเลือกอื่นที่ไม่ต้องสมัครอะไรเพิ่ม: เปิด GitHub Pages จาก Settings → Pages ของรีโปนี้)
+
 ครั้งแรกที่อ่านใบเสร็จ เบราว์เซอร์จะดาวน์โหลดตัวอ่าน OCR และชุดภาษาไทย (~5 MB) จาก CDN
 แล้วแคชไว้ ครั้งต่อไปเร็วขึ้นและใช้แบบออฟไลน์ได้
 
