@@ -238,7 +238,11 @@ details.raw pre {
 .trend-label { flex: 1; text-align: center; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
 .rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.rank li { display: flex; gap: 10px; align-items: baseline; font-size: 14px; border-bottom: 1px dashed var(--border-soft); padding-bottom: 8px; }
+.rank li {
+  display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: baseline;
+  font-size: 14px; border-bottom: 1px dashed var(--border-soft); padding-bottom: 8px;
+}
+.rank .r-name { min-width: 0; }
 .rank li:last-child { border-bottom: 0; padding-bottom: 0; }
 .rank .r-amount { margin-left: auto; font-variant-numeric: tabular-nums; }
 
@@ -335,4 +339,76 @@ details.raw pre {
 .modal code {
   background: var(--surface-2); border-radius: 5px; padding: 1px 5px; font-size: 12.5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---------- ปรับให้ใช้ง่ายขึ้นบนมือถือ ---------- */
+/* แตะแล้วตอบสนองทันที ไม่ต้องรอเช็คดับเบิลแท็ป และไม่มีกรอบไฮไลต์กระพริบ */
+button, .tab, a, input, select, textarea { touch-action: manipulation; }
+button, .tab { -webkit-tap-highlight-color: transparent; }
+
+/* iOS จะซูมหน้าจอเองถ้าตัวอักษรในช่องกรอกเล็กกว่า 16px */
+input, select, textarea { font-size: 16px; }
+
+/* พื้นที่กดอย่างน้อย 44px ตามเกณฑ์ Apple */
+.btn { min-height: 44px; }
+.btn-sm { min-height: 38px; }
+.icon-btn { width: 44px; height: 44px; }
+.tab { min-height: 44px; }
+
+/* เว้นระยะให้พ้นติ่งและแถบล่างของ iPhone */
+.topbar { padding-top: env(safe-area-inset-top); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.foot { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
+.toast { bottom: calc(22px + env(safe-area-inset-bottom)); }
+.modal { padding-bottom: calc(16px + env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+
+@media (max-width: 560px) {
+  /* ตัวเลขสรุปสามช่องเรียงเป็นแถวเดียว ไม่กินพื้นที่ทั้งจอ */
+  .tiles { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { padding: 10px 11px; }
+  .tile-label { font-size: 11px; }
+  .tile-value { font-size: 19px; letter-spacing: -.03em; }
+  .tile-foot { font-size: 11px; line-height: 1.45; }
+
+  /* ชื่อหมวดได้พื้นที่เต็มบรรทัด แล้ววางแถบไว้ข้างล่าง ไม่ต้องตัดคำ */
+  .bar-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "name value" "track track";
+    row-gap: 5px;
+    align-items: baseline;
+  }
+  .bar-name { grid-area: name; }
+  .bar-label { white-space: normal; }
+  .bar-sub { white-space: normal; }
+  .bar-track { grid-area: track; }
+  .bar-value { grid-area: value; }
+
+  /* หัวการ์ดงบ: ข้อความเต็มบรรทัด ชิปกับปุ่มอยู่แถวเดียวกันด้านล่าง */
+  .budget-head > div:first-child { min-width: 100%; }
+  .budget-head .chip { order: 2; }
+  .budget-head > button { order: 3; margin-left: auto; }
+
+  /* ชื่อร้านยาวๆ ขึ้นบรรทัดใหม่ได้ แต่ยอดเงินยังอยู่บรรทัดเดียวกับชื่อเสมอ */
+  .rank .r-amount { white-space: nowrap; }
+
+  /* ช่องค้นหาเต็มบรรทัด ไม่ให้ถูกบีบจนพิมพ์ไม่ได้ ส่วนตัวกรองสองอันแบ่งครึ่งบรรทัดถัดไป */
+  .filters { gap: 8px; }
+  .filters .field.grow { flex: 0 0 100%; }
+  .filters .field:not(.grow) { flex: 1 1 0; }
+
+  /* ชื่อร้านยาวขึ้นบรรทัดใหม่ได้ ดีกว่าตัดด้วย … */
+  .ecard-title { white-space: normal; }
+  .ecard-meta { row-gap: 2px; }
+}
+
+/* จอเล็ก (iPhone SE / จอ 375px) — กันไม่ให้การ์ดตัวเลขดันจอจนเลื่อนแนวนอนได้ */
+@media (max-width: 560px) {
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tile-value { overflow-wrap: anywhere; }
+}
+@media (max-width: 400px) {
+  .tab { padding-inline: 9px; font-size: 14px; }
+  .tile-value { font-size: 16.5px; }
+  .tile-label, .tile-foot { font-size: 10.5px; }
+  .brand { font-size: 16px; }
 }

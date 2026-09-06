@@ -828,7 +828,8 @@
       return { name: n, count: byMerchant[n].count, total: byMerchant[n].total };
     }).sort(function (a, b) { return b.total - a.total; }).slice(0, 5);
     $('#topMerchants').innerHTML = merchants.length ? merchants.map(function (m) {
-      return '<li><span>' + esc(m.name) + '</span><span class="muted">· ' + m.count + ' ครั้ง</span>' +
+      return '<li><span class="r-name">' + esc(m.name) +
+        ' <span class="muted">· ' + m.count + ' ครั้ง</span></span>' +
         '<span class="r-amount">' + fmtMoney(m.total) + '</span></li>';
     }).join('') : '<li class="muted">ยังไม่มีข้อมูล</li>';
   }
