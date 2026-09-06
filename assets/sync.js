@@ -66,6 +66,7 @@ window.CloudSync = (function () {
     return {
       id: rec.id,
       user_id: userId,
+      book_id: rec.bookId || 'b_default',
       date: rec.date,
       merchant: rec.merchant,
       amount: Number(rec.amount) || 0,
@@ -82,6 +83,7 @@ window.CloudSync = (function () {
   function toLocal(row) {
     return {
       id: row.id,
+      bookId: row.book_id || 'b_default',
       date: row.date,
       merchant: row.merchant || '',
       amount: Number(row.amount) || 0,
@@ -89,6 +91,27 @@ window.CloudSync = (function () {
       note: row.note || '',
       items: Array.isArray(row.items) ? row.items : [],
       rawText: row.raw_text || '',
+      deleted: !!row.deleted,
+      createdAt: Date.parse(row.created_at) || Date.now(),
+      updatedAt: Date.parse(row.updated_at) || Date.now()
+    };
+  }
+
+  function bookToRemote(book, userId) {
+    return {
+      id: book.id,
+      user_id: userId,
+      name: book.name || 'สมุดของฉัน',
+      deleted: !!book.deleted,
+      created_at: new Date(book.createdAt || Date.now()).toISOString(),
+      updated_at: new Date(book.updatedAt || Date.now()).toISOString()
+    };
+  }
+
+  function bookToLocal(row) {
+    return {
+      id: row.id,
+      name: row.name || 'สมุดของฉัน',
       deleted: !!row.deleted,
       createdAt: Date.parse(row.created_at) || Date.now(),
       updatedAt: Date.parse(row.updated_at) || Date.now()
@@ -184,13 +207,16 @@ window.CloudSync = (function () {
       });
     },
 
-    /* ดึงของใหม่จากเซิร์ฟเวอร์ รวมกับของในเครื่อง แล้วส่งของที่แก้ในเครื่องขึ้นไป */
+    /* ดึงของใหม่จากเซิร์ฟเวอร์ รวมกับของในเครื่อง แล้วส่งของที่แก้ในเครื่องขึ้นไป
+       ครอบคลุมทั้งสมุด รายจ่าย และงบประมาณของทุกสมุด */
     syncNow: function () {
       if (!isConfigured()) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า Supabase'));
       if (syncing) return Promise.resolve({ skipped: true });
       var startedAt = Date.now();
       var since = ExpenseStore.lastSync.get();
+      var sinceISO = since ? new Date(since).toISOString() : null;
       var userId, c;
+      var counts = { pulled: 0, pushed: 0 };
       syncing = true;
 
       return getClient().then(function (cl) {
@@ -198,27 +224,42 @@ window.CloudSync = (function () {
         if (!session || !session.user) throw new Error('ยังไม่ได้ล็อกอิน');
         userId = session.user.id;
 
+        var booksQuery = c.from('books').select('*').eq('user_id', userId);
+        if (sinceISO) booksQuery = booksQuery.gt('updated_at', sinceISO);
+        return booksQuery;
+      }).then(function (res) {
+        if (res.error) throw new Error(friendly(res.error));
+        counts.pulled += ExpenseStore.mergeRemoteBooks((res.data || []).map(bookToLocal));
+
+        var pendingBooks = ExpenseStore.pendingBooks();
+        if (!pendingBooks.length) return null;
+        return c.from('books')
+          .upsert(pendingBooks.map(function (b) { return bookToRemote(b, userId); }), { onConflict: 'user_id,id' })
+          .then(function (up) {
+            if (up.error) throw new Error(friendly(up.error));
+            ExpenseStore.clearPendingBooks(pendingBooks.map(function (b) { return b.id; }));
+            counts.pushed += pendingBooks.length;
+          });
+      }).then(function () {
         var query = c.from('expenses').select('*').eq('user_id', userId);
-        if (since) query = query.gt('updated_at', new Date(since).toISOString());
+        if (sinceISO) query = query.gt('updated_at', sinceISO);
         return query;
       }).then(function (res) {
         if (res.error) throw new Error(friendly(res.error));
-        var pulled = ExpenseStore.mergeRemote((res.data || []).map(toLocal));
+        counts.pulled += ExpenseStore.mergeRemote((res.data || []).map(toLocal));
 
         var pending = ExpenseStore.pendingRecords();
-        var outgoing = pending.map(function (rec) { return toRemote(rec, userId); });
-        var step = outgoing.length
-          ? c.from('expenses').upsert(outgoing, { onConflict: 'user_id,id' })
-          : Promise.resolve({ error: null });
-
-        return Promise.resolve(step).then(function (up) {
-          if (up && up.error) throw new Error(friendly(up.error));
-          ExpenseStore.clearPending(pending.map(function (rec) { return rec.id; }));
-          return { pulled: pulled, pushed: outgoing.length };
-        });
-      }).then(function (counts) {
-        return api.syncBudget(c, userId).then(function () { return counts; });
-      }).then(function (counts) {
+        if (!pending.length) return null;
+        return c.from('expenses')
+          .upsert(pending.map(function (rec) { return toRemote(rec, userId); }), { onConflict: 'user_id,id' })
+          .then(function (up) {
+            if (up.error) throw new Error(friendly(up.error));
+            ExpenseStore.clearPending(pending.map(function (rec) { return rec.id; }));
+            counts.pushed += pending.length;
+          });
+      }).then(function () {
+        return api.syncBudgets(c, userId);
+      }).then(function () {
         ExpenseStore.lastSync.set(startedAt - 5000);   // เผื่อเวลาคลาดเคลื่อนเล็กน้อย
         syncing = false;
         emit();
@@ -229,27 +270,36 @@ window.CloudSync = (function () {
       });
     },
 
-    syncBudget: function (c, userId) {
-      var local = ExpenseStore.budget.get();
-      return c.from('budgets').select('*').eq('user_id', userId).maybeSingle().then(function (res) {
+    /* งบประมาณมีเล่มละชุด จึงซิงก์ทีละสมุด */
+    syncBudgets: function (c, userId) {
+      return c.from('budgets').select('*').eq('user_id', userId).then(function (res) {
         if (res.error) throw new Error(friendly(res.error));
-        var row = res.data;
-        var remoteAt = row ? (Date.parse(row.updated_at) || 0) : 0;
-        if (row && remoteAt > (local.updatedAt || 0)) {
-          ExpenseStore.budget.set({ total: Number(row.total) || 0, categories: row.categories || {}, updatedAt: remoteAt }, true);
-          return null;
-        }
-        if (!ExpenseStore.budgetPending() && !local.updatedAt) return null;
-        if (row && remoteAt >= local.updatedAt) return null;
-        return c.from('budgets').upsert({
-          user_id: userId,
-          total: local.total,
-          categories: local.categories,
-          updated_at: new Date(local.updatedAt).toISOString()
-        }, { onConflict: 'user_id' }).then(function (up) {
+        (res.data || []).forEach(function (row) {
+          var bookId = row.book_id || 'b_default';
+          var remoteAt = Date.parse(row.updated_at) || 0;
+          var local = ExpenseStore.budget.get(bookId);
+          if (remoteAt > (local.updatedAt || 0)) {
+            ExpenseStore.budget.set({
+              total: Number(row.total) || 0,
+              categories: row.categories || {},
+              updatedAt: remoteAt
+            }, true, bookId);
+          }
+        });
+
+        var pending = ExpenseStore.pendingBudgets();
+        if (!pending.length) return null;
+        return c.from('budgets').upsert(pending.map(function (p) {
+          return {
+            user_id: userId,
+            book_id: p.bookId,
+            total: p.budget.total,
+            categories: p.budget.categories,
+            updated_at: new Date(p.budget.updatedAt || Date.now()).toISOString()
+          };
+        }), { onConflict: 'user_id,book_id' }).then(function (up) {
           if (up.error) throw new Error(friendly(up.error));
-          ExpenseStore.clearBudgetPending();
-          return null;
+          ExpenseStore.clearPendingBudgets(pending.map(function (p) { return p.bookId; }));
         });
       });
     }

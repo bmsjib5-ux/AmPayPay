@@ -6,7 +6,7 @@
 <title>สมุดเก็บรายจ่ายของฉัน</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/styles.css?v=19">
+<link rel="stylesheet" href="assets/styles.css?v=20">
 </head>
 <body>
 <header class="topbar">
@@ -21,6 +21,15 @@
     <button class="tab" role="tab" aria-selected="false" data-tab="list">รายการทั้งหมด</button>
   </nav>
 </header>
+
+<div class="bookbar">
+  <div class="wrap bookbar-inner">
+    <span class="bookbar-icon" aria-hidden="true">📒</span>
+    <label class="sr-only" for="bookSelect">สมุดที่กำลังใช้</label>
+    <select id="bookSelect"></select>
+    <button id="bookManageBtn" class="btn btn-ghost btn-sm" type="button">จัดการสมุด</button>
+  </div>
+</div>
 
 <main class="wrap">
 
@@ -140,8 +149,18 @@
 
 <footer class="wrap foot">
   ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
-  <span class="ver">เวอร์ชัน 19</span>
+  <span class="ver">เวอร์ชัน 20</span>
 </footer>
+
+<div id="bookModal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="bookTitle">
+    <div class="modal-head">
+      <h2 id="bookTitle" class="section-title">จัดการสมุด</h2>
+      <button class="btn btn-ghost btn-sm" type="button" data-book="close" aria-label="ปิด">✕</button>
+    </div>
+    <div id="bookBody"></div>
+  </div>
+</div>
 
 <div id="syncModal" class="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
@@ -156,10 +175,10 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/config.js?v=19"></script>
-<script src="assets/parser.js?v=19"></script>
-<script src="assets/store.js?v=19"></script>
-<script src="assets/sync.js?v=19"></script>
-<script src="assets/app.js?v=19"></script>
+<script src="assets/config.js?v=20"></script>
+<script src="assets/parser.js?v=20"></script>
+<script src="assets/store.js?v=20"></script>
+<script src="assets/sync.js?v=20"></script>
+<script src="assets/app.js?v=20"></script>
 </body>
 </html>
