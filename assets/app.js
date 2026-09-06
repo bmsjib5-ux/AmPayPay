@@ -96,14 +96,56 @@
       img.src = url;
     });
   }
-  function resizeToDataURL(img, maxSide, quality) {
-    var scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+  function drawScaled(img, scale) {
     var canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(img.width * scale));
     canvas.height = Math.max(1, Math.round(img.height * scale));
     var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', quality);
+    return canvas;
+  }
+
+  function resizeToDataURL(img, maxSide, quality) {
+    return drawScaled(img, Math.min(1, maxSide / Math.max(img.width, img.height)))
+      .toDataURL('image/jpeg', quality);
+  }
+
+  /* เตรียมรูปให้ OCR อ่านง่ายขึ้น: ขยายรูปเล็ก, ทำเป็นขาวดำ แล้วดึงคอนทราสต์
+     ช่วยมากกับสลิปธนาคารที่พื้นหลังไล่สีและตัวหนังสือบาง */
+  function preprocessForOCR(img) {
+    var longest = Math.max(img.width, img.height);
+    var scale = longest < 1400 ? Math.min(2.5, 1400 / longest) : Math.min(1, 2000 / longest);
+    var canvas = drawScaled(img, scale);
+    var ctx = canvas.getContext('2d');
+    try {
+      var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var px = data.data;
+      var hist = new Uint32Array(256);
+      var i;
+      for (i = 0; i < px.length; i += 4) {
+        var g = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) | 0;
+        px[i] = px[i + 1] = px[i + 2] = g;
+        hist[g]++;
+      }
+      // ตัดหางฮิสโทแกรม 2% บน-ล่าง แล้วยืดช่วงที่เหลือเต็ม 0–255
+      var total = canvas.width * canvas.height, cut = total * 0.02, acc = 0, lo = 0, hi = 255;
+      for (i = 0; i < 256; i++) { acc += hist[i]; if (acc > cut) { lo = i; break; } }
+      acc = 0;
+      for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc > cut) { hi = i; break; } }
+      if (hi - lo > 20) {
+        var span = 255 / (hi - lo);
+        for (i = 0; i < px.length; i += 4) {
+          var v = Math.max(0, Math.min(255, Math.round((px[i] - lo) * span)));
+          px[i] = px[i + 1] = px[i + 2] = v;
+        }
+      }
+      ctx.putImageData(data, 0, 0);
+    } catch (e) {
+      /* getImageData ถูกบล็อกในบางเบราว์เซอร์ — ใช้รูปที่ย่อ/ขยายแล้วตามเดิม */
+    }
+    return canvas.toDataURL('image/png');
   }
 
   /* ---------------- OCR ---------------- */
@@ -281,7 +323,8 @@
         next.parsed = parsed;
         next.status = 'done';
         next.statusText = parsed.amount != null
-          ? 'อ่านใบเสร็จแล้ว — ตรวจสอบข้อมูลก่อนบันทึก'
+          ? (parsed.isSlip ? 'อ่านสลิปโอนเงินแล้ว — ตรวจสอบข้อมูลก่อนบันทึก'
+                           : 'อ่านใบเสร็จแล้ว — ตรวจสอบข้อมูลก่อนบันทึก')
           : 'อ่านข้อความได้ แต่หายอดเงินไม่เจอ';
         renderCard(next);
       })
@@ -306,7 +349,7 @@
       addCard(card);
       loadImage(file).then(function (img) {
         card.thumb = resizeToDataURL(img, 360, 0.62);   // เก็บคู่กับรายการ
-        card.ocrSrc = resizeToDataURL(img, 1600, 0.9);  // ส่งให้ OCR
+        card.ocrSrc = preprocessForOCR(img);            // ส่งให้ OCR
         renderCard(card);
         pump();
       }).catch(function (err) {
