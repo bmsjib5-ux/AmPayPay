@@ -97,6 +97,10 @@ window.CloudSync = (function () {
 
   function friendly(error) {
     var msg = (error && (error.message || error.error_description)) || 'เกิดข้อผิดพลาด';
+    if (/invalid login credentials/i.test(msg)) return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง (ถ้ายังไม่เคยสมัคร กด "สมัครใหม่")';
+    if (/email not confirmed/i.test(msg)) return 'อีเมลนี้ยังไม่ได้ยืนยัน — ปิด "Confirm email" ใน Supabase หรือกดยืนยันในอีเมลก่อน';
+    if (/user already registered|already been registered/i.test(msg)) return 'อีเมลนี้สมัครไว้แล้ว กด "เข้าสู่ระบบ" ได้เลย';
+    if (/password should be at least|weak password/i.test(msg)) return 'รหัสผ่านสั้นเกินไป ต้องอย่างน้อย 6 ตัวอักษร';
     if (/token has expired|invalid|expired/i.test(msg)) return 'รหัสไม่ถูกต้องหรือหมดอายุ กรุณาขอรหัสใหม่';
     if (/rate|too many/i.test(msg)) return 'ขอรหัสถี่เกินไป รอสักครู่แล้วลองใหม่';
     if (/relation .* does not exist|schema cache/i.test(msg)) return 'ยังไม่ได้สร้างตารางใน Supabase — รันไฟล์ supabase/schema.sql ก่อน';
@@ -120,6 +124,33 @@ window.CloudSync = (function () {
           emit();
           return session;
         });
+    },
+
+    /* ล็อกอินด้วยรหัสผ่าน — ไม่ต้องพึ่งอีเมลเลย */
+    signInWithPassword: function (email, password) {
+      return getClient().then(function (c) {
+        return c.auth.signInWithPassword({ email: email, password: password });
+      }).then(function (res) {
+        if (res.error) throw new Error(friendly(res.error));
+        session = res.data.session;
+        emit();
+        return session;
+      });
+    },
+
+    signUpWithPassword: function (email, password) {
+      return getClient().then(function (c) {
+        return c.auth.signUp({
+          email: email,
+          password: password,
+          options: { emailRedirectTo: location.origin + location.pathname }
+        });
+      }).then(function (res) {
+        if (res.error) throw new Error(friendly(res.error));
+        session = res.data.session || null;
+        emit();
+        return { session: session, needsConfirm: !res.data.session };
+      });
     },
 
     sendCode: function (email) {
