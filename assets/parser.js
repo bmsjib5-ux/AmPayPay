@@ -28,7 +28,8 @@ window.ReceiptParser = (function () {
 
   /* สลิปโอนเงินจากแอปธนาคาร มีโครงสร้างต่างจากใบเสร็จร้านค้า */
   var SLIP_RE = /(โอนเงินสำเร็จ|โอนสำเร็จ|ทำรายการสำเร็จ|สลิป|พร้อมเพย์|promptpay|transfer\s*(success|complete)|รหัสอ้างอิง|เลขที่รายการ)/i;
-  var TO_RE = /^(ไปยัง|ไปที่|ผู้รับเงิน|ผู้รับ|โอนไปยัง|ชื่อผู้รับ|บัญชีปลายทาง|to)\s*[:：]?\s*(.*)$/i;
+  var TO_RE = /(โอนไปยัง|โอนไปที่|ไปยังบัญชี|ไปยัง|ไปที่|ผู้รับเงิน|ผู้รับโอน|ผู้รับ|ชื่อผู้รับ|ชื่อบัญชีปลายทาง|บัญชีปลายทาง|จ่ายให้|ชำระให้|ชื่อร้านค้า|ร้านค้า|ผู้ขาย|merchant|payee|to\s*account|\bto\b)\s*[:：]?\s*(.*)$/i;
+  var FROM_RE = /^(จาก|ผู้โอน|ชื่อผู้โอน|บัญชีต้นทาง|from)\s*[:：]?/i;
   var NOTE_RE = /(บันทึกช่วยจำ|หมายเหตุ|บันทึกช่วยจา|memo|remark|note)\s*[:：]?\s*(.*)$/i;
   var DATE_LABEL_RE = /(วันที่ทำรายการ|วันเวลาทำรายการ|เวลาทำรายการ|วันที่โอน|วันที่ชำระ|วันที่ออก|วันที่รับเงิน|วันที่|วัน\/เวลา|transaction\s*date|date\s*\/?\s*time|\bdate\b)/i;
   var BANK_RE = /(ธนาคาร|กรุงไทย|กสิกร|ไทยพาณิชย์|กรุงเทพ|กรุงศรี|ทหารไทย|ออมสิน|ธกส|ยูโอบี|ซีไอเอ็มบี|เกียรตินาคิน|xxx-|x-x|bank|\d{3}-\d)/i;
@@ -220,19 +221,46 @@ window.ReceiptParser = (function () {
       .slice(0, 60);
   }
 
-  /* สลิปโอนเงิน: ชื่อ "ร้าน" ที่มีความหมายคือชื่อผู้รับเงิน */
+  /* ตัดชื่อธนาคาร/เลขบัญชีออก เหลือแต่ชื่อคนหรือชื่อร้าน */
+  function stripBankParts(value) {
+    return cleanName(String(value)
+      .replace(/x{2,}[\dx*\-]*/gi, ' ')
+      .replace(/\b\d{2,}[\d\-]*\b/g, ' ')
+      .replace(/(ธนาคาร|บมจ\.?|บัญชี|กรุงไทย|กสิกรไทย|กสิกร|ไทยพาณิชย์|กรุงเทพ|กรุงศรีอยุธยา|กรุงศรี|ทหารไทยธนชาต|ทหารไทย|ธนชาต|ออมสิน|ธกส|ยูโอบี|ซีไอเอ็มบี|เกียรตินาคิน|แลนด์แอนด์เฮ้าส์|ทิสโก้|พร้อมเพย์|promptpay|bank)/gi, ' '));
+  }
+
+  function nameLike(line) {
+    var v = stripBankParts(line);
+    if (v.length < 3 || looksLikeGarbage(v)) return '';
+    if (!/[ก-๙A-Za-z]{3}/.test(v)) return '';
+    return v;
+  }
+
+  /* สลิปโอนเงิน: "ร้าน" ที่มีความหมายคือปลายทางที่โอนไป — คน ร้าน หรือบริษัทที่รับเงิน */
   function findPayee(lines) {
-    for (var i = 0; i < lines.length; i++) {
+    var i, j;
+    for (i = 0; i < lines.length; i++) {
       var m = lines[i].match(TO_RE);
-      if (!m) continue;
-      var inline = cleanName(m[2] || '');
-      if (inline.length >= 3 && !BANK_RE.test(inline)) return inline;
-      for (var j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-        var next = cleanName(lines[j]);
-        if (next.length < 3 || BANK_RE.test(next) || looksLikeGarbage(next)) continue;
-        if (!/[ก-๙A-Za-z]{3}/.test(next)) continue;
-        return next;
+      if (!m || FROM_RE.test(lines[i])) continue;
+      var inline = nameLike(m[2] || '');           // ชื่ออยู่บรรทัดเดียวกับป้ายกำกับ
+      if (inline) return inline;
+      for (j = i + 1; j < Math.min(i + 4, lines.length); j++) {   // ชื่ออยู่บรรทัดถัดไป
+        if (TO_RE.test(lines[j]) || FROM_RE.test(lines[j])) break;
+        var next = nameLike(lines[j]);
+        if (next) return next;
       }
+    }
+    // OCR อ่านป้าย "ไปยัง" ไม่ออก — ใช้ชื่อถัดจากชื่อผู้โอน (คนแรกคือผู้โอน คนที่สองคือผู้รับ)
+    for (i = 0; i < lines.length; i++) {
+      if (!FROM_RE.test(lines[i])) continue;
+      var seen = 0;
+      for (j = i + 1; j < lines.length; j++) {
+        var cand = nameLike(lines[j]);
+        if (!cand) continue;
+        seen++;
+        if (seen === 2) return cand;
+      }
+      break;
     }
     return '';
   }
