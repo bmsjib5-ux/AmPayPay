@@ -948,7 +948,8 @@
     }
 
     if (syncUI.step === 'code') {
-      body.innerHTML = '<p class="chart-sub">ส่งรหัส 6 หลักไปที่ <strong>' + esc(syncUI.email) + '</strong> แล้ว</p>' + msg +
+      body.innerHTML = '<p class="chart-sub">ส่งอีเมลไปที่ <strong>' + esc(syncUI.email) + '</strong> แล้ว — ' +
+          'ใส่รหัส 6 หลักจากอีเมล หรือกดลิงก์ในอีเมลก็เข้าได้เลย</p>' + msg +
         '<label class="field" style="margin-top:12px;max-width:220px"><span class="field-label">รหัสจากอีเมล</span>' +
           '<input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" data-sf="code" placeholder="123456"></label>' +
         '<div class="row-actions" style="margin-top:14px">' +
@@ -1090,8 +1091,13 @@
   renderBudgetAlert();
   renderSyncBadge();
   if (CloudSync.isConfigured()) {
+    var cameFromEmailLink = /access_token=|error_description=/.test(location.hash);
     CloudSync.init().then(function (session) {
       renderSyncBadge();
+      if (cameFromEmailLink) {
+        history.replaceState(null, '', location.pathname + location.search);   // ล้าง token ออกจาก URL
+        if (session) toast('ล็อกอินสำเร็จ กำลังซิงก์ข้อมูล…');
+      }
       if (session) runSync(true);
     }).catch(function () { /* ต่อเซิร์ฟเวอร์ไม่ได้ก็ใช้งานออฟไลน์ได้ตามปกติ */ });
   }
