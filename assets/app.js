@@ -237,6 +237,48 @@
     if (status && label) status.textContent = label;
   }
 
+  /* ---------------- กันบันทึกใบเดิมซ้ำ ---------------- */
+  var refCache = {};
+
+  function refOfRecord(rec) {
+    if (!rec.rawText) return '';
+    var key = rec.id + ':' + (rec.updatedAt || 0);
+    if (refCache[key] === undefined) refCache[key] = ReceiptParser.refOf(rec.rawText);
+    return refCache[key];
+  }
+
+  function normName(value) {
+    return String(value || '').toLowerCase().replace(/[^ก-๙a-z0-9]/g, '');
+  }
+
+  /* ถือว่าซ้ำเมื่อ เลขที่รายการบนสลิปตรงกัน หรือ วันที่+ยอดเงิน+ชื่อร้านตรงกัน */
+  function findDuplicate(candidate) {
+    var ref = candidate.rawText ? ReceiptParser.refOf(candidate.rawText) : '';
+    var name = normName(candidate.merchant);
+    var amount = Number(candidate.amount) || 0;
+    var list = ExpenseStore.all();
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (e.id === candidate.id) continue;
+      if (ref && refOfRecord(e) === ref) return { record: e, reason: 'ref' };
+      if (e.date === candidate.date && Math.abs((Number(e.amount) || 0) - amount) < 0.005) {
+        var other = normName(e.merchant);
+        if (other && name && (other === name || other.indexOf(name) === 0 || name.indexOf(other) === 0)) {
+          return { record: e, reason: 'fields' };
+        }
+      }
+    }
+    return null;
+  }
+
+  function duplicateText(dup) {
+    var e = dup.record;
+    var when = dateLabel(e.date);
+    return dup.reason === 'ref'
+      ? 'ใบเสร็จนี้เคยบันทึกไปแล้ว (เลขที่รายการเดียวกัน): ' + e.merchant + ' ' + fmtMoney(e.amount) + ' · ' + when
+      : 'มีรายการที่เหมือนกันอยู่แล้ว: ' + e.merchant + ' ' + fmtMoney(e.amount) + ' · ' + when;
+  }
+
   /* ---------------- คิวใบเสร็จ ---------------- */
   var queue = [];
   var processing = false;
@@ -269,6 +311,9 @@
           '</div>' +
           '<label class="field"><span class="field-label">บันทึกช่วยจำ</span>' +
             '<input type="text" data-f="note" value="' + esc(p.note || '') + '" placeholder="เช่น เลี้ยงข้าวทีม"></label>' +
+          (card.dupHint
+            ? '<p class="banner is-warn" style="margin:0">⚠️ ' + esc(duplicateText(card.dupHint)) + '</p>'
+            : '') +
           (p.amount == null
             ? '<p class="rcard-status is-error"><span>อ่านยอดเงินไม่เจอ กรุณาใส่จำนวนเงินเอง</span></p>'
             : (p.confident ? '' : '<p class="rcard-status"><span>ยอดเงินเป็นการเดาจาก “' + esc((p.amountSource || '').slice(0, 40)) + '” โปรดตรวจสอบ</span></p>')) +
@@ -310,6 +355,17 @@
       if (!silent) { toast('กรุณาใส่จำนวนเงินก่อนบันทึก'); $('[data-f="amount"]', card.el).focus(); }
       return false;
     }
+    var dup = findDuplicate({
+      date: f.date || todayISO(),
+      amount: amount,
+      merchant: f.merchant,
+      rawText: (card.parsed && card.parsed.text) || ''
+    });
+    if (dup) {
+      if (silent) return 'duplicate';                        // โหมดบันทึกทั้งหมด: ข้ามไว้ก่อน แล้วรายงานทีเดียว
+      if (!confirm(duplicateText(dup) + '\n\nต้องการบันทึกซ้ำอีกรายการไหม?')) return false;
+    }
+
     var res = ExpenseStore.add({
       date: f.date || todayISO(),
       merchant: f.merchant,
@@ -376,6 +432,7 @@
       .then(function (parsed) {
         if (!parsed.date) parsed.date = todayISO();
         next.parsed = parsed;
+        next.dupHint = findDuplicate({ date: parsed.date, amount: parsed.amount, merchant: parsed.merchant, rawText: parsed.text });
         next.status = 'done';
         next.statusText = parsed.amount != null
           ? (parsed.isSlip ? 'อ่านสลิปโอนเงินแล้ว — ตรวจสอบข้อมูลก่อนบันทึก'
@@ -445,12 +502,15 @@
 
   $('#saveAllBtn').addEventListener('click', function () {
     var ready = queue.filter(function (c) { return c.status === 'done'; });
-    var saved = 0, lastDate = '';
+    var saved = 0, skipped = 0, lastDate = '';
     ready.forEach(function (c) {
       var d = saveCard(c, true);
+      if (d === 'duplicate') { skipped++; return; }
       if (d) { saved++; lastDate = d; }
     });
-    toast(saved ? saveToast(lastDate, 'บันทึกแล้ว ' + saved + ' รายการ') : 'ยังไม่มีรายการที่กรอกยอดเงินครบ');
+    var summary = saved ? 'บันทึกแล้ว ' + saved + ' รายการ' : 'ยังไม่มีรายการที่กรอกยอดเงินครบ';
+    if (skipped) summary += ' · ข้าม ' + skipped + ' ใบที่ซ้ำกับรายการเดิม (กดบันทึกทีละใบถ้าต้องการเก็บซ้ำ)';
+    toast(saved ? saveToast(lastDate, summary) : summary);
   });
   $('#clearQueueBtn').addEventListener('click', function () {
     queue.slice().forEach(removeCard);
