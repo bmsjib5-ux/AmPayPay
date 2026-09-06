@@ -315,3 +315,24 @@ details.raw pre {
 .bar-fill.is-over { background: var(--crit); }
 
 .ver { color: var(--text-muted); opacity: .7; margin-left: 6px; }
+
+/* ---------- กล่องซิงก์ข้อมูล ---------- */
+.icon-btn.is-on { border-color: var(--good); box-shadow: 0 0 0 2px var(--ok-soft); }
+.banner.is-ok { background: var(--ok-soft); border-color: var(--good); color: var(--ok-ink); }
+
+[hidden] { display: none !important; }
+
+.modal {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(11, 11, 11, .45); padding: 16px; overflow-y: auto;
+}
+.modal-card {
+  background: var(--surface-1); border: 1px solid var(--border-soft); border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .25); padding: 18px; width: 100%; max-width: 460px;
+}
+.modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.modal-head .section-title { flex: 1; }
+.modal code {
+  background: var(--surface-2); border-radius: 5px; padding: 1px 5px; font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

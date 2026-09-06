@@ -903,8 +903,196 @@
     reader.readAsText(file);
   });
 
+  /* ---------------- ซิงก์ข้อมูลกับ Supabase ---------------- */
+  var syncUI = { step: 'signin', email: '', busy: false, message: '', error: '' };
+  var autoSyncTimer = null;
+  var lastSyncFinished = 0;
+
+  function syncTimeLabel() {
+    var ts = ExpenseStore.lastSync.get();
+    if (!ts) return 'ยังไม่เคยซิงก์';
+    var d = new Date(ts + 5000);
+    return 'ซิงก์ล่าสุด ' + d.toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderSyncBadge() {
+    var btn = $('#syncBtn');
+    var on = CloudSync.isConfigured() && !!CloudSync.user();
+    btn.classList.toggle('is-on', on);
+    btn.title = on ? 'ซิงก์ข้อมูล (' + CloudSync.email() + ')' : 'ซิงก์ข้อมูลข้ามเครื่อง';
+  }
+
+  function renderSyncModal() {
+    var body = $('#syncBody');
+    var note = '<p class="chart-sub" style="margin-top:10px">รูปใบเสร็จไม่ถูกอัปโหลด เก็บไว้ในเครื่องนี้เท่านั้น · ซิงก์เฉพาะวันที่ ยอดเงิน ชื่อร้าน หมวด บันทึกช่วยจำ และงบประมาณ</p>';
+    var msg = syncUI.error
+      ? '<p class="banner is-over" style="margin-top:12px">' + esc(syncUI.error) + '</p>'
+      : (syncUI.message ? '<p class="banner is-ok" style="margin-top:12px">' + esc(syncUI.message) + '</p>' : '');
+
+    if (!CloudSync.isConfigured()) {
+      body.innerHTML = '<p class="chart-sub">ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์สำหรับซิงก์</p>' +
+        '<p class="budget-foot">ใส่ Project URL และ anon key ของ Supabase ในไฟล์ <code>assets/config.js</code> ' +
+        'แล้วรัน <code>supabase/schema.sql</code> ใน SQL Editor หนึ่งครั้ง (ดูขั้นตอนใน README)</p>' + note;
+      return;
+    }
+
+    if (CloudSync.user()) {
+      body.innerHTML = '<p class="chart-sub">ล็อกอินเป็น <strong>' + esc(CloudSync.email()) + '</strong></p>' +
+        '<p class="budget-foot">' + esc(syncTimeLabel()) + '</p>' + msg +
+        '<div class="row-actions" style="margin-top:14px">' +
+          '<button class="btn btn-primary btn-sm" data-sync="now"' + (syncUI.busy ? ' disabled' : '') + '>' +
+            (syncUI.busy ? 'กำลังซิงก์…' : 'ซิงก์ตอนนี้') + '</button>' +
+          '<button class="btn btn-ghost btn-sm" data-sync="signout">ออกจากระบบ</button>' +
+        '</div>' + note;
+      return;
+    }
+
+    if (syncUI.step === 'code') {
+      body.innerHTML = '<p class="chart-sub">ส่งรหัส 6 หลักไปที่ <strong>' + esc(syncUI.email) + '</strong> แล้ว</p>' + msg +
+        '<label class="field" style="margin-top:12px;max-width:220px"><span class="field-label">รหัสจากอีเมล</span>' +
+          '<input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" data-sf="code" placeholder="123456"></label>' +
+        '<div class="row-actions" style="margin-top:14px">' +
+          '<button class="btn btn-primary btn-sm" data-sync="verify"' + (syncUI.busy ? ' disabled' : '') + '>' +
+            (syncUI.busy ? 'กำลังตรวจสอบ…' : 'ยืนยันรหัส') + '</button>' +
+          '<button class="btn btn-ghost btn-sm" data-sync="resend">ส่งรหัสใหม่</button>' +
+          '<button class="btn btn-ghost btn-sm" data-sync="back">เปลี่ยนอีเมล</button>' +
+        '</div>' + note;
+      var input = $('[data-sf="code"]', body);
+      if (input) input.focus();
+      return;
+    }
+
+    body.innerHTML = '<p class="chart-sub">ล็อกอินด้วยอีเมล แล้วรายจ่ายจะซิงก์ข้ามมือถือกับคอมให้อัตโนมัติ</p>' + msg +
+      '<label class="field" style="margin-top:12px;max-width:320px"><span class="field-label">อีเมล</span>' +
+        '<input type="email" inputmode="email" autocomplete="email" data-sf="email" value="' + esc(syncUI.email) + '" placeholder="you@example.com"></label>' +
+      '<div class="row-actions" style="margin-top:14px">' +
+        '<button class="btn btn-primary btn-sm" data-sync="send"' + (syncUI.busy ? ' disabled' : '') + '>' +
+          (syncUI.busy ? 'กำลังส่ง…' : 'ส่งรหัสไปที่อีเมล') + '</button>' +
+      '</div>' + note;
+  }
+
+  function openSync() {
+    syncUI.error = '';
+    syncUI.message = '';
+    $('#syncModal').hidden = false;
+    renderSyncModal();
+  }
+
+  function closeSync() { $('#syncModal').hidden = true; }
+
+  function refreshAfterSync() {
+    renderList();
+    renderBudgetAlert();
+    if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+  }
+
+  function runSync(silent) {
+    if (!CloudSync.isConfigured() || !CloudSync.user()) return;
+    syncUI.busy = true;
+    syncUI.error = '';
+    renderSyncModal();
+    CloudSync.syncNow().then(function (counts) {
+      syncUI.busy = false;
+      lastSyncFinished = Date.now();
+      if (!counts || !counts.skipped) {
+        syncUI.message = 'ซิงก์เรียบร้อย · รับมา ' + (counts.pulled || 0) + ' รายการ · ส่งขึ้น ' + (counts.pushed || 0) + ' รายการ';
+        refreshAfterSync();
+        if (!silent && (counts.pulled || counts.pushed)) toast(syncUI.message);
+      }
+      renderSyncModal();
+      renderSyncBadge();
+    }).catch(function (err) {
+      syncUI.busy = false;
+      syncUI.error = err.message || 'ซิงก์ไม่สำเร็จ';
+      renderSyncModal();
+      if (!silent) toast('ซิงก์ไม่สำเร็จ: ' + syncUI.error);
+    });
+  }
+
+  $('#syncBtn').addEventListener('click', openSync);
+  $('#syncModal').addEventListener('click', function (ev) {
+    if (ev.target === this) closeSync();
+    var btn = ev.target.closest('[data-sync]');
+    if (!btn) return;
+    var act = btn.dataset.sync;
+    var body = $('#syncBody');
+
+    if (act === 'close') { closeSync(); return; }
+    if (act === 'back') { syncUI.step = 'signin'; syncUI.error = ''; syncUI.message = ''; renderSyncModal(); return; }
+    if (act === 'now') { runSync(false); return; }
+    if (act === 'signout') {
+      CloudSync.signOut().then(function () {
+        syncUI.step = 'signin';
+        syncUI.message = 'ออกจากระบบแล้ว (ข้อมูลในเครื่องยังอยู่ครบ)';
+        renderSyncModal();
+        renderSyncBadge();
+      });
+      return;
+    }
+    if (act === 'send' || act === 'resend') {
+      var emailInput = $('[data-sf="email"]', body);
+      var email = (emailInput ? emailInput.value : syncUI.email).trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { syncUI.error = 'กรุณาใส่อีเมลให้ถูกต้อง'; renderSyncModal(); return; }
+      syncUI.email = email;
+      syncUI.busy = true;
+      syncUI.error = '';
+      renderSyncModal();
+      CloudSync.sendCode(email).then(function () {
+        syncUI.busy = false;
+        syncUI.step = 'code';
+        syncUI.message = 'ส่งรหัสแล้ว ถ้าไม่เจอในกล่องจดหมาย ลองดูในสแปม';
+        renderSyncModal();
+      }).catch(function (err) {
+        syncUI.busy = false;
+        syncUI.error = err.message;
+        renderSyncModal();
+      });
+      return;
+    }
+    if (act === 'verify') {
+      var codeInput = $('[data-sf="code"]', body);
+      var code = codeInput ? codeInput.value.trim() : '';
+      if (code.length < 4) { syncUI.error = 'กรุณาใส่รหัสจากอีเมล'; renderSyncModal(); return; }
+      syncUI.busy = true;
+      syncUI.error = '';
+      renderSyncModal();
+      CloudSync.verifyCode(syncUI.email, code).then(function () {
+        syncUI.busy = false;
+        syncUI.message = 'ล็อกอินสำเร็จ กำลังซิงก์ข้อมูล…';
+        renderSyncModal();
+        renderSyncBadge();
+        runSync(true);
+      }).catch(function (err) {
+        syncUI.busy = false;
+        syncUI.error = err.message;
+        renderSyncModal();
+      });
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('#syncModal').hidden) closeSync();
+  });
+
+  CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
+
+  /* แก้ข้อมูลในเครื่องแล้วซิงก์ตามให้อัตโนมัติ (หน่วงไว้กันซิงก์ถี่เกินไป) */
+  ExpenseStore.onChange(function () {
+    if (!CloudSync.isConfigured() || !CloudSync.user()) return;
+    if (Date.now() - lastSyncFinished < 4000) return;
+    clearTimeout(autoSyncTimer);
+    autoSyncTimer = setTimeout(function () { runSync(true); }, 3000);
+  });
+
   /* ---------------- เริ่มต้น ---------------- */
   renderQueueHead();
   renderList();
   renderBudgetAlert();
+  renderSyncBadge();
+  if (CloudSync.isConfigured()) {
+    CloudSync.init().then(function (session) {
+      renderSyncBadge();
+      if (session) runSync(true);
+    }).catch(function () { /* ต่อเซิร์ฟเวอร์ไม่ได้ก็ใช้งานออฟไลน์ได้ตามปกติ */ });
+  }
 })();

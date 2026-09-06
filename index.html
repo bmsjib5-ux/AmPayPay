@@ -6,12 +6,13 @@
 <title>สมุดเก็บรายจ่ายของฉัน</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/styles.css?v=10">
+<link rel="stylesheet" href="assets/styles.css?v=11">
 </head>
 <body>
 <header class="topbar">
   <div class="wrap topbar-inner">
     <h1 class="brand"><span aria-hidden="true">🧾</span> สมุดเก็บรายจ่ายของฉัน</h1>
+    <button id="syncBtn" class="icon-btn" type="button" title="ซิงก์ข้อมูลข้ามเครื่อง" aria-label="ซิงก์ข้อมูล">☁️</button>
     <button id="themeBtn" class="icon-btn" type="button" title="สลับธีมสว่าง/มืด" aria-label="สลับธีม">🌗</button>
   </div>
   <nav class="wrap tabs" role="tablist" aria-label="เมนูหลัก">
@@ -139,14 +140,26 @@
 
 <footer class="wrap foot">
   ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
-  <span class="ver">เวอร์ชัน 10</span>
+  <span class="ver">เวอร์ชัน 11</span>
 </footer>
+
+<div id="syncModal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
+    <div class="modal-head">
+      <h2 id="syncTitle" class="section-title">ซิงก์ข้อมูลข้ามเครื่อง</h2>
+      <button class="btn btn-ghost btn-sm" type="button" data-sync="close" aria-label="ปิด">✕</button>
+    </div>
+    <div id="syncBody"></div>
+  </div>
+</div>
 
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/parser.js?v=10"></script>
-<script src="assets/store.js?v=10"></script>
-<script src="assets/app.js?v=10"></script>
+<script src="assets/config.js?v=11"></script>
+<script src="assets/parser.js?v=11"></script>
+<script src="assets/store.js?v=11"></script>
+<script src="assets/sync.js?v=11"></script>
+<script src="assets/app.js?v=11"></script>
 </body>
 </html>
