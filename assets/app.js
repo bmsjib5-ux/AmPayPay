@@ -406,6 +406,7 @@
   function addCard(card) {
     card.el = document.createElement('article');
     card.el.className = 'rcard';
+    if (card.fileName) card.el.dataset.file = card.fileName;
     queue.push(card);
     $('#queue').appendChild(card.el);
     renderCard(card);
@@ -456,8 +457,10 @@
   function intake(files) {
     var images = Array.prototype.filter.call(files || [], function (f) { return /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif|bmp)$/i.test(f.name); });
     if (!images.length) { toast('กรุณาเลือกไฟล์รูปภาพ'); return; }
+    // เรียงรูปที่ถ่ายล่าสุดขึ้นก่อน (เว็บสั่งการเรียงในหน้าต่างเลือกรูปของเครื่องไม่ได้ แต่จัดลำดับหลังเลือกได้)
+    images.sort(function (a, b) { return (b.lastModified || 0) - (a.lastModified || 0); });
     images.forEach(function (file) {
-      var card = { status: 'queued', statusText: 'รออ่าน… (' + file.name + ')', thumb: null, ocrSrc: null, parsed: null };
+      var card = { status: 'queued', statusText: 'รออ่าน… (' + file.name + ')', fileName: file.name, thumb: null, ocrSrc: null, parsed: null };
       addCard(card);
       loadImage(file).then(function (img) {
         card.thumb = resizeToDataURL(img, 360, 0.62);   // เก็บคู่กับรายการ
