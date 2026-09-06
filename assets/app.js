@@ -188,28 +188,44 @@
       .then(function (res) { return (res && res.data && res.data.text) || ''; });
   }
 
-  function mergeParsed(first, both) {
+  /* เทียบยอดเงินจากสองรอบ: เชื่อรอบที่คำใบ้แข็งแรงกว่า ถ้าเท่ากันให้เชื่อเลขที่มีทศนิยม
+     (ยอดในสลิปแทบทั้งหมดลงท้าย .00 — เลขที่ไม่มีทศนิยมมักเป็น OCR อ่านตกหลัก) */
+  function betterAmount(a, b) {
+    if (a.amount == null) return b;
+    if (b.amount == null) return a;
+    if (a.amount === b.amount) return a.amountScore >= b.amountScore ? a : b;
+    if ((a.amountScore || 0) !== (b.amountScore || 0)) return (a.amountScore || 0) > (b.amountScore || 0) ? a : b;
+    if (a.amountHasDecimals !== b.amountHasDecimals) return a.amountHasDecimals ? a : b;
+    return a.amount >= b.amount ? a : b;
+  }
+
+  function mergeParsed(first, second) {
     var out = {};
-    Object.keys(both).forEach(function (k) { out[k] = both[k]; });
-    var keepFirstAmount = first.amount != null &&
-      (both.amount == null || (first.confident && !both.confident));
-    if (keepFirstAmount) {
-      out.amount = first.amount;
-      out.amountSource = first.amountSource;
-      out.confident = first.confident;
-    }
+    Object.keys(second).forEach(function (k) { out[k] = second[k]; });
+    var pick = betterAmount(first, second);
+    out.amount = pick.amount;
+    out.amountSource = pick.amountSource;
+    out.amountScore = pick.amountScore;
+    out.amountHasDecimals = pick.amountHasDecimals;
+    // ถ้าสองรอบได้ยอดไม่ตรงกัน ให้เตือนผู้ใช้ตรวจสอบ
+    out.confident = pick.confident && (first.amount == null || second.amount == null || first.amount === second.amount);
     ['date', 'merchant', 'note'].forEach(function (k) { if (!out[k] && first[k]) out[k] = first[k]; });
     if (!out.items || !out.items.length) out.items = first.items || [];
+    if (!out.text) out.text = first.text;
     return out;
   }
 
   function readReceipt(worker, card, src) {
     return recognizeWith(worker, src, '6').then(function (text1) {
       var first = ReceiptParser.parse(text1);
-      if (first.amount != null && first.confident && first.date) return first;
+      var complete = first.amount != null && first.confident && first.date && first.amountHasDecimals;
+      if (complete) return first;
       setProgress(card, 1, 'ตรวจซ้ำอีกรอบเพื่อความแม่นยำ…');
       return recognizeWith(worker, src, '4').then(function (text2) {
-        return mergeParsed(first, ReceiptParser.parse(text1 + '\n' + text2));
+        var second = ReceiptParser.parse(text2);
+        var merged = mergeParsed(first, second);
+        merged.text = text1 + '\n----- อ่านรอบที่สอง -----\n' + text2;
+        return merged;
       });
     });
   }
