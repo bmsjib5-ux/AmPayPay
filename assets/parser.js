@@ -240,7 +240,11 @@ window.ReceiptParser = (function () {
       // บางใบเสร็จ/สลิปขึ้นบรรทัดใหม่ก่อนตัวเลข
       if (!nums.length && lines[i + 1] && !isBlockedLine(lines[i + 1])) nums = moneyIn(lines[i + 1]);
       // คำใบ้อ่อน (เงินสด/โอนเงิน) ต้องเป็นตัวเลขที่หน้าตาเหมือนเงินจริงๆ เท่านั้น
-      if (hint.w <= 45) nums = nums.filter(function (n) { return n.hasDecimals || n.grouped || n.value >= 10; });
+      // และบรรทัดที่มีเวลาหรือวันที่ (เช่นหัวสลิป "โอนเงินสำเร็จ 4 ก.ย. 69 13:49 น.") ไม่ใช่ยอดเงิน
+      if (hint.w <= 45) {
+        if (/\d{1,2}\s*[:.]\s*\d{2}\s*(น\.|น|am|pm)?/i.test(line) || datesInLine(line).length) return;
+        nums = nums.filter(function (n) { return n.hasDecimals || n.grouped; });
+      }
       if (!nums.length) return;
       var pick = nums[nums.length - 1];
       var score = hint.w + (pick.hasDecimals ? 6 : 0) + (pick.grouped ? 3 : 0) + i * 0.1;

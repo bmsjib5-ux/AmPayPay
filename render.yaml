@@ -15,6 +15,7 @@ services:
         name: Referrer-Policy
         value: no-referrer
       # Tesseract.js ต้องสร้าง Web Worker และโหลด wasm — ห้ามใส่ CSP ที่บล็อก blob:/CDN
-      - path: /assets/*
+      # ห้ามแคชยาว ไม่งั้นมือถือจะค้างอยู่กับโค้ดเก่าหลัง deploy
+      - path: /*
         name: Cache-Control
-        value: public, max-age=3600
+        value: no-cache, must-revalidate
