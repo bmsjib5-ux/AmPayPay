@@ -279,6 +279,30 @@
       : 'มีรายการที่เหมือนกันอยู่แล้ว: ' + e.merchant + ' ' + fmtMoney(e.amount) + ' · ' + when;
   }
 
+  /* ---------------- เดาหมวดจากชื่อร้าน ---------------- */
+  /* หมวดที่ผู้ใช้เคยเลือกให้ร้านนี้ มีน้ำหนักกว่าการเดาจากคำ เพราะเป็นความตั้งใจของเจ้าของข้อมูลเอง */
+  function categoryFromHistory(merchant) {
+    var name = normName(merchant);
+    if (name.length < 3) return '';
+    var counts = {};
+    ExpenseStore.all().forEach(function (e) {
+      var other = normName(e.merchant);
+      if (!other) return;
+      if (other === name || other.indexOf(name) === 0 || name.indexOf(other) === 0) {
+        counts[e.category] = (counts[e.category] || 0) + 1;
+      }
+    });
+    var best = '';
+    Object.keys(counts).forEach(function (k) {
+      if (k !== 'other' && (!best || counts[k] > counts[best])) best = k;
+    });
+    return best;
+  }
+
+  function autoCategory(merchant, note) {
+    return categoryFromHistory(merchant) || ReceiptParser.guessCategory(merchant, note);
+  }
+
   /* ---------------- คิวใบเสร็จ ---------------- */
   var queue = [];
   var processing = false;
@@ -403,6 +427,28 @@
     }
   });
 
+  /* พิมพ์ชื่อร้านเสร็จแล้วเติมหมวดให้เอง ถ้าผู้ใช้ยังไม่ได้เลือกหมวดเอง */
+  document.addEventListener('change', function (ev) {
+    var input = ev.target;
+    if (!input.dataset || (input.dataset.f !== 'merchant' && input.dataset.f !== 'note')) return;
+    var cardEl = input.closest('.rcard');
+    if (!cardEl) return;
+    var select = $('[data-f="category"]', cardEl);
+    if (!select || select.dataset.touched === '1' || select.value !== 'other') return;
+    var merchant = ($('[data-f="merchant"]', cardEl) || {}).value || '';
+    var note = ($('[data-f="note"]', cardEl) || {}).value || '';
+    var guess = autoCategory(merchant, note);
+    if (guess && guess !== 'other') {
+      select.value = guess;
+      toast('เดาหมวดให้เป็น "' + ReceiptParser.categoryLabel(guess) + '" — เปลี่ยนเองได้');
+    }
+  });
+
+  /* ผู้ใช้เลือกหมวดเองแล้ว อย่าไปเปลี่ยนทับ */
+  document.addEventListener('change', function (ev) {
+    if (ev.target.dataset && ev.target.dataset.f === 'category') ev.target.dataset.touched = '1';
+  });
+
   function addCard(card) {
     card.el = document.createElement('article');
     card.el.className = 'rcard';
@@ -432,6 +478,9 @@
       .then(function (worker) { return readReceipt(worker, next, next.ocrSrc); })
       .then(function (parsed) {
         if (!parsed.date) parsed.date = todayISO();
+        var learned = categoryFromHistory(parsed.merchant);
+        if (learned) parsed.category = learned;
+        else if (parsed.category === 'other') parsed.category = ReceiptParser.guessCategory(parsed.merchant, parsed.note);
         next.parsed = parsed;
         next.dupHint = findDuplicate({ date: parsed.date, amount: parsed.amount, merchant: parsed.merchant, rawText: parsed.text });
         next.status = 'done';
