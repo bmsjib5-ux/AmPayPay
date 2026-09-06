@@ -412,3 +412,9 @@ input, select, textarea { font-size: 16px; }
   .tile-label, .tile-foot { font-size: 10.5px; }
   .brand { font-size: 16px; }
 }
+
+/* บนอุปกรณ์ที่ใช้นิ้วแตะ ทุกอย่างที่กดได้ต้องสูงอย่างน้อย 44px รวมช่องเลือกและปุ่มเล็ก */
+@media (pointer: coarse) {
+  .btn-sm { min-height: 44px; min-width: 44px; }
+  input:not(.sr-only), select, textarea { min-height: 44px; }
+}
