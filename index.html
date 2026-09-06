@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สมุดเก็บรายจ่ายของฉัน</title>
+<meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <h1 class="brand"><span aria-hidden="true">🧾</span> สมุดเก็บรายจ่ายของฉัน</h1>
+    <button id="themeBtn" class="icon-btn" type="button" title="สลับธีมสว่าง/มืด" aria-label="สลับธีม">🌗</button>
+  </div>
+  <nav class="wrap tabs" role="tablist" aria-label="เมนูหลัก">
+    <button class="tab is-active" role="tab" aria-selected="true" data-tab="add">เพิ่มรายจ่าย</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="summary">สรุปรายจ่าย</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="list">รายการทั้งหมด</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <!-- ---------- แท็บ: เพิ่มรายจ่าย ---------- -->
+  <section id="panel-add" class="panel is-active" role="tabpanel" aria-label="เพิ่มรายจ่าย">
+    <div id="dropzone" class="dropzone" tabindex="0" role="button"
+         aria-label="เลือกหรือลากรูปใบเสร็จมาวางที่นี่">
+      <div class="dz-icon" aria-hidden="true">📷</div>
+      <p class="dz-title">ลากรูปใบเสร็จมาวาง หรือกดเพื่อเลือกไฟล์</p>
+      <p class="dz-sub">รองรับ JPG / PNG / HEIC หลายไฟล์พร้อมกัน · อ่านข้อความไทย–อังกฤษในเครื่องคุณเอง</p>
+      <div class="dz-actions">
+        <button id="pickBtn" class="btn btn-primary" type="button">เลือกรูปใบเสร็จ</button>
+        <button id="camBtn" class="btn" type="button">ถ่ายรูป</button>
+        <button id="manualBtn" class="btn btn-ghost" type="button">กรอกเอง</button>
+      </div>
+      <input id="fileInput" class="sr-only" type="file" accept="image/*" multiple>
+      <input id="camInput" class="sr-only" type="file" accept="image/*" capture="environment">
+    </div>
+
+    <p id="ocrStatus" class="ocr-status" role="status" aria-live="polite"></p>
+
+    <div id="queueHead" class="queue-head" hidden>
+      <h2 class="section-title">ใบเสร็จที่รออ่าน/รอบันทึก <span id="queueCount" class="pill"></span></h2>
+      <div class="row-actions">
+        <button id="saveAllBtn" class="btn btn-primary" type="button">บันทึกทั้งหมด</button>
+        <button id="clearQueueBtn" class="btn btn-ghost" type="button">ล้างรายการ</button>
+      </div>
+    </div>
+    <div id="queue" class="queue"></div>
+
+    <p class="hint">
+      เคล็ดลับให้อ่านแม่น: ถ่ายใบเสร็จให้เต็มกรอบ แสงสม่ำเสมอ ไม่เอียง และไม่มีเงาทับตัวเลข ·
+      ถ้าอ่านผิดสามารถแก้ตัวเลขในช่องก่อนกดบันทึกได้เสมอ
+    </p>
+  </section>
+
+  <!-- ---------- แท็บ: สรุป ---------- -->
+  <section id="panel-summary" class="panel" role="tabpanel" aria-label="สรุปรายจ่าย" hidden>
+    <div class="filters">
+      <label class="field">
+        <span class="field-label">เดือน</span>
+        <select id="sumMonth"></select>
+      </label>
+    </div>
+
+    <div class="tiles">
+      <div class="tile">
+        <span class="tile-label">รวมทั้งเดือน</span>
+        <strong id="sumTotal" class="tile-value">฿0</strong>
+        <span id="sumCompare" class="tile-foot"></span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">จำนวนรายการ</span>
+        <strong id="sumCount" class="tile-value">0</strong>
+        <span class="tile-foot">รายการที่บันทึกไว้</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">เฉลี่ยต่อรายการ</span>
+        <strong id="sumAvg" class="tile-value">฿0</strong>
+        <span id="sumTop" class="tile-foot"></span>
+      </div>
+    </div>
+
+    <figure class="chart-card">
+      <figcaption>
+        <h2 class="section-title">รายจ่ายแยกตามหมวด</h2>
+        <p class="chart-sub" id="catSub">หน่วย: บาท</p>
+      </figcaption>
+      <div id="catChart" class="bars"></div>
+    </figure>
+
+    <figure class="chart-card">
+      <figcaption>
+        <h2 class="section-title">แนวโน้ม 6 เดือนล่าสุด</h2>
+        <p class="chart-sub">ยอดรวมรายเดือน (บาท)</p>
+      </figcaption>
+      <div id="trendChart" class="trend"></div>
+    </figure>
+
+    <div class="chart-card">
+      <h2 class="section-title">ร้าน/ผู้ขายที่จ่ายบ่อยที่สุด</h2>
+      <ol id="topMerchants" class="rank"></ol>
+    </div>
+  </section>
+
+  <!-- ---------- แท็บ: รายการ ---------- -->
+  <section id="panel-list" class="panel" role="tabpanel" aria-label="รายการทั้งหมด" hidden>
+    <div class="filters">
+      <label class="field grow">
+        <span class="field-label">ค้นหา</span>
+        <input id="q" type="search" placeholder="ชื่อร้าน, หมวด, บันทึกช่วยจำ…">
+      </label>
+      <label class="field">
+        <span class="field-label">หมวด</span>
+        <select id="fCat"></select>
+      </label>
+      <label class="field">
+        <span class="field-label">เดือน</span>
+        <select id="fMonth"></select>
+      </label>
+    </div>
+    <div class="row-actions list-actions">
+      <span id="listSummary" class="muted"></span>
+      <span class="spacer"></span>
+      <button id="csvBtn" class="btn" type="button">ดาวน์โหลด CSV</button>
+      <button id="backupBtn" class="btn" type="button">สำรองข้อมูล</button>
+      <button id="restoreBtn" class="btn" type="button">กู้คืนข้อมูล</button>
+      <input id="restoreInput" class="sr-only" type="file" accept="application/json">
+    </div>
+    <div id="expenseList" class="cards"></div>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="assets/parser.js"></script>
+<script src="assets/store.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
