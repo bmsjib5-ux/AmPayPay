@@ -1016,6 +1016,105 @@
     reader.readAsText(file);
   });
 
+  /* ---------------- สมุดหลายเล่ม ---------------- */
+  function renderBookBar() {
+    var select = $('#bookSelect');
+    var books = ExpenseStore.books();
+    var current = ExpenseStore.currentBook();
+    select.innerHTML = books.map(function (b) {
+      return '<option value="' + esc(b.id) + '"' + (b.id === current ? ' selected' : '') + '>' +
+        esc(b.name) + ' (' + ExpenseStore.countInBook(b.id) + ')</option>';
+    }).join('');
+  }
+
+  function switchBook(id) {
+    ExpenseStore.setCurrentBook(id);
+    queue.slice().forEach(removeCard);         // ใบเสร็จที่ค้างในคิวเป็นของสมุดเดิม
+    $('#ocrStatus').textContent = '';
+    renderBookBar();
+    renderList();
+    renderBudgetAlert();
+    if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+    toast('เปลี่ยนไปสมุด "' + ExpenseStore.currentBookName() + '"');
+  }
+
+  function renderBookModal() {
+    var books = ExpenseStore.books();
+    var current = ExpenseStore.currentBook();
+    $('#bookBody').innerHTML =
+      '<p class="chart-sub">แยกรายจ่ายเป็นหลายเล่มได้ เช่น ส่วนตัว · ร้านค้า · บ้าน — แต่ละเล่มมีงบประมาณและสรุปของตัวเอง</p>' +
+      '<div class="book-list">' +
+        books.map(function (b) {
+          return '<div class="book-row' + (b.id === current ? ' is-current' : '') + '" data-id="' + esc(b.id) + '">' +
+            '<div class="book-info">' +
+              '<span class="book-name">' + esc(b.name) + (b.id === current ? ' <span class="chip is-ok">กำลังใช้</span>' : '') + '</span>' +
+              '<span class="book-count">' + ExpenseStore.countInBook(b.id) + ' รายการ</span>' +
+            '</div>' +
+            '<div class="row-actions">' +
+              (b.id === current ? '' : '<button class="btn btn-sm" data-book="use">เปิดสมุดนี้</button>') +
+              '<button class="btn btn-ghost btn-sm" data-book="rename">เปลี่ยนชื่อ</button>' +
+              (books.length > 1 ? '<button class="btn btn-ghost btn-sm btn-danger" data-book="delete">ลบ</button>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+      '<div class="row-actions" style="margin-top:14px">' +
+        '<input type="text" id="newBookName" placeholder="ชื่อสมุดใหม่ เช่น ร้านกาแฟ" style="flex:1;min-width:150px">' +
+        '<button class="btn btn-primary btn-sm" data-book="add">สร้างสมุด</button>' +
+      '</div>';
+  }
+
+  $('#bookSelect').addEventListener('change', function () { switchBook(this.value); });
+  $('#bookManageBtn').addEventListener('click', function () {
+    $('#bookModal').hidden = false;
+    renderBookModal();
+  });
+
+  $('#bookModal').addEventListener('click', function (ev) {
+    if (ev.target === this) { closeBookModal(); return; }
+    var btn = ev.target.closest('[data-book]');
+    if (!btn) return;
+    var act = btn.dataset.book;
+    var row = btn.closest('.book-row');
+    var id = row ? row.dataset.id : '';
+
+    if (act === 'close') { closeBookModal(); return; }
+    if (act === 'add') {
+      var input = $('#newBookName');
+      var book = ExpenseStore.addBook(input.value);
+      input.value = '';
+      switchBook(book.id);
+      renderBookModal();
+      toast('สร้างสมุด "' + book.name + '" แล้ว');
+      return;
+    }
+    if (act === 'use') { switchBook(id); renderBookModal(); return; }
+    if (act === 'rename') {
+      var books = ExpenseStore.books();
+      var found = books.filter(function (b) { return b.id === id; })[0];
+      var name = prompt('ชื่อสมุดใหม่', found ? found.name : '');
+      if (name === null) return;
+      ExpenseStore.renameBook(id, name);
+      renderBookBar();
+      renderBookModal();
+      return;
+    }
+    if (act === 'delete') {
+      var count = ExpenseStore.countInBook(id);
+      if (!confirm('ลบสมุดนี้ใช่ไหม? รายการในสมุด ' + count + ' รายการจะถูกลบไปด้วย')) return;
+      var res = ExpenseStore.removeBook(id);
+      if (!res.ok) { toast('ต้องเหลือสมุดอย่างน้อยหนึ่งเล่ม'); return; }
+      renderBookBar();
+      renderBookModal();
+      renderList();
+      renderBudgetAlert();
+      if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+      toast('ลบสมุดแล้ว');
+    }
+  });
+
+  function closeBookModal() { $('#bookModal').hidden = true; }
+
   /* ---------------- ซิงก์ข้อมูลกับ Supabase ---------------- */
   var syncUI = { step: 'password', email: '', busy: false, message: '', error: '' };
   var autoSyncTimer = null;
@@ -1240,7 +1339,9 @@
   });
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !$('#syncModal').hidden) closeSync();
+    if (e.key !== 'Escape') return;
+    if (!$('#syncModal').hidden) closeSync();
+    if (!$('#bookModal').hidden) closeBookModal();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
@@ -1255,9 +1356,11 @@
 
   /* ---------------- เริ่มต้น ---------------- */
   renderQueueHead();
+  renderBookBar();
   renderList();
   renderBudgetAlert();
   renderSyncBadge();
+  ExpenseStore.onChange(function () { renderBookBar(); });
   if (CloudSync.isConfigured()) {
     var cameFromEmailLink = /access_token=|error_description=/.test(location.hash);
     CloudSync.init().then(function (session) {

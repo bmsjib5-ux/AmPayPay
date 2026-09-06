@@ -418,3 +418,18 @@ input, select, textarea { font-size: 16px; }
   .btn-sm { min-height: 44px; min-width: 44px; }
   input:not(.sr-only), select, textarea { min-height: 44px; }
 }
+
+/* ---------- แถบเลือกสมุด ---------- */
+.bookbar { background: var(--surface-2); border-bottom: 1px solid var(--border-soft); }
+.bookbar-inner { display: flex; align-items: center; gap: 8px; padding-block: 8px; }
+.bookbar-icon { font-size: 15px; }
+.bookbar select { flex: 1; min-width: 0; max-width: 320px; background: var(--surface-1); }
+.book-list { display: grid; gap: 8px; margin-top: 12px; }
+.book-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px 12px; background: var(--surface-1);
+}
+.book-row.is-current { border-color: var(--accent); background: var(--accent-soft); }
+.book-info { flex: 1; min-width: 140px; display: grid; gap: 2px; }
+.book-name { font-weight: 600; }
+.book-count { font-size: 12.5px; color: var(--text-muted); }
