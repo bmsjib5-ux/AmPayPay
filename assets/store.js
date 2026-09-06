@@ -4,6 +4,7 @@ window.ExpenseStore = (function () {
 
   var KEY = 'expense-book:v1';
   var THEME_KEY = 'expense-book:theme';
+  var BUDGET_KEY = 'expense-book:budget:v1';
   var cache = null;
 
   function read() {
@@ -94,6 +95,28 @@ window.ExpenseStore = (function () {
     replaceAll: function (list) {
       var cleaned = (list || []).filter(function (e) { return e && e.date && e.amount; }).map(clean);
       return write(cleaned);
+    },
+    budget: {
+      get: function () {
+        var b = null;
+        try { b = JSON.parse(localStorage.getItem(BUDGET_KEY) || 'null'); } catch (e) { b = null; }
+        if (!b || typeof b !== 'object') b = {};
+        return {
+          total: Number(b.total) > 0 ? Number(b.total) : 0,
+          categories: (b.categories && typeof b.categories === 'object') ? b.categories : {}
+        };
+      },
+      set: function (b) {
+        var cats = {};
+        Object.keys((b && b.categories) || {}).forEach(function (k) {
+          var v = Number(b.categories[k]);
+          if (v > 0) cats[k] = v;
+        });
+        try {
+          localStorage.setItem(BUDGET_KEY, JSON.stringify({ total: Number(b.total) > 0 ? Number(b.total) : 0, categories: cats }));
+          return true;
+        } catch (e) { return false; }
+      }
     },
     theme: {
       get: function () { try { return localStorage.getItem(THEME_KEY) || 'system'; } catch (e) { return 'system'; } },
