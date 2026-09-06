@@ -540,6 +540,22 @@ window.ReceiptParser = (function () {
     return '';
   }
 
+  var REF_KEYS = ['เลขที่รายการ', 'รหัสอ้างอิง', 'เลขที่อ้างอิง', 'หมายเลขอ้างอิง', 'รหัสธุรกรรม'];
+  var REF_EN_RE = /(reference|ref\s*no|transaction\s*(id|no))\s*[:：]?\s*([A-Za-z0-9]{6,})/i;
+
+  /* เลขอ้างอิงของสลิป — ถ้าตรงกันแปลว่าเป็นใบเดียวกันแน่ๆ */
+  function findRef(lines) {
+    for (var i = 0; i < lines.length; i++) {
+      var en = lines[i].match(REF_EN_RE);
+      var tail = en ? en[3] : tailAfter(lines[i], REF_KEYS);
+      if (tail === null) continue;
+      var value = String(tail).replace(/[^A-Za-z0-9]/g, '');
+      if (!value && lines[i + 1]) value = String(lines[i + 1]).replace(/[^A-Za-z0-9]/g, '');
+      if (value.length >= 8) return value.toUpperCase().slice(0, 40);
+    }
+    return '';
+  }
+
   function guessCategory(text) {
     var hay = text.toLowerCase();
     var best = null;
@@ -583,6 +599,7 @@ window.ReceiptParser = (function () {
       amountScore: amountInfo.amountScore,
       amountHasDecimals: amountInfo.amountHasDecimals,
       note: note,
+      ref: findRef(lines),
       category: guessCategory(text + ' ' + note),
       items: isSlip ? [] : findItems(lines)
     };
@@ -597,6 +614,8 @@ window.ReceiptParser = (function () {
       return OTHER.label;
     },
     toNumber: toNumber,
-    normalizeText: normalizeText
+    normalizeText: normalizeText,
+    /* ใช้ตรวจว่าใบเสร็จนี้เคยบันทึกไปแล้วหรือยัง */
+    refOf: function (rawText) { return findRef(normalizeText(rawText || '').split('\n')); }
   };
 })();
