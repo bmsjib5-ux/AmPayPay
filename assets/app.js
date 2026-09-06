@@ -270,7 +270,8 @@
     });
     if (!res.result.ok) toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — บันทึกข้อมูลแล้วแต่ต้องลบรูปย่อบางส่วนออก');
     removeCard(card);
-    return true;
+    renderBudgetAlert();
+    return res.record.date;
   }
 
   document.addEventListener('click', function (ev) {
@@ -281,7 +282,10 @@
     var card = queue.filter(function (c) { return c.el === cardEl; })[0];
     if (!card) return;
     var act = btn.dataset.act;
-    if (act === 'save') { if (saveCard(card)) toast('บันทึกรายจ่ายแล้ว'); }
+    if (act === 'save') {
+      var savedDate = saveCard(card);
+      if (savedDate) toast(saveToast(savedDate, 'บันทึกรายจ่ายแล้ว'));
+    }
     else if (act === 'drop') removeCard(card);
     else if (act === 'retry') { card.status = 'queued'; card.statusText = 'รออ่าน…'; renderCard(card); pump(); }
     else if (act === 'manual') {
@@ -390,13 +394,167 @@
 
   $('#saveAllBtn').addEventListener('click', function () {
     var ready = queue.filter(function (c) { return c.status === 'done'; });
-    var saved = 0;
-    ready.forEach(function (c) { if (saveCard(c, true)) saved++; });
-    toast(saved ? 'บันทึกแล้ว ' + saved + ' รายการ' : 'ยังไม่มีรายการที่กรอกยอดเงินครบ');
+    var saved = 0, lastDate = '';
+    ready.forEach(function (c) {
+      var d = saveCard(c, true);
+      if (d) { saved++; lastDate = d; }
+    });
+    toast(saved ? saveToast(lastDate, 'บันทึกแล้ว ' + saved + ' รายการ') : 'ยังไม่มีรายการที่กรอกยอดเงินครบ');
   });
   $('#clearQueueBtn').addEventListener('click', function () {
     queue.slice().forEach(removeCard);
     $('#ocrStatus').textContent = '';
+  });
+
+  /* ---------------- งบประมาณรายเดือน ---------------- */
+  var budgetEditing = false;
+
+  function budgetStatus(key) {
+    var b = ExpenseStore.budget.get();
+    var inMonth = ExpenseStore.all().filter(function (e) { return monthKey(e.date) === key; });
+    var used = sumOf(inMonth);
+    var byCat = {};
+    inMonth.forEach(function (e) { byCat[e.category] = (byCat[e.category] || 0) + (Number(e.amount) || 0); });
+    var pct = b.total ? (used / b.total) * 100 : 0;
+    return {
+      limit: b.total, categories: b.categories, usedByCat: byCat,
+      used: used, pct: pct, remaining: b.total - used,
+      level: !b.total ? 'none' : (pct >= 100 ? 'over' : (pct >= 80 ? 'warn' : 'ok'))
+    };
+  }
+
+  var LEVEL_CHIP = {
+    ok:   { cls: 'is-ok',   text: '✓ อยู่ในงบ' },
+    warn: { cls: 'is-warn', text: '! ใกล้เต็มงบ' },
+    over: { cls: 'is-over', text: '⚠ ใช้เกินงบ' }
+  };
+
+  function daysLeftInMonth(key) {
+    if (key !== monthKey(todayISO())) return 0;
+    var now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1;
+  }
+
+  function budgetForm(st) {
+    var cats = CATS.filter(function (c) { return c.key !== 'other'; });
+    return '<h2 class="section-title">ตั้งงบประมาณรายเดือน</h2>' +
+      '<p class="chart-sub">งบนี้ใช้กับทุกเดือน · เว้นว่างหรือใส่ 0 = ไม่จำกัด</p>' +
+      '<label class="field" style="max-width:260px;margin-top:14px">' +
+        '<span class="field-label">งบรวมต่อเดือน (บาท)</span>' +
+        '<input type="number" min="0" step="100" inputmode="decimal" data-bf="total" value="' + (st.limit || '') + '" placeholder="เช่น 15000">' +
+      '</label>' +
+      '<details class="raw" style="margin-top:14px"><summary>ตั้งงบรายหมวด (ไม่บังคับ)</summary>' +
+        '<div class="grid2" style="margin-top:10px">' +
+          cats.map(function (c) {
+            return '<label class="field"><span class="field-label">' + esc(c.label) + '</span>' +
+              '<input type="number" min="0" step="100" inputmode="decimal" data-bcat="' + c.key + '" value="' +
+              (st.categories[c.key] || '') + '" placeholder="ไม่จำกัด"></label>';
+          }).join('') +
+        '</div>' +
+      '</details>' +
+      '<div class="row-actions" style="margin-top:14px">' +
+        '<button class="btn btn-primary btn-sm" data-bact="save">บันทึกงบ</button>' +
+        '<button class="btn btn-ghost btn-sm" data-bact="cancel">ยกเลิก</button>' +
+        (st.limit ? '<button class="btn btn-ghost btn-sm btn-danger" data-bact="clear">ล้างงบทั้งหมด</button>' : '') +
+      '</div>';
+  }
+
+  function renderBudgetCard(key) {
+    var el = $('#budgetCard');
+    var st = budgetStatus(key);
+
+    if (budgetEditing) { el.innerHTML = budgetForm(st); return; }
+
+    if (!st.limit) {
+      el.innerHTML = '<div class="budget-empty">' +
+        '<div><h2 class="section-title">ยังไม่ได้ตั้งงบประมาณ</h2>' +
+        '<p class="chart-sub">ตั้งงบไว้ แล้วระบบจะเตือนเมื่อใช้ถึง 80% และเมื่อใช้เกินงบ</p></div>' +
+        '<button class="btn btn-primary" data-bact="edit">ตั้งงบประมาณ</button></div>';
+      return;
+    }
+
+    var chip = LEVEL_CHIP[st.level];
+    var days = daysLeftInMonth(key);
+    var perDay = days > 0 && st.remaining > 0 ? st.remaining / days : 0;
+    var foot;
+    if (st.remaining < 0) foot = 'เกินงบไปแล้ว <strong>' + esc(fmtMoney(-st.remaining)) + '</strong>';
+    else if (days > 0) foot = 'เหลือ <strong>' + esc(fmtMoney(st.remaining)) + '</strong> · อีก ' + days +
+      ' วันจะสิ้นเดือน ใช้ได้เฉลี่ยวันละ ' + esc(fmtMoney(perDay));
+    else foot = 'เหลือ <strong>' + esc(fmtMoney(st.remaining)) + '</strong> จากงบทั้งเดือน';
+
+    el.innerHTML =
+      '<div class="budget-head">' +
+        '<div><h2 class="section-title">งบประมาณ ' + esc(monthLabel(key)) + '</h2>' +
+        '<p class="chart-sub">ใช้ไป ' + esc(fmtMoney(st.used)) + ' จากงบ ' + esc(fmtMoney(st.limit)) + '</p></div>' +
+        '<span class="chip ' + chip.cls + '">' + chip.text + ' ' + Math.floor(st.pct) + '%</span>' +
+        '<button class="btn btn-ghost btn-sm" data-bact="edit">แก้ไขงบ</button>' +
+      '</div>' +
+      '<div class="meter" role="img" aria-label="ใช้ไป ' + Math.floor(st.pct) + ' เปอร์เซ็นต์ของงบเดือนนี้">' +
+        '<span class="meter-fill ' + chip.cls + '" style="width:' + Math.min(100, Math.round(st.pct)) + '%"></span>' +
+      '</div>' +
+      '<p class="budget-foot">' + foot + '</p>';
+  }
+
+  function renderBudgetAlert() {
+    var el = $('#budgetAlert');
+    var key = monthKey(todayISO());
+    var st = budgetStatus(key);
+    if (st.level === 'over') {
+      el.className = 'banner is-over';
+      el.innerHTML = '<strong>⚠️ เดือนนี้ใช้เกินงบแล้ว</strong> ใช้ไป ' + esc(fmtMoney(st.used)) +
+        ' จากงบ ' + esc(fmtMoney(st.limit)) + ' — เกินมา ' + esc(fmtMoney(-st.remaining));
+      el.hidden = false;
+    } else if (st.level === 'warn') {
+      el.className = 'banner is-warn';
+      el.innerHTML = '<strong>ใกล้เต็มงบแล้ว</strong> ใช้ไป ' + Math.floor(st.pct) + '% ของงบเดือนนี้ · เหลืออีก ' +
+        esc(fmtMoney(st.remaining));
+      el.hidden = false;
+    } else {
+      el.hidden = true;
+      el.innerHTML = '';
+    }
+  }
+
+  /* ข้อความแจ้งเตือนหลังบันทึกรายจ่าย — ถ้าใกล้เต็มหรือเกินงบให้เตือนแทนข้อความปกติ */
+  function saveToast(dateISO, fallback) {
+    var key = monthKey(dateISO || todayISO());
+    var st = budgetStatus(key);
+    if (st.level === 'over') return '⚠️ ' + monthLabel(key) + ' ใช้เกินงบแล้ว ' + fmtMoney(-st.remaining);
+    if (st.level === 'warn') return 'ใช้ไปแล้ว ' + Math.floor(st.pct) + '% ของงบเดือนนี้ · เหลือ ' + fmtMoney(st.remaining);
+    return fallback;
+  }
+
+  $('#budgetCard').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-bact]');
+    if (!btn) return;
+    var act = btn.dataset.bact;
+    var key = $('#sumMonth').value || monthKey(todayISO());
+    if (act === 'edit') { budgetEditing = true; renderBudgetCard(key); }
+    else if (act === 'cancel') { budgetEditing = false; renderBudgetCard(key); }
+    else if (act === 'clear') {
+      if (!confirm('ล้างงบประมาณทั้งหมดใช่ไหม?')) return;
+      ExpenseStore.budget.set({ total: 0, categories: {} });
+      budgetEditing = false;
+      renderSummary();
+      renderBudgetAlert();
+      toast('ล้างงบประมาณแล้ว');
+    } else if (act === 'save') {
+      var card = $('#budgetCard');
+      var cats = {};
+      card.querySelectorAll('[data-bcat]').forEach(function (input) {
+        var v = ReceiptParser.toNumber(input.value);
+        if (v > 0) cats[input.dataset.bcat] = v;
+      });
+      var total = ReceiptParser.toNumber($('[data-bf="total"]', card).value) || 0;
+      if (!ExpenseStore.budget.set({ total: total, categories: cats })) {
+        toast('บันทึกงบไม่สำเร็จ — พื้นที่เก็บข้อมูลเต็ม');
+        return;
+      }
+      budgetEditing = false;
+      renderSummary();
+      renderBudgetAlert();
+      toast(total ? 'ตั้งงบเดือนละ ' + fmtMoney(total) + ' แล้ว' : 'ล้างงบรวมแล้ว');
+    }
   });
 
   /* ---------------- สรุปรายจ่าย ---------------- */
@@ -426,6 +584,8 @@
     var select = $('#sumMonth');
     fillMonthSelect(select);
     var key = select.value;
+    renderBudgetCard(key);
+    var budget = ExpenseStore.budget.get();
     var all = ExpenseStore.all();
     var inMonth = all.filter(function (e) { return monthKey(e.date) === key; });
     var total = sumOf(inMonth);
@@ -455,9 +615,17 @@
     $('#catSub').textContent = rows.length ? 'ทั้งหมด ' + rows.length + ' หมวด · หน่วย: บาท' : '';
     $('#catChart').innerHTML = rows.length ? rows.map(function (r) {
       var pct = total ? Math.round(r.value / total * 100) : 0;
+      var cap = budget.categories[r.key];
+      var over = cap && r.value > cap;
+      var sub = '';
+      if (cap) {
+        sub = over
+          ? '<span class="bar-sub is-over">เกินงบ ' + esc(moneyShort.format(r.value - cap)) + ' (งบ ' + esc(moneyShort.format(cap)) + ')</span>'
+          : '<span class="bar-sub">งบ ' + esc(moneyShort.format(cap)) + ' · ใช้ไป ' + Math.round(r.value / cap * 100) + '%</span>';
+      }
       return '<div class="bar-row">' +
-        '<span class="bar-name" title="' + esc(r.label) + '">' + esc(r.label) + '</span>' +
-        '<span class="bar-track"><span class="bar-fill" style="width:' + (max ? Math.max(2, r.value / max * 100) : 0) + '%"></span></span>' +
+        '<span class="bar-name"><span class="bar-label" title="' + esc(r.label) + '">' + esc(r.label) + '</span>' + sub + '</span>' +
+        '<span class="bar-track"><span class="bar-fill' + (over ? ' is-over' : '') + '" style="width:' + (max ? Math.max(2, r.value / max * 100) : 0) + '%"></span></span>' +
         '<span class="bar-value">' + moneyShort.format(r.value) + '<span class="bar-pct">' + pct + '%</span></span>' +
       '</div>';
     }).join('') : '<p class="empty">ยังไม่มีรายจ่ายในเดือนนี้</p>';
@@ -601,6 +769,7 @@
       if (!confirm('ลบรายจ่าย "' + exp.merchant + '" ' + fmtMoney(exp.amount) + ' ใช่ไหม?')) return;
       ExpenseStore.remove(id);
       renderList();
+      renderBudgetAlert();
       toast('ลบรายการแล้ว');
     } else if (act === 'edit') {
       if ($('.ecard-edit', card)) return;
@@ -616,7 +785,8 @@
       patch.amount = amount;
       ExpenseStore.update(id, patch);
       renderList();
-      toast('แก้ไขเรียบร้อย');
+      renderBudgetAlert();
+      toast(saveToast(patch.date, 'แก้ไขเรียบร้อย'));
     }
   });
 
@@ -648,7 +818,12 @@
   });
 
   $('#backupBtn').addEventListener('click', function () {
-    var data = { version: 1, exportedAt: new Date().toISOString(), expenses: ExpenseStore.all() };
+    var data = {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      budget: ExpenseStore.budget.get(),
+      expenses: ExpenseStore.all()
+    };
     download('expense-book-backup-' + todayISO() + '.json', JSON.stringify(data, null, 2), 'application/json');
     toast('สำรองข้อมูลแล้ว');
   });
@@ -666,7 +841,9 @@
         if (!Array.isArray(list)) throw new Error('รูปแบบไฟล์ไม่ถูกต้อง');
         if (!confirm('กู้คืน ' + list.length + ' รายการ และแทนที่ข้อมูลเดิมทั้งหมดใช่ไหม?')) return;
         ExpenseStore.replaceAll(list);
+        if (data && data.budget) ExpenseStore.budget.set(data.budget);
         renderList();
+        renderBudgetAlert();
         toast('กู้คืนข้อมูลแล้ว');
       } catch (err) {
         toast('อ่านไฟล์สำรองไม่สำเร็จ: ' + err.message);
@@ -678,4 +855,5 @@
   /* ---------------- เริ่มต้น ---------------- */
   renderQueueHead();
   renderList();
+  renderBudgetAlert();
 })();
