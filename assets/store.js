@@ -6,6 +6,7 @@ window.ExpenseStore = (function () {
   var THEME_KEY = 'expense-book:theme';
   var BUDGET_KEY = 'expense-book:budget:v1';
   var SYNC_KEY = 'expense-book:lastSync';
+  var DIRTY_KEY = 'expense-book:dirty';
   var cache = null;
   var listeners = [];
 
@@ -46,6 +47,31 @@ window.ExpenseStore = (function () {
     listeners.forEach(function (fn) {
       try { fn(); } catch (e) {}
     });
+  }
+
+
+  /* จำว่ารายการไหนแก้ในเครื่องแล้วยังไม่ได้ส่งขึ้นเซิร์ฟเวอร์ จะได้ส่งเฉพาะที่จำเป็น */
+  function readDirty() {
+    try {
+      var d = JSON.parse(localStorage.getItem(DIRTY_KEY) || '{}');
+      return { ids: (d && d.ids) || {}, budget: !!(d && d.budget) };
+    } catch (e) { return { ids: {}, budget: false }; }
+  }
+
+  function writeDirty(d) {
+    try { localStorage.setItem(DIRTY_KEY, JSON.stringify(d)); } catch (e) {}
+  }
+
+  function markDirty(id) {
+    var d = readDirty();
+    d.ids[id] = 1;
+    writeDirty(d);
+  }
+
+  function markBudgetDirty() {
+    var d = readDirty();
+    d.budget = true;
+    writeDirty(d);
   }
 
   function sortByDateDesc(list) {
@@ -94,6 +120,7 @@ window.ExpenseStore = (function () {
       var rec = clean(exp);
       rec.updatedAt = Date.now();
       list.push(rec);
+      markDirty(rec.id);
       return { record: rec, result: write(list) };
     },
     update: function (id, patch) {
@@ -102,6 +129,7 @@ window.ExpenseStore = (function () {
         if (list[i].id === id) {
           list[i] = clean(Object.assign({}, list[i], patch, { id: id }));
           list[i].updatedAt = Date.now();
+          markDirty(id);
           break;
         }
       }
@@ -115,6 +143,7 @@ window.ExpenseStore = (function () {
           list[i].deleted = true;
           list[i].image = null;
           list[i].updatedAt = Date.now();
+          markDirty(id);
           break;
         }
       }
@@ -125,14 +154,28 @@ window.ExpenseStore = (function () {
       var cleaned = (list || []).filter(function (e) { return e && e.date && e.amount; }).map(function (e) {
         var rec = clean(e);
         rec.updatedAt = now;
+        markDirty(rec.id);
         return rec;
       });
       return write(cleaned);
     },
 
     /* ---------- ส่วนที่ใช้ตอนซิงก์ ---------- */
-    changedSince: function (ts) {
-      return read().filter(function (e) { return (e.updatedAt || 0) > (ts || 0); });
+    /* รายการที่แก้ในเครื่องและยังไม่ได้ส่งขึ้นเซิร์ฟเวอร์ */
+    pendingRecords: function () {
+      var dirty = readDirty().ids;
+      return read().filter(function (e) { return dirty[e.id]; });
+    },
+    clearPending: function (ids) {
+      var d = readDirty();
+      (ids || []).forEach(function (id) { delete d.ids[id]; });
+      writeDirty(d);
+    },
+    budgetPending: function () { return readDirty().budget; },
+    clearBudgetPending: function () {
+      var d = readDirty();
+      d.budget = false;
+      writeDirty(d);
     },
     /* รวมข้อมูลจากเซิร์ฟเวอร์เข้ากับของในเครื่อง — ฝั่งที่แก้ล่าสุดชนะ */
     mergeRemote: function (rows) {
@@ -186,6 +229,7 @@ window.ExpenseStore = (function () {
             categories: cats,
             updatedAt: keepTimestamp && b.updatedAt ? Number(b.updatedAt) : Date.now()
           }));
+          if (!keepTimestamp) markBudgetDirty();
           notify();
           return true;
         } catch (e) { return false; }

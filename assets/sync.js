@@ -174,13 +174,15 @@ window.CloudSync = (function () {
         if (res.error) throw new Error(friendly(res.error));
         var pulled = ExpenseStore.mergeRemote((res.data || []).map(toLocal));
 
-        var outgoing = ExpenseStore.changedSince(since).map(function (rec) { return toRemote(rec, userId); });
+        var pending = ExpenseStore.pendingRecords();
+        var outgoing = pending.map(function (rec) { return toRemote(rec, userId); });
         var step = outgoing.length
           ? c.from('expenses').upsert(outgoing, { onConflict: 'user_id,id' })
           : Promise.resolve({ error: null });
 
         return Promise.resolve(step).then(function (up) {
           if (up && up.error) throw new Error(friendly(up.error));
+          ExpenseStore.clearPending(pending.map(function (rec) { return rec.id; }));
           return { pulled: pulled, pushed: outgoing.length };
         });
       }).then(function (counts) {
@@ -206,7 +208,8 @@ window.CloudSync = (function () {
           ExpenseStore.budget.set({ total: Number(row.total) || 0, categories: row.categories || {}, updatedAt: remoteAt }, true);
           return null;
         }
-        if (!local.updatedAt || (row && remoteAt >= local.updatedAt)) return null;
+        if (!ExpenseStore.budgetPending() && !local.updatedAt) return null;
+        if (row && remoteAt >= local.updatedAt) return null;
         return c.from('budgets').upsert({
           user_id: userId,
           total: local.total,
@@ -214,6 +217,7 @@ window.CloudSync = (function () {
           updated_at: new Date(local.updatedAt).toISOString()
         }, { onConflict: 'user_id' }).then(function (up) {
           if (up.error) throw new Error(friendly(up.error));
+          ExpenseStore.clearBudgetPending();
           return null;
         });
       });
