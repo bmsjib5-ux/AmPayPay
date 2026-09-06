@@ -226,6 +226,11 @@ window.ReceiptParser = (function () {
     return out;
   }
 
+  /* บรรทัดที่เป็น "บล็อกยอดเงิน" จริงต้องมีตัวเลขด้วย ไม่ใช่แค่มีคำอย่าง PAYMENT/QR อยู่ในชื่อร้าน */
+  function isAmountLine(line) {
+    return !!matchHint(line) && /\d/.test(line);
+  }
+
   function matchHint(line) {
     for (var h = 0; h < TOTAL_HINTS.length; h++) {
       var hint = TOTAL_HINTS[h];
@@ -425,9 +430,13 @@ window.ReceiptParser = (function () {
   /* บรรทัดหัวสลิป ป้ายกำกับ และลายน้ำ ไม่ใช่ชื่อคน/ร้าน */
   var NAME_NOISE_RE = /(^จาก$|^ถึง$|^ไปยัง$|^ผู้รับ|^ผู้โอน|รายการชำระ|สำเร็จ|สาเร็จ|โอนเงิน|ทำรายการ|พร้อมเพย์|พรอมเพย|promptpay|prompt|สแกน|ตรวจสอบสลิป|เลขที่รายการ|รหัสอ้างอิง|จำนวน|ค่าธรรมเนียม|ยอดคงเหลือ|วันที่|เวลา|บาท|ธนาคาร|บันทึกช่วยจำ|หมายเหตุ|ขอบคุณ|มั่งมี|slip|scan)/i;
   var BANK_APP_RE = /^(krungthai|kasikorn|kbank|k\s*plus|scb\s*easy|scb|bualuang|ttb|gsb|uob|cimb|ktb|mymo)\b.{0,14}$/i;
+  /* เทียบแบบยอมให้ OCR อ่านเพี้ยนได้ 1 ตัว เช่น "รหัสฮ้างอิง" → รหัสอ้างอิง */
+  var NAME_NOISE_KEYS = ['รหัสอ้างอิง', 'เลขที่รายการ', 'รหัสการอนุมัติ', 'หมายเลขคู่ค้า', 'หมายเลขบัตร',
+    'จำนวนเงิน', 'ค่าธรรมเนียม', 'วันที่ทำรายการ', 'บันทึกช่วยจำ', 'ยอดคงเหลือ'];
 
   function nameLike(line, strict) {
-    if (strict && (NAME_NOISE_RE.test(line) || BANK_APP_RE.test(String(line).trim()) || BANK_RE.test(line))) return '';
+    if (strict && (NAME_NOISE_RE.test(line) || hasAny(line, NAME_NOISE_KEYS) ||
+        BANK_APP_RE.test(String(line).trim()) || BANK_RE.test(line))) return '';
     var v = tidyName(stripBankParts(line));
     if (v.length < 3 || looksLikeGarbage(v)) return '';
     // ต้องมีตัวอักษรไทยพอสมควร หรือเป็นคำอังกฤษที่ยาวพอ ไม่ใช่เศษอักษรอย่าง "TRE"
@@ -483,7 +492,7 @@ window.ReceiptParser = (function () {
       if (!FROM_RE.test(lines[i]) && !hasAny(lines[i], FROM_KEYS)) continue;
       var afterFrom = [];
       for (j = i + 1; j < lines.length; j++) {
-        if (isBlockedLine(lines[j]) || matchHint(lines[j])) break;
+        if (isBlockedLine(lines[j]) || isAmountLine(lines[j])) break;
         var c1 = nameLike(lines[j], true);
         if (c1) afterFrom.push({ name: c1, index: j });
       }
@@ -496,7 +505,7 @@ window.ReceiptParser = (function () {
       if (!ACCOUNT_RE.test(lines[i])) continue;
       var afterAccount = [];
       for (j = i + 1; j < lines.length; j++) {
-        if (isBlockedLine(lines[j]) || matchHint(lines[j])) break;   // ถึงบล็อกเลขที่รายการ/ยอดเงินแล้วหยุด
+        if (isBlockedLine(lines[j]) || isAmountLine(lines[j])) break;   // ถึงบล็อกเลขที่รายการ/ยอดเงินแล้วหยุด
         var c2 = nameLike(lines[j], true);
         if (c2) afterAccount.push({ name: c2, index: j });
       }
