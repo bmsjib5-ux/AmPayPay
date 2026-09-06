@@ -279,6 +279,30 @@
       : 'มีรายการที่เหมือนกันอยู่แล้ว: ' + e.merchant + ' ' + fmtMoney(e.amount) + ' · ' + when;
   }
 
+  /* ---------------- เดาหมวดจากชื่อร้าน ---------------- */
+  /* หมวดที่ผู้ใช้เคยเลือกให้ร้านนี้ มีน้ำหนักกว่าการเดาจากคำ เพราะเป็นความตั้งใจของเจ้าของข้อมูลเอง */
+  function categoryFromHistory(merchant) {
+    var name = normName(merchant);
+    if (name.length < 3) return '';
+    var counts = {};
+    ExpenseStore.all().forEach(function (e) {
+      var other = normName(e.merchant);
+      if (!other) return;
+      if (other === name || other.indexOf(name) === 0 || name.indexOf(other) === 0) {
+        counts[e.category] = (counts[e.category] || 0) + 1;
+      }
+    });
+    var best = '';
+    Object.keys(counts).forEach(function (k) {
+      if (k !== 'other' && (!best || counts[k] > counts[best])) best = k;
+    });
+    return best;
+  }
+
+  function autoCategory(merchant, note) {
+    return categoryFromHistory(merchant) || ReceiptParser.guessCategory(merchant, note);
+  }
+
   /* ---------------- คิวใบเสร็จ ---------------- */
   var queue = [];
   var processing = false;
@@ -403,6 +427,28 @@
     }
   });
 
+  /* พิมพ์ชื่อร้านเสร็จแล้วเติมหมวดให้เอง ถ้าผู้ใช้ยังไม่ได้เลือกหมวดเอง */
+  document.addEventListener('change', function (ev) {
+    var input = ev.target;
+    if (!input.dataset || (input.dataset.f !== 'merchant' && input.dataset.f !== 'note')) return;
+    var cardEl = input.closest('.rcard');
+    if (!cardEl) return;
+    var select = $('[data-f="category"]', cardEl);
+    if (!select || select.dataset.touched === '1' || select.value !== 'other') return;
+    var merchant = ($('[data-f="merchant"]', cardEl) || {}).value || '';
+    var note = ($('[data-f="note"]', cardEl) || {}).value || '';
+    var guess = autoCategory(merchant, note);
+    if (guess && guess !== 'other') {
+      select.value = guess;
+      toast('เดาหมวดให้เป็น "' + ReceiptParser.categoryLabel(guess) + '" — เปลี่ยนเองได้');
+    }
+  });
+
+  /* ผู้ใช้เลือกหมวดเองแล้ว อย่าไปเปลี่ยนทับ */
+  document.addEventListener('change', function (ev) {
+    if (ev.target.dataset && ev.target.dataset.f === 'category') ev.target.dataset.touched = '1';
+  });
+
   function addCard(card) {
     card.el = document.createElement('article');
     card.el.className = 'rcard';
@@ -432,6 +478,9 @@
       .then(function (worker) { return readReceipt(worker, next, next.ocrSrc); })
       .then(function (parsed) {
         if (!parsed.date) parsed.date = todayISO();
+        var learned = categoryFromHistory(parsed.merchant);
+        if (learned) parsed.category = learned;
+        else if (parsed.category === 'other') parsed.category = ReceiptParser.guessCategory(parsed.merchant, parsed.note);
         next.parsed = parsed;
         next.dupHint = findDuplicate({ date: parsed.date, amount: parsed.amount, merchant: parsed.merchant, rawText: parsed.text });
         next.status = 'done';
@@ -967,7 +1016,7 @@
   });
 
   /* ---------------- ซิงก์ข้อมูลกับ Supabase ---------------- */
-  var syncUI = { step: 'signin', email: '', busy: false, message: '', error: '' };
+  var syncUI = { step: 'password', email: '', busy: false, message: '', error: '' };
   var autoSyncTimer = null;
   var lastSyncFinished = 0;
 
@@ -1028,13 +1077,32 @@
       return;
     }
 
-    body.innerHTML = '<p class="chart-sub">ล็อกอินด้วยอีเมล แล้วรายจ่ายจะซิงก์ข้ามมือถือกับคอมให้อัตโนมัติ</p>' + msg +
-      '<label class="field" style="margin-top:12px;max-width:320px"><span class="field-label">อีเมล</span>' +
-        '<input type="email" inputmode="email" autocomplete="email" data-sf="email" value="' + esc(syncUI.email) + '" placeholder="you@example.com"></label>' +
+    if (syncUI.step === 'maillink') {
+      body.innerHTML = '<p class="chart-sub">ส่งลิงก์เข้าใช้งานไปที่อีเมล (ต้องเปิดอีเมลแล้วกดลิงก์)</p>' + msg +
+        '<label class="field" style="margin-top:12px;max-width:320px"><span class="field-label">อีเมล</span>' +
+          '<input type="email" inputmode="email" autocomplete="email" data-sf="email" value="' + esc(syncUI.email) + '" placeholder="you@example.com"></label>' +
+        '<div class="row-actions" style="margin-top:14px">' +
+          '<button class="btn btn-primary btn-sm" data-sync="send"' + (syncUI.busy ? ' disabled' : '') + '>' +
+            (syncUI.busy ? 'กำลังส่ง…' : 'ส่งลิงก์ไปที่อีเมล') + '</button>' +
+          '<button class="btn btn-ghost btn-sm" data-sync="usepassword">ใช้รหัสผ่านแทน</button>' +
+        '</div>' + note;
+      return;
+    }
+
+    body.innerHTML = '<p class="chart-sub">ล็อกอินครั้งเดียวด้วยอีเมลกับรหัสผ่าน แล้วรายจ่ายจะซิงก์ข้ามมือถือกับคอมให้อัตโนมัติ</p>' + msg +
+      '<div class="grid2" style="margin-top:12px;max-width:420px">' +
+        '<label class="field"><span class="field-label">อีเมล</span>' +
+          '<input type="email" inputmode="email" autocomplete="email" data-sf="email" value="' + esc(syncUI.email) + '" placeholder="you@example.com"></label>' +
+        '<label class="field"><span class="field-label">รหัสผ่าน (อย่างน้อย 6 ตัว)</span>' +
+          '<input type="password" autocomplete="current-password" data-sf="password" placeholder="••••••••"></label>' +
+      '</div>' +
       '<div class="row-actions" style="margin-top:14px">' +
-        '<button class="btn btn-primary btn-sm" data-sync="send"' + (syncUI.busy ? ' disabled' : '') + '>' +
-          (syncUI.busy ? 'กำลังส่ง…' : 'ส่งรหัสไปที่อีเมล') + '</button>' +
-      '</div>' + note;
+        '<button class="btn btn-primary btn-sm" data-sync="pwlogin"' + (syncUI.busy ? ' disabled' : '') + '>' +
+          (syncUI.busy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ') + '</button>' +
+        '<button class="btn btn-sm" data-sync="pwsignup"' + (syncUI.busy ? ' disabled' : '') + '>สมัครใหม่</button>' +
+        '<button class="btn btn-ghost btn-sm" data-sync="usemail">ส่งลิงก์ทางอีเมลแทน</button>' +
+      '</div>' +
+      '<p class="budget-foot">ครั้งแรกให้ใส่อีเมลกับรหัสผ่านที่ต้องการ แล้วกด <strong>สมัครใหม่</strong> · เครื่องอื่นใช้อีเมลกับรหัสผ่านเดียวกันเพื่อดูข้อมูลชุดเดียวกัน</p>' + note;
   }
 
   function openSync() {
@@ -1084,11 +1152,45 @@
     var body = $('#syncBody');
 
     if (act === 'close') { closeSync(); return; }
-    if (act === 'back') { syncUI.step = 'signin'; syncUI.error = ''; syncUI.message = ''; renderSyncModal(); return; }
+    if (act === 'usemail') { syncUI.step = 'maillink'; syncUI.error = ''; syncUI.message = ''; renderSyncModal(); return; }
+    if (act === 'usepassword') { syncUI.step = 'password'; syncUI.error = ''; syncUI.message = ''; renderSyncModal(); return; }
+    if (act === 'pwlogin' || act === 'pwsignup') {
+      var emailEl = $('[data-sf="email"]', body);
+      var passEl = $('[data-sf="password"]', body);
+      var mail = (emailEl ? emailEl.value : '').trim();
+      var pass = passEl ? passEl.value : '';
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { syncUI.error = 'กรุณาใส่อีเมลให้ถูกต้อง'; renderSyncModal(); return; }
+      if (pass.length < 6) { syncUI.error = 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร'; renderSyncModal(); return; }
+      syncUI.email = mail;
+      syncUI.busy = true;
+      syncUI.error = '';
+      renderSyncModal();
+      var work = act === 'pwlogin'
+        ? CloudSync.signInWithPassword(mail, pass).then(function () { return { session: true }; })
+        : CloudSync.signUpWithPassword(mail, pass);
+      work.then(function (res) {
+        syncUI.busy = false;
+        if (res && res.needsConfirm) {
+          syncUI.message = 'สมัครแล้ว — Supabase ตั้งให้ต้องยืนยันอีเมลก่อน กดลิงก์ในอีเมลหนึ่งครั้ง หรือปิด "Confirm email" ในหน้า Supabase แล้วกดเข้าสู่ระบบได้เลย';
+          renderSyncModal();
+          return;
+        }
+        syncUI.message = 'ล็อกอินสำเร็จ กำลังซิงก์ข้อมูล…';
+        renderSyncModal();
+        renderSyncBadge();
+        runSync(true);
+      }).catch(function (err) {
+        syncUI.busy = false;
+        syncUI.error = err.message;
+        renderSyncModal();
+      });
+      return;
+    }
+    if (act === 'back') { syncUI.step = 'maillink'; syncUI.error = ''; syncUI.message = ''; renderSyncModal(); return; }
     if (act === 'now') { runSync(false); return; }
     if (act === 'signout') {
       CloudSync.signOut().then(function () {
-        syncUI.step = 'signin';
+        syncUI.step = 'password';
         syncUI.message = 'ออกจากระบบแล้ว (ข้อมูลในเครื่องยังอยู่ครบ)';
         renderSyncModal();
         renderSyncBadge();

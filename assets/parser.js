@@ -5,14 +5,15 @@ window.ReceiptParser = (function () {
   var THAI_DIGITS = '๐๑๒๓๔๕๖๗๘๙';
 
   var CATEGORIES = [
-    { key: 'food',      label: 'อาหาร & เครื่องดื่ม', words: ['ร้านอาหาร','อาหาร','ค่าอาหาร','กับข้าว','ก๋วยเตี๋ยว','ข้าว','กาแฟ','คาเฟ่','ชานม','เบเกอรี่','ขนม','ครัว','สุกี้','ชาบู','หมูกระทะ','บุฟเฟ่ต์','restaurant','cafe','coffee','starbucks','kfc','mcdonald','pizza','bakery','food'] },
-    { key: 'grocery',   label: 'ของใช้ & ซูเปอร์',    words: ['เซเว่น','7-eleven','7 eleven','เทสโก้','โลตัส','บิ๊กซี','แม็คโคร','ท็อปส์','วิลล่า','ซุปเปอร์','ซูเปอร์','ตลาด','lotus','big c','bigc','makro','tops','villa','supermarket','mini mart','family mart'] },
-    { key: 'transport', label: 'เดินทาง',            words: ['แท็กซี่','ค่ารถ','ค่าโดยสาร','วินมอเตอร์ไซค์','รถไฟฟ้า','น้ำมัน','ปตท','บางจาก','เชลล์','เอสโซ่','คาลเท็กซ์','ทางด่วน','ที่จอดรถ','grab','bolt','taxi','ptt','shell','esso','caltex','bts','mrt','parking','fuel','petrol'] },
-    { key: 'bills',     label: 'บิล & ค่าบริการ',     words: ['ค่าไฟ','ค่าน้ำ','ค่าเน็ต','อินเทอร์เน็ต','ค่าโทรศัพท์','ค่าเช่า','ค่าห้อง','ค่าส่วนกลาง','ประกัน','การไฟฟ้า','การประปา','ทรู','เอไอเอส','ดีแทค','true','ais','dtac','3bb','internet','electric','water bill','insurance','rent'] },
-    { key: 'health',    label: 'สุขภาพ',             words: ['โรงพยาบาล','คลินิก','ร้านยา','เภสัช','ทันตกรรม','ค่ายา','hospital','clinic','pharmacy','dental','watsons','boots','fascino'] },
-    { key: 'shopping',  label: 'ช้อปปิ้ง',            words: ['เสื้อผ้า','รองเท้า','เครื่องสำอาง','ลาซาด้า','ช้อปปี้','lazada','shopee','uniqlo','h&m','zara','muji','ikea','central','robinson','power buy'] },
-    { key: 'fun',       label: 'บันเทิง & อื่นๆ',      words: ['โรงหนัง','ค่าหนัง','เกม','คาราโอเกะ','ท่องเที่ยว','โรงแรม','major','sf cinema','netflix','spotify','steam','hotel','cinema'] }
+    { key: 'food',      label: 'อาหาร & เครื่องดื่ม', words: ['ร้านอาหาร','อาหารตามสั่ง','ค่าอาหาร','ค่ากิน','ค่าข้าว','กับข้าว','ส้มตำ','ตำแซ่บ','ก๋วยเตี๋ยว','ก๋วยจั๊บ','ข้าวมันไก่','ข้าวหมูแดง','ข้าวแกง','ข้าวเหนียว','หมูปิ้ง','ลูกชิ้น','ไก่ทอด','เป็ดย่าง','ชาตรามือ','ชานม','ชาไทย','ชาเย็น','กาแฟ','อเมซอน','คาเฟ่','เบเกอรี่','เค้ก','ขนม','ไอศกรีม','น้ำปั่น','ครัว','สุกี้','ชาบู','หมูกระทะ','บุฟเฟ่ต์','ปิ้งย่าง','อาหาร','เครื่องดื่ม','restaurant','cafe','coffee','starbucks','kfc','mcdonald','pizza','bakery','tea','food','noodle'] },
+    { key: 'grocery',   label: 'ของใช้ & ซูเปอร์',    words: ['เซเว่น','7-eleven','7 eleven','เทสโก้','โลตัส','บิ๊กซี','บิกซี','แม็คโคร','ท็อปส์','วิลล่า','แฟมิลี่มาร์ท','มินิมาร์ท','ซุปเปอร์','ซูเปอร์','ตลาด','ของใช้','ผงซักฟอก','กระดาษทิชชู','ยาสีฟัน','lotus','big c','bigc','makro','tops','villa','supermarket','mini mart','family mart','cp all'] },
+    { key: 'transport', label: 'เดินทาง',            words: ['ค่ารถ','ค่าเดินทาง','ค่าโดยสาร','แท็กซี่','วินมอเตอร์ไซค์','วินมอไซค์','มอเตอร์ไซค์รับจ้าง','รถไฟฟ้า','รถเมล์','ค่าน้ำมัน','น้ำมัน','เติมน้ำมัน','ปตท','บางจาก','เชลล์','เอสโซ่','คาลเท็กซ์','ทางด่วน','ค่าทางด่วน','ที่จอดรถ','ค่าจอดรถ','แกร็บ','โบลท์','ลาลามูฟ','grab','bolt','taxi','ptt','shell','esso','caltex','bts','mrt','parking','fuel','petrol','lineman'] },
+    { key: 'bills',     label: 'บิล & ค่าบริการ',     words: ['ค่าไฟ','ค่าน้ำ','ค่าเน็ต','ค่าอินเทอร์เน็ต','อินเทอร์เน็ต','ค่าโทรศัพท์','ค่าเช่า','ค่าห้อง','ค่าส่วนกลาง','ค่าประกัน','เบี้ยประกัน','การไฟฟ้า','การประปา','กฟภ','กฟน','กปน','ทรู','เอไอเอส','ดีแทค','true','ais','dtac','3bb','internet','electric','water bill','insurance','rent','bill payment'] },
+    { key: 'health',    label: 'สุขภาพ',             words: ['โรงพยาบาล','คลินิก','ร้านยา','เภสัช','ทันตกรรม','ทำฟัน','ค่ายา','ค่ารักษา','ตรวจสุขภาพ','แล็บ','วัตสัน','บู๊ทส์','hospital','clinic','pharmacy','dental','watsons','boots','fascino','lab'] },
+    { key: 'shopping',  label: 'ช้อปปิ้ง',            words: ['เสื้อผ้า','รองเท้า','กระเป๋า','เครื่องสำอาง','ลาซาด้า','ช้อปปี้','ติ๊กต็อก','เซ็นทรัล','โรบินสัน','ห้างสรรพสินค้า','ไอที','โทรศัพท์มือถือ','lazada','shopee','tiktok','uniqlo','h&m','zara','muji','ikea','central','robinson','power buy','jd central'] },
+    { key: 'fun',       label: 'บันเทิง & อื่นๆ',      words: ['โรงหนัง','ค่าหนัง','ดูหนัง','เมเจอร์','เกม','เติมเกม','คาราโอเกะ','ท่องเที่ยว','ค่าที่พัก','โรงแรม','รีสอร์ท','ตั๋วเครื่องบิน','สวนสนุก','major','sf cinema','netflix','spotify','youtube premium','steam','hotel','cinema','ticket'] }
   ];
+
   var OTHER = { key: 'other', label: 'ไม่ระบุหมวด' };
 
   /* คำที่บอกว่าบรรทัดนี้คือ "ยอดที่ต้องจ่าย" — ค่ามากคือน่าเชื่อถือกว่า */
@@ -556,13 +557,21 @@ window.ReceiptParser = (function () {
     return '';
   }
 
-  function guessCategory(text) {
-    var hay = text.toLowerCase();
+  /* เดาหมวดจากคำที่เจอ โดยชื่อร้านกับบันทึกช่วยจำมีน้ำหนักมากกว่าข้อความทั้งใบ
+     และคำที่เจาะจงกว่า (ยาวกว่า) ชนะคำกว้างๆ เช่น "ค่าน้ำมัน" ชนะ "น้ำ" */
+  function guessCategory(fullText, strongText) {
+    var hay = String(fullText || '').toLowerCase();
+    var strong = String(strongText || '').toLowerCase();
     var best = null;
     CATEGORIES.forEach(function (cat) {
-      var hits = 0;
-      cat.words.forEach(function (w) { if (hay.indexOf(w.toLowerCase()) !== -1) hits++; });
-      if (hits && (!best || hits > best.hits)) best = { key: cat.key, hits: hits };
+      var score = 0;
+      cat.words.forEach(function (word) {
+        var w = word.toLowerCase();
+        var weight = Math.min(4, Math.max(1, Math.ceil(w.length / 3)));
+        if (strong && strong.indexOf(w) !== -1) score += weight * 4;      // เจอในชื่อร้าน/บันทึกช่วยจำ
+        else if (hay.indexOf(w) !== -1) score += weight;                   // เจอที่อื่นในใบเสร็จ
+      });
+      if (score && (!best || score > best.score)) best = { key: cat.key, score: score };
     });
     return best ? best.key : OTHER.key;
   }
@@ -588,11 +597,12 @@ window.ReceiptParser = (function () {
     var isSlip = detectSlip(lines);
     var amountInfo = findAmount(lines);
     var note = findNote(lines);
+    var merchantName = findMerchant(lines, isSlip);
     return {
       text: text,
       isSlip: isSlip,
       date: findDate(lines),
-      merchant: findMerchant(lines, isSlip),
+      merchant: merchantName,
       amount: amountInfo.amount,
       amountSource: amountInfo.amountSource,
       confident: amountInfo.confident,
@@ -600,7 +610,7 @@ window.ReceiptParser = (function () {
       amountHasDecimals: amountInfo.amountHasDecimals,
       note: note,
       ref: findRef(lines),
-      category: guessCategory(text + ' ' + note),
+      category: guessCategory(text + ' ' + note, merchantName + ' ' + note),
       items: isSlip ? [] : findItems(lines)
     };
   }
@@ -608,6 +618,11 @@ window.ReceiptParser = (function () {
   return {
     parse: parse,
     categories: CATEGORIES.concat([OTHER]),
+    /* เดาหมวดจากชื่อร้าน/บันทึกช่วยจำอย่างเดียว (ใช้ตอนผู้ใช้พิมพ์ชื่อร้านเอง) */
+    guessCategory: function (merchant, note) {
+      var joined = (merchant || '') + ' ' + (note || '');
+      return guessCategory(joined, joined);
+    },
     categoryLabel: function (key) {
       var all = CATEGORIES.concat([OTHER]);
       for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i].label;
