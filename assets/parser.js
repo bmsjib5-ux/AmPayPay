@@ -17,21 +17,51 @@ window.ReceiptParser = (function () {
 
   /* คำที่บอกว่าบรรทัดนี้คือ "ยอดที่ต้องจ่าย" — ค่ามากคือน่าเชื่อถือกว่า */
   var TOTAL_HINTS = [
-    { re: /(รวมทั้งสิ้น|ยอดสุทธิ|รวมสุทธิ|สุทธิ|ยอดชำระ|grand\s*total|net\s*total|net\s*amount|amount\s*due|total\s*due|balance\s*due)/i, w: 100 },
-    { re: /(จำนวนเงิน|ยอดเงิน|ยอดโอน|เงินที่โอน)/i, w: 90 },
-    { re: /(ยอดรวม|รวมเงิน|รวมทั้งหมด|^\s*รวม|\btotal\b|\bamount\b)/i, w: 80 },
-    { re: /(ราคารวม|รวมย่อย|sub\s*-?\s*total)/i, w: 60 },
-    { re: /(เงินสด|รับเงิน|ชำระโดย|บัตรเครดิต|พร้อมเพย์|โอนเงิน|\bcash\b|\bcard\b|credit|payment|paid|promptpay|qr)/i, w: 45 }
+    { keys: ['รวมทั้งสิ้น', 'ยอดสุทธิ', 'รวมสุทธิ', 'ยอดชำระ'], re: /(grand\s*total|net\s*total|net\s*amount|amount\s*due|total\s*due|balance\s*due)/i, w: 100 },
+    { keys: ['จำนวนเงิน', 'ยอดเงิน', 'ยอดโอน', 'เงินที่โอน'], w: 90 },
+    { keys: ['จำนวน'], needColon: true, w: 88 },
+    { keys: ['ยอดรวม', 'รวมเงิน', 'รวมทั้งหมด'], re: /(^\s*รวม|\btotal\b|\bamount\b)/i, w: 80 },
+    { keys: ['ราคารวม', 'รวมย่อย'], re: /sub\s*-?\s*total/i, w: 60 },
+    { keys: ['เงินสด', 'รับเงิน', 'ชำระโดย', 'บัตรเครดิต', 'พร้อมเพย์', 'โอนเงิน'], re: /(\bcash\b|\bcard\b|credit|payment|paid|promptpay|\bqr\b)/i, w: 45 }
   ];
-  /* บรรทัดที่ไม่ใช่ยอดที่จ่ายจริง */
-  var TOTAL_BLOCK = /(ภาษีมูลค่าเพิ่ม|ภาษี|vat|เลขประจำตัวผู้เสียภาษี|tax\s*id|เงินทอน|ทอน|change|ส่วนลด|discount|คะแนน|point|สะสม|ค่าธรรมเนียม|ค่าบริการธนาคาร|fee|ยอดคงเหลือ|คงเหลือ|balance|รหัสอ้างอิง|เลขที่อ้างอิง|หมายเลขอ้างอิง|เลขที่รายการ|reference|ref\s*no|เลขที่บัญชี|บัญชี|account|โทร|tel|เลขที่|no\.|ต่อหน่วย|unit\s*price)/i;
 
-  /* สลิปโอนเงินจากแอปธนาคาร มีโครงสร้างต่างจากใบเสร็จร้านค้า */
-  var SLIP_RE = /(โอนเงินสำเร็จ|โอนสำเร็จ|ทำรายการสำเร็จ|สลิป|พร้อมเพย์|promptpay|transfer\s*(success|complete)|รหัสอ้างอิง|เลขที่รายการ)/i;
-  var TO_RE = /(โอนไปยัง|โอนไปที่|ไปยังบัญชี|ไปยัง|ไปที่|ผู้รับเงิน|ผู้รับโอน|ผู้รับ|ชื่อผู้รับ|ชื่อบัญชีปลายทาง|บัญชีปลายทาง|จ่ายให้|ชำระให้|ชื่อร้านค้า|ร้านค้า|ผู้ขาย|merchant|payee|to\s*account|\bto\b)\s*[:：]?\s*(.*)$/i;
-  var FROM_RE = /^(จาก|ผู้โอน|ชื่อผู้โอน|บัญชีต้นทาง|from)\s*[:：]?/i;
-  var NOTE_RE = /(บันทึกช่วยจำ|หมายเหตุ|บันทึกช่วยจา|memo|remark|note)\s*[:：]?\s*(.*)$/i;
-  var DATE_LABEL_RE = /(วันที่ทำรายการ|วันเวลาทำรายการ|เวลาทำรายการ|วันที่โอน|วันที่ชำระ|วันที่ออก|วันที่รับเงิน|วันที่|วัน\/เวลา|transaction\s*date|date\s*\/?\s*time|\bdate\b)/i;
+  /* บรรทัดที่ไม่ใช่ยอดที่จ่ายจริง */
+  var BLOCK_KEYS = ['ภาษีมูลค่าเพิ่ม', 'เลขประจำตัวผู้เสียภาษี', 'เงินทอน', 'ส่วนลด', 'ค่าธรรมเนียม',
+    'ยอดคงเหลือ', 'คงเหลือ', 'รหัสอ้างอิง', 'เลขที่อ้างอิง', 'หมายเลขอ้างอิง', 'เลขที่รายการ',
+    'เลขที่บัญชี', 'ต่อหน่วย', 'คะแนนสะสม'];
+  var BLOCK_RE = /(ภาษี|vat|tax\s*id|ทอน|change|discount|point|\bfee\b|balance|reference|ref\s*no|account|บัญชี|โทร|tel|เลขที่|no\.|unit\s*price)/i;
+
+  function isBlockedLine(line) {
+    if (hasAny(line, ['รวมทั้งสิ้น', 'ยอดสุทธิ']) || /grand\s*total/i.test(line)) return false;
+    return BLOCK_RE.test(line) || hasAny(line, BLOCK_KEYS);
+  }
+
+  /* สลิปโอนเงินจากแอปธนาคาร มีโครงสร้างต่างจากใบเสร็จร้านค้า — ดูจากหลายสัญญาณรวมกัน
+     เพราะคำเดียวอาจถูก OCR อ่านเพี้ยนจนหาไม่เจอ */
+  var SLIP_SIGNALS = ['โอนเงินสำเร็จ', 'ทำรายการสำเร็จ', 'โอนเงิน', 'ค่าธรรมเนียม', 'รหัสอ้างอิง',
+    'เลขที่รายการ', 'พร้อมเพย์', 'วันที่ทำรายการ', 'บันทึกช่วยจำ', 'ไปยัง', 'ผู้รับเงิน'];
+
+  function detectSlip(lines) {
+    var hits = 0;
+    SLIP_SIGNALS.forEach(function (key) {
+      for (var i = 0; i < lines.length; i++) {
+        if (fuzzyFind(lines[i], key) >= 0) { hits++; return; }
+      }
+    });
+    if (/(promptpay|transfer\s*(success|complete)|slip)/i.test(lines.join('\n'))) hits++;
+    return hits >= 2;
+  }
+
+  var TO_KEYS = ['โอนไปยัง', 'โอนไปที่', 'ไปยังบัญชี', 'ไปยัง', 'ไปที่', 'ผู้รับเงิน', 'ผู้รับโอน',
+    'ชื่อผู้รับ', 'ผู้รับ', 'ชื่อบัญชีปลายทาง', 'บัญชีปลายทาง', 'จ่ายให้', 'ชำระให้', 'ชื่อร้านค้า', 'ร้านค้า', 'ผู้ขาย'];
+  var TO_EN_RE = /^(to|payee|merchant|to\s*account)\s*[:：]?\s*(.*)$/i;
+  var FROM_KEYS = ['ผู้โอน', 'ชื่อผู้โอน', 'บัญชีต้นทาง'];
+  var FROM_RE = /^(จาก|from)\s*[:：]?/i;
+  var NOTE_KEYS = ['บันทึกช่วยจำ', 'หมายเหตุ'];
+  var NOTE_EN_RE = /(memo|remark|note)\s*[:：]?\s*(.*)$/i;
+  var DATE_LABEL_KEYS = ['วันที่ทำรายการ', 'วันเวลาทำรายการ', 'เวลาทำรายการ', 'วันที่โอน', 'วันที่ชำระ',
+    'วันที่ออก', 'วันที่รับเงิน', 'วันที่'];
+  var DATE_LABEL_RE = /(transaction\s*date|date\s*\/?\s*time|\bdate\b)/i;
   var BANK_RE = /(ธนาคาร|กรุงไทย|กสิกร|ไทยพาณิชย์|กรุงเทพ|กรุงศรี|ทหารไทย|ออมสิน|ธกส|ยูโอบี|ซีไอเอ็มบี|เกียรตินาคิน|xxx-|x-x|bank|\d{3}-\d)/i;
 
   var MONTHS_TH = ['ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
@@ -78,6 +108,90 @@ window.ReceiptParser = (function () {
     return normalizeUnicode(text);
   }
 
+  /* ---------- จับคู่คำแบบทนความเพี้ยนของ OCR ----------
+     OCR ภาษาไทยมักทำสระ/วรรณยุกต์หาย และสลับพยัญชนะหน้าตาคล้ายกัน
+     (จำนวนเงิน -> ขำนวนเงน, บันทึกช่วยจำ -> ปันทึกชวยจำ)
+     จึงเทียบกันที่ "โครงพยัญชนะ" และยอมให้ต่างกันได้ 1 ตัวอักษร */
+  var STRIP_RE = /[\u0E31\u0E33-\u0E3A\u0E40-\u0E4E\s.,:：;_'"()\[\]\-]/;
+
+  function skeletonMap(text) {
+    var str = String(text).toLowerCase();
+    var sk = '', map = [];
+    for (var i = 0; i < str.length; i++) {
+      if (STRIP_RE.test(str[i])) continue;
+      sk += str[i];
+      map.push(i);
+    }
+    map.push(str.length);
+    return { sk: sk, map: map };
+  }
+
+  function skeleton(text) { return skeletonMap(text).sk; }
+
+  /* ต่างกันไม่เกิน 1 ตัวอักษร (แทนที่ / เพิ่ม / ขาด) */
+  function withinOneEdit(a, b) {
+    if (a === b) return true;
+    var la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    var i = 0, j = 0, edits = 0;
+    while (i < la && j < lb) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      if (++edits > 1) return false;
+      if (la === lb) { i++; j++; }
+      else if (la > lb) i++;
+      else j++;
+    }
+    return edits + (la - i) + (lb - j) <= 1;
+  }
+
+  /* คืนตำแหน่งท้ายคำในสตริงเดิมถ้าเจอคำนี้ (แบบทนเพี้ยน) ไม่เจอคืน -1
+     ยอมให้เพี้ยนได้เฉพาะคำยาวพอ และต้องขึ้นต้นคำใหม่ ไม่ใช่โผล่กลางคำอื่น */
+  var FUZZY_MIN = 6;
+
+  /* คำนี้ขึ้นต้นคำใหม่หรือไม่ — ดูช่องว่าง/เครื่องหมายคั่นก่อนหน้า
+     (เทียบบนสตริงเดิม เพราะโครงพยัญชนะตัดสระนำอย่าง ไ เ โ ออกไปแล้ว) */
+  function isWordStart(line, map, idx) {
+    if (idx <= 0) return true;
+    var between = String(line).slice(map[idx - 1] + 1, map[idx]);
+    return /[\s:：,;|()\[\]\-\/]/.test(between);
+  }
+
+  function fuzzyFind(line, keyword) {
+    var k = skeleton(keyword);
+    if (!k) return -1;
+    var m = skeletonMap(line);
+    var from = 0, idx;
+    while ((idx = m.sk.indexOf(k, from)) >= 0) {              // ตรงตัวก่อน
+      if (isWordStart(line, m.map, idx)) return m.map[idx + k.length];
+      from = idx + 1;
+    }
+    if (k.length < FUZZY_MIN) return -1;
+    for (var i = 0; i + k.length - 1 <= m.sk.length; i++) {
+      if (!isWordStart(line, m.map, i)) continue;
+      for (var d = -1; d <= 1; d++) {
+        var len = k.length + d;
+        if (len <= 0 || i + len > m.sk.length) continue;
+        if (withinOneEdit(m.sk.substr(i, len), k)) return m.map[i + len];
+      }
+    }
+    return -1;
+  }
+
+  function hasAny(line, keywords) {
+    for (var i = 0; i < keywords.length; i++) if (fuzzyFind(line, keywords[i]) >= 0) return true;
+    return false;
+  }
+
+  /* ข้อความที่อยู่หลังป้ายกำกับในบรรทัดเดียวกัน */
+  function tailAfter(line, keywords) {
+    var best = -1;
+    keywords.forEach(function (k) {
+      var end = fuzzyFind(line, k);
+      if (end > best) best = end;
+    });
+    return best < 0 ? null : String(line).slice(best);
+  }
+
   function toNumber(str) {
     if (str === null || str === undefined) return null;
     var s = String(str).replace(/[^\d.,-]/g, '');
@@ -105,18 +219,25 @@ window.ReceiptParser = (function () {
     return out;
   }
 
+  function matchHint(line) {
+    for (var h = 0; h < TOTAL_HINTS.length; h++) {
+      var hint = TOTAL_HINTS[h];
+      if (hint.needColon && line.indexOf(':') === -1 && line.indexOf('：') === -1) continue;
+      if (hint.re && hint.re.test(line)) return hint;
+      if (hint.keys && hasAny(line, hint.keys)) return hint;
+    }
+    return null;
+  }
+
   function findAmount(lines) {
     var best = null;
     lines.forEach(function (line, i) {
-      if (TOTAL_BLOCK.test(line) && !/รวมทั้งสิ้น|ยอดสุทธิ|grand\s*total/i.test(line)) return;
-      var hint = null;
-      for (var h = 0; h < TOTAL_HINTS.length; h++) {
-        if (TOTAL_HINTS[h].re.test(line)) { hint = TOTAL_HINTS[h]; break; }
-      }
+      if (isBlockedLine(line)) return;
+      var hint = matchHint(line);
       if (!hint) return;
       var nums = moneyIn(line);
       // บางใบเสร็จ/สลิปขึ้นบรรทัดใหม่ก่อนตัวเลข
-      if (!nums.length && lines[i + 1] && !TOTAL_BLOCK.test(lines[i + 1])) nums = moneyIn(lines[i + 1]);
+      if (!nums.length && lines[i + 1] && !isBlockedLine(lines[i + 1])) nums = moneyIn(lines[i + 1]);
       // คำใบ้อ่อน (เงินสด/โอนเงิน) ต้องเป็นตัวเลขที่หน้าตาเหมือนเงินจริงๆ เท่านั้น
       if (hint.w <= 45) nums = nums.filter(function (n) { return n.hasDecimals || n.grouped || n.value >= 10; });
       if (!nums.length) return;
@@ -130,7 +251,7 @@ window.ReceiptParser = (function () {
     var start = Math.floor(lines.length * 0.35);
     var fallback = null;
     for (var i = start; i < lines.length; i++) {
-      if (TOTAL_BLOCK.test(lines[i])) continue;
+      if (isBlockedLine(lines[i])) continue;
       moneyIn(lines[i]).forEach(function (n) {
         if (n.hasDecimals && (!fallback || n.value > fallback.value)) fallback = { value: n.value, line: lines[i] };
       });
@@ -142,13 +263,31 @@ window.ReceiptParser = (function () {
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
   function makeDate(y, m, d) {
-    if (y > 2400) y -= 543;              // พ.ศ. -> ค.ศ.
-    else if (y < 100) y += (y > 70 ? 1900 : 2000);
-    if (y < 1990 || y > 2100) return null;
     if (m < 1 || m > 12 || d < 1 || d > 31) return null;
-    var dt = new Date(y, m - 1, d);
-    if (dt.getMonth() !== m - 1) return null;
-    return y + '-' + pad(m) + '-' + pad(d);
+    var years = [];
+    if (y > 2400) years.push(y - 543);                 // พ.ศ. เต็ม
+    else if (y >= 1900) years.push(y);                 // ค.ศ. เต็ม
+    else if (y < 100) {
+      years.push(2000 + y);                            // ค.ศ. 2 หลัก เช่น 24 -> 2024
+      years.push(2500 + y - 543);                      // พ.ศ. 2 หลัก เช่น 69 -> 2569 -> 2026
+      if (y > 70) years.push(1900 + y);
+    }
+    var now = new Date();
+    var limit = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    var best = null;
+    years.forEach(function (year) {
+      if (year < 1990 || year > 2100) return;
+      var dt = new Date(year, m - 1, d);
+      if (dt.getMonth() !== m - 1) return;             // เช่น 31 ก.พ.
+      // เลือกปีที่ไม่ใช่อนาคต และใกล้ปัจจุบันที่สุด (ใบเสร็จลงวันที่อนาคตไม่ได้)
+      var future = dt > limit;
+      var distance = Math.abs(dt - now);
+      if (!best || (best.future && !future) || (best.future === future && distance < best.distance)) {
+        best = { year: year, future: future, distance: distance };
+      }
+    });
+    if (!best) return null;
+    return best.year + '-' + pad(m) + '-' + pad(d);
   }
 
   function monthIndexFromName(name) {
@@ -192,7 +331,7 @@ window.ReceiptParser = (function () {
     var best = null;
 
     lines.forEach(function (line, i) {
-      var labeled = DATE_LABEL_RE.test(line);
+      var labeled = DATE_LABEL_RE.test(line) || hasAny(line, DATE_LABEL_KEYS);
       var found = datesInLine(line);
       // ป้ายกำกับอยู่บรรทัดหนึ่ง แต่ค่าตกไปอีกบรรทัด (สลิปแบบสองคอลัมน์)
       if (!found.length && labeled && lines[i + 1]) found = datesInLine(lines[i + 1]);
@@ -229,10 +368,30 @@ window.ReceiptParser = (function () {
       .replace(/(ธนาคาร|บมจ\.?|บัญชี|กรุงไทย|กสิกรไทย|กสิกร|ไทยพาณิชย์|กรุงเทพ|กรุงศรีอยุธยา|กรุงศรี|ทหารไทยธนชาต|ทหารไทย|ธนชาต|ออมสิน|ธกส|ยูโอบี|ซีไอเอ็มบี|เกียรตินาคิน|แลนด์แอนด์เฮ้าส์|ทิสโก้|พร้อมเพย์|promptpay|bank)/gi, ' '));
   }
 
-  function nameLike(line) {
-    var v = stripBankParts(line);
+  function tidyName(value) {
+    var tokens = String(value).split(/\s+/).filter(Boolean);
+    var isJunk = function (t) {
+      var letters = t.replace(/[^฀-๿A-Za-z]/g, '');
+      if (letters.length <= 1) return true;
+      return /^[A-Za-z]{1,3}$/.test(t);
+    };
+    while (tokens.length && isJunk(tokens[0])) tokens.shift();
+    while (tokens.length && isJunk(tokens[tokens.length - 1])) tokens.pop();
+    var out = cleanName(tokens.join(' '));
+    // OCR มักเอาตัวอักษรข้างเคียงมาติดหน้าคำนำหน้าชื่อ เช่น "วนางสาวอัครยุภา"
+    var m = out.match(/(นางสาว|นาง|นาย|น\.ส\.|ด\.ช\.|ด\.ญ\.|บริษัท|บจก\.|หจก\.|ร้าน)/);
+    if (m && m.index > 0 && m.index <= 3) out = cleanName(out.slice(m.index));
+    return out;
+  }
+
+  /* บรรทัดหัวสลิป ป้ายกำกับ และลายน้ำ ไม่ใช่ชื่อคน/ร้าน */
+  var NAME_NOISE_RE = /(สำเร็จ|สาเร็จ|โอนเงิน|ทำรายการ|พร้อมเพย์|พรอมเพย|promptpay|prompt|สแกน|ตรวจสอบสลิป|เลขที่รายการ|รหัสอ้างอิง|จำนวน|ค่าธรรมเนียม|ยอดคงเหลือ|วันที่|เวลา|บาท|ธนาคาร|บันทึกช่วยจำ|หมายเหตุ|ขอบคุณ|มั่งมี|slip|scan|krungthai|kasikorn|kbank|\bscb\b|bualuang|\bttb\b|\bgsb\b)/i;
+
+  function nameLike(line, strict) {
+    if (strict && NAME_NOISE_RE.test(line)) return '';
+    var v = tidyName(stripBankParts(line));
     if (v.length < 3 || looksLikeGarbage(v)) return '';
-    if (!/[ก-๙A-Za-z]{3}/.test(v)) return '';
+    if (!/[฀-๿A-Za-z]{3}/.test(v)) return '';
     return v;
   }
 
@@ -240,29 +399,38 @@ window.ReceiptParser = (function () {
   function findPayee(lines) {
     var i, j;
     for (i = 0; i < lines.length; i++) {
-      var m = lines[i].match(TO_RE);
-      if (!m || FROM_RE.test(lines[i])) continue;
-      var inline = nameLike(m[2] || '');           // ชื่ออยู่บรรทัดเดียวกับป้ายกำกับ
+      if (FROM_RE.test(lines[i]) || hasAny(lines[i], FROM_KEYS)) continue;
+      var en = lines[i].match(TO_EN_RE);
+      var tail = en ? en[2] : tailAfter(lines[i], TO_KEYS);
+      if (tail === null) continue;
+      var inline = nameLike(tail);                 // ชื่ออยู่บรรทัดเดียวกับป้ายกำกับ
       if (inline) return inline;
       for (j = i + 1; j < Math.min(i + 4, lines.length); j++) {   // ชื่ออยู่บรรทัดถัดไป
-        if (TO_RE.test(lines[j]) || FROM_RE.test(lines[j])) break;
-        var next = nameLike(lines[j]);
+        if (tailAfter(lines[j], TO_KEYS) !== null || FROM_RE.test(lines[j])) break;
+        var next = nameLike(lines[j], true);
         if (next) return next;
       }
     }
     // OCR อ่านป้าย "ไปยัง" ไม่ออก — ใช้ชื่อถัดจากชื่อผู้โอน (คนแรกคือผู้โอน คนที่สองคือผู้รับ)
     for (i = 0; i < lines.length; i++) {
-      if (!FROM_RE.test(lines[i])) continue;
+      if (!FROM_RE.test(lines[i]) && !hasAny(lines[i], FROM_KEYS)) continue;
       var seen = 0;
       for (j = i + 1; j < lines.length; j++) {
-        var cand = nameLike(lines[j]);
+        var cand = nameLike(lines[j], true);
         if (!cand) continue;
         seen++;
         if (seen === 2) return cand;
       }
       break;
     }
-    return '';
+    // สลิปบางธนาคาร (เช่น K+) ไม่มีป้ายกำกับเลย มีแค่ลูกศรระหว่างสองชื่อ
+    var names = [];
+    lines.forEach(function (line) {
+      var cand = nameLike(line, true);
+      if (cand) names.push(cand);
+    });
+    if (names.length >= 2) return names[1];
+    return names.length === 1 ? names[0] : '';
   }
 
   function findMerchant(lines, isSlip) {
@@ -287,11 +455,12 @@ window.ReceiptParser = (function () {
   /* สลิปธนาคารมีช่อง "บันทึกช่วยจำ" อยู่แล้ว — ดึงมาใส่ให้เลย */
   function findNote(lines) {
     for (var i = 0; i < lines.length; i++) {
-      var m = lines[i].match(NOTE_RE);
-      if (!m) continue;
-      var value = cleanName(m[2] || '');
+      var en = lines[i].match(NOTE_EN_RE);
+      var tail = en ? en[2] : tailAfter(lines[i], NOTE_KEYS);
+      if (tail === null) continue;
+      var value = cleanName(tail);
       if (!value && lines[i + 1]) value = cleanName(lines[i + 1]);
-      if (value.length >= 2 && /[ก-๙A-Za-z]/.test(value) && !looksLikeGarbage(value)) return value.slice(0, 80);
+      if (value.length >= 2 && /[฀-๿A-Za-z]/.test(value) && !looksLikeGarbage(value)) return value.slice(0, 80);
     }
     return '';
   }
@@ -310,8 +479,7 @@ window.ReceiptParser = (function () {
   function findItems(lines) {
     var items = [];
     lines.forEach(function (line) {
-      if (TOTAL_BLOCK.test(line)) return;
-      for (var h = 0; h < TOTAL_HINTS.length; h++) if (TOTAL_HINTS[h].re.test(line)) return;
+      if (isBlockedLine(line) || matchHint(line)) return;
       var m = line.match(/^(.{2,40}?)\s+(\d{1,3}(?:,\d{3})*(?:\.\d{2})|\d+\.\d{2})$/);
       if (!m) return;
       var name = m[1].replace(/\s+x?\s*\d+\s*$/, '').trim();
@@ -326,7 +494,7 @@ window.ReceiptParser = (function () {
   function parse(rawText) {
     var text = normalizeText(rawText);
     var lines = text ? text.split('\n') : [];
-    var isSlip = SLIP_RE.test(text);
+    var isSlip = detectSlip(lines);
     var amountInfo = findAmount(lines);
     var note = findNote(lines);
     return {
