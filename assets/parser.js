@@ -30,6 +30,7 @@ window.ReceiptParser = (function () {
   var SLIP_RE = /(โอนเงินสำเร็จ|โอนสำเร็จ|ทำรายการสำเร็จ|สลิป|พร้อมเพย์|promptpay|transfer\s*(success|complete)|รหัสอ้างอิง|เลขที่รายการ)/i;
   var TO_RE = /^(ไปยัง|ไปที่|ผู้รับเงิน|ผู้รับ|โอนไปยัง|ชื่อผู้รับ|บัญชีปลายทาง|to)\s*[:：]?\s*(.*)$/i;
   var NOTE_RE = /(บันทึกช่วยจำ|หมายเหตุ|บันทึกช่วยจา|memo|remark|note)\s*[:：]?\s*(.*)$/i;
+  var DATE_LABEL_RE = /(วันที่ทำรายการ|วันเวลาทำรายการ|เวลาทำรายการ|วันที่โอน|วันที่ชำระ|วันที่ออก|วันที่รับเงิน|วันที่|วัน\/เวลา|transaction\s*date|date\s*\/?\s*time|\bdate\b)/i;
   var BANK_RE = /(ธนาคาร|กรุงไทย|กสิกร|ไทยพาณิชย์|กรุงเทพ|กรุงศรี|ทหารไทย|ออมสิน|ธกส|ยูโอบี|ซีไอเอ็มบี|เกียรตินาคิน|xxx-|x-x|bank|\d{3}-\d)/i;
 
   var MONTHS_TH = ['ม.ค','ก.พ','มี.ค','เม.ย','พ.ค','มิ.ย','ก.ค','ส.ค','ก.ย','ต.ค','พ.ย','ธ.ค'];
@@ -159,26 +160,49 @@ window.ReceiptParser = (function () {
     return 0;
   }
 
-  function findDate(text) {
-    var m;
+  /* ดึงวันที่ทุกรูปแบบที่เจอในบรรทัดเดียว */
+  function datesInLine(line) {
+    var found = [], m;
     var re1 = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/g;      // 31/12/2567
-    while ((m = re1.exec(text)) !== null) {
+    while ((m = re1.exec(line)) !== null) {
       var d1 = makeDate(+m[3], +m[2], +m[1]);
-      if (d1) return d1;
+      if (d1) found.push(d1);
     }
     var re2 = /\b(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/g;        // 2024-12-31
-    while ((m = re2.exec(text)) !== null) {
+    while ((m = re2.exec(line)) !== null) {
       var d2 = makeDate(+m[1], +m[2], +m[3]);
-      if (d2) return d2;
+      if (d2) found.push(d2);
     }
     var re3 = /\b(\d{1,2})\s*([฀-๿.]{2,12}|[A-Za-z]{3,9})\.?\s*(\d{2,4})\b/g;  // 31 ธ.ค. 2567
-    while ((m = re3.exec(text)) !== null) {
+    while ((m = re3.exec(line)) !== null) {
       var mi = monthIndexFromName(m[2]);
       if (!mi) continue;
       var d3 = makeDate(+m[3], mi, +m[1]);
-      if (d3) return d3;
+      if (d3) found.push(d3);
     }
-    return null;
+    return found;
+  }
+
+  /* เลือกวันที่ของรายการ: ให้น้ำหนักบรรทัดที่มีป้ายกำกับ เช่น "วันที่ทำรายการ" มากกว่าเลขที่บังเอิญ
+     หน้าตาเหมือนวันที่ (เลขที่เอกสาร/รหัสอ้างอิง) และตัดวันที่ในอนาคตทิ้งก่อน */
+  function findDate(lines) {
+    var today = new Date();
+    var tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    var best = null;
+
+    lines.forEach(function (line, i) {
+      var labeled = DATE_LABEL_RE.test(line);
+      var found = datesInLine(line);
+      // ป้ายกำกับอยู่บรรทัดหนึ่ง แต่ค่าตกไปอีกบรรทัด (สลิปแบบสองคอลัมน์)
+      if (!found.length && labeled && lines[i + 1]) found = datesInLine(lines[i + 1]);
+      found.forEach(function (iso) {
+        var score = (labeled ? 100 : 0) - i * 0.1;
+        var parts = iso.split('-');
+        if (new Date(+parts[0], +parts[1] - 1, +parts[2]) > tomorrow) score -= 200;  // ใบเสร็จไม่ควรลงวันที่อนาคต
+        if (!best || score > best.score) best = { iso: iso, score: score };
+      });
+    });
+    return best ? best.iso : null;
   }
 
   /* บรรทัดที่ OCR อ่านไม่ออก (สัญลักษณ์เยอะ / ตัวอักษรโดดๆ หลายตัว) ไม่ควรกลายเป็นชื่อร้าน */
@@ -280,7 +304,7 @@ window.ReceiptParser = (function () {
     return {
       text: text,
       isSlip: isSlip,
-      date: findDate(text),
+      date: findDate(lines),
       merchant: findMerchant(lines, isSlip),
       amount: amountInfo.amount,
       amountSource: amountInfo.amountSource,
