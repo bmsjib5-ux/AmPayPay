@@ -53,7 +53,8 @@ window.ReceiptParser = (function () {
   }
 
   var TO_KEYS = ['โอนไปยัง', 'โอนไปที่', 'ไปยังบัญชี', 'ไปยัง', 'ไปที่', 'ผู้รับเงิน', 'ผู้รับโอน',
-    'ชื่อผู้รับ', 'ผู้รับ', 'ชื่อบัญชีปลายทาง', 'บัญชีปลายทาง', 'จ่ายให้', 'ชำระให้', 'ชื่อร้านค้า', 'ร้านค้า', 'ผู้ขาย'];
+    'ชื่อผู้รับ', 'ผู้รับชำระ', 'ผู้รับ', 'ชื่อบัญชีปลายทาง', 'บัญชีปลายทาง', 'จ่ายให้', 'ชำระให้',
+    'ชื่อร้านค้า', 'ร้านค้า', 'ผู้ขาย', 'ถึง'];
   var TO_EN_RE = /^(to|payee|merchant|to\s*account)\s*[:：]?\s*(.*)$/i;
   var FROM_KEYS = ['ผู้โอน', 'ชื่อผู้โอน', 'บัญชีต้นทาง'];
   var FROM_RE = /^(จาก|from)\s*[:：]?/i;
@@ -373,7 +374,7 @@ window.ReceiptParser = (function () {
     var isJunk = function (t) {
       var letters = t.replace(/[^฀-๿A-Za-z]/g, '');
       if (letters.length <= 1) return true;
-      return /^[A-Za-z]{1,3}$/.test(t);
+      return /^[a-z]{1,3}$/.test(t);   // เศษอักษรละตินตัวเล็ก ไม่ใช่ตัวย่ออย่าง SCB
     };
     while (tokens.length && isJunk(tokens[0])) tokens.shift();
     while (tokens.length && isJunk(tokens[tokens.length - 1])) tokens.pop();
@@ -385,14 +386,23 @@ window.ReceiptParser = (function () {
   }
 
   /* บรรทัดหัวสลิป ป้ายกำกับ และลายน้ำ ไม่ใช่ชื่อคน/ร้าน */
-  var NAME_NOISE_RE = /(สำเร็จ|สาเร็จ|โอนเงิน|ทำรายการ|พร้อมเพย์|พรอมเพย|promptpay|prompt|สแกน|ตรวจสอบสลิป|เลขที่รายการ|รหัสอ้างอิง|จำนวน|ค่าธรรมเนียม|ยอดคงเหลือ|วันที่|เวลา|บาท|ธนาคาร|บันทึกช่วยจำ|หมายเหตุ|ขอบคุณ|มั่งมี|slip|scan|krungthai|kasikorn|kbank|\bscb\b|bualuang|\bttb\b|\bgsb\b)/i;
+  var NAME_NOISE_RE = /(^จาก$|^ถึง$|^ไปยัง$|^ผู้รับ|^ผู้โอน|รายการชำระ|สำเร็จ|สาเร็จ|โอนเงิน|ทำรายการ|พร้อมเพย์|พรอมเพย|promptpay|prompt|สแกน|ตรวจสอบสลิป|เลขที่รายการ|รหัสอ้างอิง|จำนวน|ค่าธรรมเนียม|ยอดคงเหลือ|วันที่|เวลา|บาท|ธนาคาร|บันทึกช่วยจำ|หมายเหตุ|ขอบคุณ|มั่งมี|slip|scan)/i;
+  var BANK_APP_RE = /^(krungthai|kasikorn|kbank|k\s*plus|scb\s*easy|scb|bualuang|ttb|gsb|uob|cimb|ktb|mymo)\b.{0,14}$/i;
 
   function nameLike(line, strict) {
-    if (strict && NAME_NOISE_RE.test(line)) return '';
+    if (strict && (NAME_NOISE_RE.test(line) || BANK_APP_RE.test(String(line).trim()))) return '';
     var v = tidyName(stripBankParts(line));
     if (v.length < 3 || looksLikeGarbage(v)) return '';
     if (!/[฀-๿A-Za-z]{3}/.test(v)) return '';
     return v;
+  }
+
+  /* ชื่อร้านที่ยาวข้ามบรรทัด — ต่อบรรทัดถัดไปให้เมื่อวงเล็บยังไม่ปิด */
+  function withContinuation(name, lines, index) {
+    if (!name || name.indexOf('(') === -1 || name.indexOf(')') !== -1) return name;
+    var next = lines[index + 1];
+    if (!next || next.indexOf(')') === -1) return name;
+    return cleanName(name + ' ' + next.replace(/\s*\)\s*$/, ')'));
   }
 
   /* สลิปโอนเงิน: "ร้าน" ที่มีความหมายคือปลายทางที่โอนไป — คน ร้าน หรือบริษัทที่รับเงิน */
@@ -404,11 +414,11 @@ window.ReceiptParser = (function () {
       var tail = en ? en[2] : tailAfter(lines[i], TO_KEYS);
       if (tail === null) continue;
       var inline = nameLike(tail);                 // ชื่ออยู่บรรทัดเดียวกับป้ายกำกับ
-      if (inline) return inline;
+      if (inline) return withContinuation(inline, lines, i);
       for (j = i + 1; j < Math.min(i + 4, lines.length); j++) {   // ชื่ออยู่บรรทัดถัดไป
         if (tailAfter(lines[j], TO_KEYS) !== null || FROM_RE.test(lines[j])) break;
         var next = nameLike(lines[j], true);
-        if (next) return next;
+        if (next) return withContinuation(next, lines, j);
       }
     }
     // OCR อ่านป้าย "ไปยัง" ไม่ออก — ใช้ชื่อถัดจากชื่อผู้โอน (คนแรกคือผู้โอน คนที่สองคือผู้รับ)

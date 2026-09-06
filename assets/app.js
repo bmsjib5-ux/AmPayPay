@@ -178,6 +178,42 @@
     return workerPromise;
   }
 
+  /* tesseract.js ใช้ค่าเริ่มต้น PSM 6 (มองทั้งรูปเป็นบล็อกข้อความเดียว) ซึ่งอ่านสลิปแบบ
+     สองคอลัมน์ได้ดีที่สุด แต่สลิปที่วางยอดเงินเป็นตัวเลขก้อนใหญ่กลางหน้า (เช่น MyMo/ออมสิน)
+     โหมดนี้จะข้ามบรรทัดนั้นไปเลย จึงอ่านซ้ำด้วย PSM 4 (คอลัมน์เดียว ตัวอักษรหลายขนาด)
+     เฉพาะตอนที่รอบแรกได้ข้อมูลไม่ครบ แล้วรวมผลจากทั้งสองรอบ */
+  function recognizeWith(worker, src, psm) {
+    return worker.setParameters({ tessedit_pageseg_mode: psm })
+      .then(function () { return worker.recognize(src); })
+      .then(function (res) { return (res && res.data && res.data.text) || ''; });
+  }
+
+  function mergeParsed(first, both) {
+    var out = {};
+    Object.keys(both).forEach(function (k) { out[k] = both[k]; });
+    var keepFirstAmount = first.amount != null &&
+      (both.amount == null || (first.confident && !both.confident));
+    if (keepFirstAmount) {
+      out.amount = first.amount;
+      out.amountSource = first.amountSource;
+      out.confident = first.confident;
+    }
+    ['date', 'merchant', 'note'].forEach(function (k) { if (!out[k] && first[k]) out[k] = first[k]; });
+    if (!out.items || !out.items.length) out.items = first.items || [];
+    return out;
+  }
+
+  function readReceipt(worker, card, src) {
+    return recognizeWith(worker, src, '6').then(function (text1) {
+      var first = ReceiptParser.parse(text1);
+      if (first.amount != null && first.confident && first.date) return first;
+      setProgress(card, 1, 'ตรวจซ้ำอีกรอบเพื่อความแม่นยำ…');
+      return recognizeWith(worker, src, '4').then(function (text2) {
+        return mergeParsed(first, ReceiptParser.parse(text1 + '\n' + text2));
+      });
+    });
+  }
+
   function setProgress(card, ratio, label) {
     var bar = $('.progress > i', card.el);
     var status = $('.rcard-status span', card.el);
@@ -320,9 +356,8 @@
       queue.filter(function (c) { return c.status === 'done'; }).length + '/' + queue.length + ' เสร็จแล้ว)';
 
     getWorker()
-      .then(function (worker) { return worker.recognize(next.ocrSrc); })
-      .then(function (res) {
-        var parsed = ReceiptParser.parse(res.data.text);
+      .then(function (worker) { return readReceipt(worker, next, next.ocrSrc); })
+      .then(function (parsed) {
         if (!parsed.date) parsed.date = todayISO();
         next.parsed = parsed;
         next.status = 'done';
