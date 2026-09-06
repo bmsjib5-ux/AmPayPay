@@ -385,6 +385,8 @@ window.ReceiptParser = (function () {
 
   function cleanName(s) {
     return s.replace(/\s+/g, ' ')
+      .replace(/\s+\)/g, ')')
+      .replace(/\(\s+/g, '(')
       .replace(/^[\s:：.\-]+|[\s:：.\-]+$/g, '')
       .replace(/^(น\.ส\.|ด\.ช\.|ด\.ญ\.|นางสาว|นาย|นาง)(?=[ก-๙])/, '$1 ')
       .slice(0, 60);
@@ -444,7 +446,7 @@ window.ReceiptParser = (function () {
   }
 
   /* เลขบัญชีที่ถูกปิดบัง หรือเลขยาวๆ — ใช้เป็นเส้นแบ่งระหว่างบล็อกผู้โอนกับผู้รับ */
-  var ACCOUNT_RE = /(x{3,}|\d{3,}[\-\s]?x{2,}|\d{6,})/i;
+  var ACCOUNT_RE = /(x{3,}[\dx*\-]*|\d{2,}-[\dx]+-[\dx]+)/i;
 
   function pickName(candidates, lines) {
     var picked = preferTitled(candidates.map(function (c) { return c.name; }));
