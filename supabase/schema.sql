@@ -36,6 +36,9 @@ create table if not exists public.expenses (
 -- รายจ่ายอยู่ในสมุดเล่มไหน (ข้อมูลเดิมก่อนมีหลายสมุด จะอยู่ในเล่มแรกโดยอัตโนมัติ)
 alter table public.expenses add column if not exists book_id text not null default 'b_default';
 
+-- การหารบิลกับเพื่อน: ใครติดเท่าไหร่ จ่ายคืนแล้วหรือยัง
+alter table public.expenses add column if not exists split jsonb not null default '{"people": []}'::jsonb;
+
 -- ดึงเฉพาะรายการที่แก้ไขหลังซิงก์ครั้งก่อน จึงต้องมี index ตรงนี้
 create index if not exists expenses_user_updated_idx
   on public.expenses (user_id, updated_at desc);

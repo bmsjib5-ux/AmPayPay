@@ -132,6 +132,24 @@ window.ExpenseStore = (function () {
     writeJSON(DIRTY_KEY, d);
   }
 
+  /* การหารบิลกับเพื่อน — เก็บว่าใครติดเท่าไหร่ และจ่ายคืนแล้วหรือยัง */
+  function cleanSplit(raw) {
+    var people = (raw && Array.isArray(raw.people)) ? raw.people : [];
+    return {
+      people: people.slice(0, 20).map(function (p, i) {
+        var amount = Math.max(0, Number(p && p.amount) || 0);
+        var paid = !!(p && p.paid);
+        return {
+          id: (p && p.id) || ('d' + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6)),
+          name: String((p && p.name) || '').trim().slice(0, 40) || 'เพื่อน',
+          amount: Math.round(amount * 100) / 100,
+          paid: paid,
+          paidAt: paid ? (Number(p.paidAt) || Date.now()) : null
+        };
+      }).filter(function (p) { return p.amount > 0; })
+    };
+  }
+
   function clean(exp) {
     var created = exp.createdAt || Date.now();
     return {
@@ -143,6 +161,7 @@ window.ExpenseStore = (function () {
       category: exp.category || 'other',
       note: (exp.note || '').trim(),
       items: Array.isArray(exp.items) ? exp.items.slice(0, 40) : [],
+      split: cleanSplit(exp.split),
       rawText: (exp.rawText || '').slice(0, 4000),
       image: exp.image || null,
       deleted: !!exp.deleted,

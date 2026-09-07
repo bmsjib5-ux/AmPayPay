@@ -789,3 +789,94 @@ img.zoomable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
 .img-close:active { transform: scale(.94); }
 /* ตัวดูรูปต้องทึบเสมอ แม้ผู้ใช้ตั้งพื้นหลังเป็นรูป */
 body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
+
+/* ---------- หารบิลกับเพื่อน / ลูกหนี้ ---------- */
+.split-box > summary { font-weight: 600; color: var(--text-primary); }
+.split-body { margin-top: 10px; display: grid; gap: 10px; }
+.split-tools { align-items: flex-end; }
+.split-tools .field { max-width: 150px; }
+.split-rows { display: grid; gap: 8px; }
+.split-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 110px auto auto; gap: 8px; align-items: center;
+}
+.split-row .sp-amt { text-align: right; font-variant-numeric: tabular-nums; }
+.sp-paid { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+.sp-paid input { min-height: 0; width: 18px; height: 18px; accent-color: var(--good); }
+.split-foot { font-size: 12.5px; line-height: 1.6; }
+@media (max-width: 560px) {
+  .split-row { grid-template-columns: minmax(0, 1fr) 96px auto; grid-template-areas: "name amt del" "paid paid paid"; row-gap: 6px; }
+  .split-row .sp-name { grid-area: name; }
+  .split-row .sp-amt { grid-area: amt; }
+  .split-row [data-split="del"] { grid-area: del; }
+  .sp-paid { grid-area: paid; }
+}
+
+.tag.is-debt { background: var(--warn-soft); color: var(--warn-ink); }
+.tag.is-settled { background: var(--ok-soft); color: var(--ok-ink); }
+
+.debt-card {
+  background: var(--surface-1); border: 1px solid var(--border-soft); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px;
+}
+.debt-card.is-clear { opacity: .78; }
+.debt-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.debt-head > div:first-child { flex: 1; min-width: 140px; }
+.debt-name { font-size: 15.5px; }
+.debt-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.debt-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 18px; color: var(--text-muted); }
+.debt-total.is-owed { color: var(--warn-ink); }
+.debt-items { display: grid; gap: 8px; }
+.debt-item {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
+  border-top: 1px dashed var(--border-soft); padding-top: 8px;
+}
+.debt-item.is-paid { opacity: .7; }
+.debt-item-main { min-width: 0; display: grid; gap: 1px; }
+.debt-item-name { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.debt-item-meta { font-size: 12px; color: var(--text-muted); }
+.debt-item-amount { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+@media (max-width: 560px) {
+  .debt-item { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main amount" "btn btn"; row-gap: 8px; }
+  .debt-item-main { grid-area: main; }
+  .debt-item-amount { grid-area: amount; }
+  .debt-item .btn { grid-area: btn; justify-self: start; }
+  .debt-item-name { white-space: normal; }
+  .debt-head .debt-total { margin-left: auto; }
+}
+.tab #debtBadge { margin-left: 4px; background: var(--warn-soft); color: var(--warn-ink); }
+/* สี่แท็บบนจอมือถือ — ใช้ชื่อสั้นเพื่อให้พอดีจอ ไม่ต้องเลื่อนหา */
+.tab-short { display: none; }
+@media (max-width: 560px) {
+  .tab-full { display: none; }
+  .tab-short { display: inline; }
+}
+@media (pointer: coarse) { .tab { min-width: 44px; } }
+
+/* ---------- รายจ่ายรายวัน ---------- */
+.days {
+  display: flex; align-items: flex-end; gap: 2px; height: 118px;
+  border-bottom: 1px solid var(--grid); padding-bottom: 0; overflow-x: auto;
+  scrollbar-width: thin;
+}
+.day-col {
+  flex: 1 1 0; min-width: 8px; display: flex; flex-direction: column;
+  justify-content: flex-end; align-items: center; gap: 3px; height: 100%;
+}
+.day-bar {
+  display: block; width: 100%; max-width: 16px; border-radius: 4px 4px 0 0; min-height: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--series-1) 80%, #fff 20%), var(--series-1));
+  transform-origin: bottom center; animation: grow-y .5s var(--ease) both;
+}
+.day-num { font-size: 9.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; line-height: 1; }
+.day-col.is-today .day-bar { background: var(--accent-ink); }
+.day-col.is-today .day-num { color: var(--accent-ink); font-weight: 700; }
+.day-col.is-future { opacity: .45; }
+.day-top { margin-top: 14px; }
+.day-top li { font-size: 13.5px; }
+@media (max-width: 560px) {
+  .days { height: 104px; gap: 1.5px; }
+  .day-num { font-size: 8.5px; }
+  /* วันคี่เท่านั้นที่แสดงเลข ไม่ให้ตัวเลขเบียดกันจนอ่านไม่ออก */
+  .day-col:nth-child(even) .day-num { visibility: hidden; }
+  .day-col.is-today .day-num { visibility: visible; }
+}
