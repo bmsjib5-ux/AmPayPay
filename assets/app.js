@@ -2174,7 +2174,7 @@
 
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
-      var done = function () { toast('คัดลอกลิงก์แล้ว — วางต่อท้ายใน Open URLs'); };
+      var done = function () { toast('คัดลอกลิงก์แล้ว — วางในช่อง “เปิด URL” แล้วต่อด้วยข้อความที่เข้ารหัสไว้'); };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(done, function () { toast('คัดลอกไม่สำเร็จ กดค้างที่ลิงก์เพื่อคัดลอกเอง'); });
       } else {
