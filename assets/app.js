@@ -40,7 +40,8 @@
   }
   function catOptions(selected) {
     return CATS.map(function (c) {
-      return '<option value="' + c.key + '"' + (c.key === selected ? ' selected' : '') + '>' + esc(c.label) + '</option>';
+      return '<option value="' + c.key + '"' + (c.key === selected ? ' selected' : '') + '>' +
+        c.icon + '  ' + esc(c.label) + '</option>';
     }).join('');
   }
 
@@ -66,6 +67,170 @@
       toast(next === 'system' ? 'ธีม: ตามระบบ' : next === 'light' ? 'ธีม: สว่าง' : 'ธีม: มืด');
     });
   })();
+
+  /* ---------------- พื้นหลังของฉัน ----------------
+     เก็บไว้ในเครื่องเท่านั้น (ไม่ซิงก์ขึ้นเซิร์ฟเวอร์ เหมือนรูปใบเสร็จ)
+     รูปถูกย่อก่อนเก็บ เพราะ localStorage มีพื้นที่จำกัด */
+  var BG_KEY = 'expense-book:bg:v1';
+  var BG_PRESETS = [
+    { id: 'none',   label: 'ค่าเริ่มต้น', swatch: 'linear-gradient(135deg,#efe9ff,#ffeede)' },
+    { id: 'mint',   label: 'มินต์',      css: 'linear-gradient(160deg,#d8f3e6 0%,#eef7ff 55%,#fdf1e3 100%)', swatch: 'linear-gradient(135deg,#d8f3e6,#fdf1e3)' },
+    { id: 'sunset', label: 'พระอาทิตย์', css: 'linear-gradient(160deg,#ffe3d3 0%,#ffd9e8 52%,#e7e2ff 100%)', swatch: 'linear-gradient(135deg,#ffe3d3,#e7e2ff)' },
+    { id: 'sky',    label: 'ท้องฟ้า',    css: 'linear-gradient(160deg,#dbe9ff 0%,#e8e2ff 50%,#fde9f3 100%)', swatch: 'linear-gradient(135deg,#dbe9ff,#fde9f3)' },
+    { id: 'matcha', label: 'ชาเขียว',    css: 'linear-gradient(160deg,#e6f0d4 0%,#f6f2df 55%,#e3f1ec 100%)', swatch: 'linear-gradient(135deg,#e6f0d4,#e3f1ec)' }
+  ];
+  var bgState = { kind: 'none', image: '', preset: '', dim: 62, blur: 3 };
+
+  function loadBg() {
+    try {
+      var raw = localStorage.getItem(BG_KEY);
+      if (raw) {
+        var v = JSON.parse(raw);
+        if (v && typeof v === 'object') {
+          bgState.kind = v.kind === 'image' || v.kind === 'preset' ? v.kind : 'none';
+          bgState.image = typeof v.image === 'string' ? v.image : '';
+          bgState.preset = typeof v.preset === 'string' ? v.preset : '';
+          bgState.dim = clampNum(v.dim, 0, 92, 62);
+          bgState.blur = clampNum(v.blur, 0, 16, 3);
+        }
+      }
+    } catch (e) { /* อ่านไม่ได้ก็ใช้ค่าเริ่มต้น */ }
+    applyBg();
+  }
+  function clampNum(v, lo, hi, dflt) {
+    var n = Number(v);
+    return isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
+  }
+  function saveBg() {
+    try {
+      localStorage.setItem(BG_KEY, JSON.stringify(bgState));
+      return true;
+    } catch (e) { return false; }
+  }
+  function presetById(id) {
+    for (var i = 0; i < BG_PRESETS.length; i++) if (BG_PRESETS[i].id === id) return BG_PRESETS[i];
+    return null;
+  }
+  function applyBg() {
+    var root = document.documentElement;
+    var body = document.body;
+    var layer = '';
+    if (bgState.kind === 'image' && bgState.image) layer = 'url("' + bgState.image + '")';
+    else if (bgState.kind === 'preset') {
+      var pre = presetById(bgState.preset);
+      if (pre && pre.css) layer = pre.css;
+    }
+    body.classList.toggle('has-bg', !!layer);
+    body.classList.toggle('has-bg-image', bgState.kind === 'image' && !!layer);
+    if (!layer) { root.style.removeProperty('--bg-layer'); return; }
+    root.style.setProperty('--bg-layer', layer);
+    root.style.setProperty('--bg-dim', bgState.dim + '%');
+    root.style.setProperty('--bg-blur', (bgState.kind === 'image' ? bgState.blur : 0) + 'px');
+  }
+
+  /* ย่อรูปลงจนพอใส่ localStorage ได้ — ไล่ลดขนาด/คุณภาพทีละขั้น */
+  function bgDataURL(img) {
+    var sizes = [1600, 1280, 1024, 800];
+    var quality = [0.72, 0.66, 0.6, 0.55];
+    for (var i = 0; i < sizes.length; i++) {
+      var url = resizeToDataURL(img, sizes[i], quality[i]);
+      if (url.length < 1700000) return url;
+    }
+    return resizeToDataURL(img, 640, 0.5);
+  }
+
+  function bgModalBody() {
+    var isImg = bgState.kind === 'image' && bgState.image;
+    return '<p class="chart-sub">เลือกรูปจากเครื่อง หรือใช้ชุดสีสำเร็จรูป · รูปพื้นหลังเก็บไว้ในเครื่องนี้เท่านั้น ไม่ถูกอัปโหลดที่ไหน</p>' +
+      '<div class="bg-presets">' +
+        BG_PRESETS.map(function (pre) {
+          var on = pre.id === 'none' ? bgState.kind === 'none' : (bgState.kind === 'preset' && bgState.preset === pre.id);
+          return '<button type="button" class="bg-swatch' + (on ? ' is-on' : '') + '" data-bg="preset" data-id="' + pre.id + '">' +
+            '<span class="bg-swatch-chip" style="background:' + pre.swatch + '"></span>' +
+            '<span class="bg-swatch-label">' + esc(pre.label) + '</span></button>';
+        }).join('') +
+        '<button type="button" class="bg-swatch' + (isImg ? ' is-on' : '') + '" data-bg="pick">' +
+          '<span class="bg-swatch-chip bg-swatch-photo"' + (isImg ? ' style="background-image:url(' + bgState.image + ')"' : '') + '>' +
+            (isImg ? '' : '🖼️') + '</span>' +
+          '<span class="bg-swatch-label">รูปของฉัน</span></button>' +
+      '</div>' +
+      (isImg
+        ? '<div class="bg-sliders">' +
+            '<label class="field"><span class="field-label">ความจางของรูป · ' + bgState.dim + '%</span>' +
+              '<input type="range" min="0" max="92" step="2" data-bg="dim" value="' + bgState.dim + '"></label>' +
+            '<label class="field"><span class="field-label">ความเบลอ · ' + bgState.blur + 'px</span>' +
+              '<input type="range" min="0" max="16" step="1" data-bg="blur" value="' + bgState.blur + '"></label>' +
+          '</div>'
+        : '') +
+      '<div class="row-actions" style="margin-top:14px">' +
+        '<button class="btn btn-primary btn-sm" data-bg="pick">🖼️ เลือกรูปจากเครื่อง</button>' +
+        (bgState.kind !== 'none' ? '<button class="btn btn-ghost btn-sm" data-bg="clear">ใช้พื้นหลังเดิม</button>' : '') +
+      '</div>';
+  }
+  function renderBgModal() { $('#bgBody').innerHTML = bgModalBody(); }
+  function closeBgModal() { $('#bgModal').hidden = true; }
+
+  $('#bgBtn').addEventListener('click', function () {
+    $('#bgModal').hidden = false;
+    renderBgModal();
+  });
+  $('#bgModal').addEventListener('click', function (ev) {
+    if (ev.target === this) { closeBgModal(); return; }
+    var btn = ev.target.closest('button[data-bg]');
+    if (!btn) return;
+    var act = btn.dataset.bg;
+    if (act === 'close') { closeBgModal(); return; }
+    if (act === 'pick') { $('#bgInput').click(); return; }
+    if (act === 'clear') {
+      bgState.kind = 'none'; bgState.image = '';
+      saveBg(); applyBg(); renderBgModal();
+      toast('กลับไปใช้พื้นหลังเดิมแล้ว');
+      return;
+    }
+    if (act === 'preset') {
+      var id = btn.dataset.id;
+      if (id === 'none') { bgState.kind = 'none'; }
+      else { bgState.kind = 'preset'; bgState.preset = id; }
+      saveBg(); applyBg(); renderBgModal();
+    }
+  });
+  $('#bgModal').addEventListener('input', function (ev) {
+    var el = ev.target;
+    if (el.tagName !== 'INPUT' || !el.dataset.bg) return;
+    if (el.dataset.bg === 'dim') bgState.dim = clampNum(el.value, 0, 92, 62);
+    if (el.dataset.bg === 'blur') bgState.blur = clampNum(el.value, 0, 16, 3);
+    applyBg();
+    var label = el.previousElementSibling;
+    if (label) {
+      label.textContent = el.dataset.bg === 'dim'
+        ? 'ความจางของรูป · ' + bgState.dim + '%'
+        : 'ความเบลอ · ' + bgState.blur + 'px';
+    }
+  });
+  $('#bgModal').addEventListener('change', function (ev) {
+    if (ev.target.tagName === 'INPUT' && ev.target.dataset.bg) saveBg();
+  });
+  $('#bgInput').addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    this.value = '';
+    if (!file) return;
+    toast('กำลังย่อรูป…');
+    loadImage(file).then(function (img) {
+      var prev = { kind: bgState.kind, image: bgState.image, preset: bgState.preset };
+      bgState.kind = 'image';
+      bgState.image = bgDataURL(img);
+      if (!saveBg()) {
+        bgState.kind = prev.kind; bgState.image = prev.image; bgState.preset = prev.preset;
+        applyBg(); renderBgModal();
+        toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — ลองลบรายการเก่าหรือใช้รูปที่เล็กลง');
+        return;
+      }
+      applyBg(); renderBgModal();
+      toast('เปลี่ยนพื้นหลังแล้ว 🎨');
+    }).catch(function () { toast('เปิดไฟล์รูปไม่ได้'); });
+  });
+
+  loadBg();
 
   /* ---------------- แท็บ ---------------- */
   document.querySelectorAll('.tab').forEach(function (tab) {
@@ -609,7 +774,7 @@
       '<details class="raw" style="margin-top:14px"><summary>ตั้งงบรายหมวด (ไม่บังคับ)</summary>' +
         '<div class="grid2" style="margin-top:10px">' +
           cats.map(function (c) {
-            return '<label class="field"><span class="field-label">' + esc(c.label) + '</span>' +
+            return '<label class="field"><span class="field-label">' + c.icon + ' ' + esc(c.label) + '</span>' +
               '<input type="number" min="0" step="100" inputmode="decimal" data-bcat="' + c.key + '" value="' +
               (st.categories[c.key] || '') + '" placeholder="ไม่จำกัด"></label>';
           }).join('') +
@@ -787,13 +952,14 @@
           : '<span class="bar-sub">งบ ' + esc(moneyShort.format(cap)) + ' · ใช้ไป ' + Math.round(r.value / cap * 100) + '%</span>';
       }
       return '<div class="bar-row">' +
-        '<span class="bar-name"><span class="bar-label" title="' + esc(r.label) + '">' + esc(r.label) + '</span>' + sub + '</span>' +
+        '<span class="bar-name"><span class="bar-label" title="' + esc(r.label) + '">' +
+          '<span class="bar-icon" aria-hidden="true">' + ReceiptParser.categoryIcon(r.key) + '</span>' + esc(r.label) + '</span>' + sub + '</span>' +
         '<span class="bar-track"><span class="bar-fill' + (over ? ' is-over' : '') + '" style="width:' + (max ? Math.max(2, r.value / max * 100) : 0) + '%"></span></span>' +
         '<span class="bar-value">' + moneyShort.format(r.value) + '<span class="bar-pct">' + pct + '%</span></span>' +
       '</div>';
-    }).join('') : '<p class="empty">ยังไม่มีรายจ่ายในเดือนนี้</p>';
+    }).join('') : '<p class="empty"><span class="empty-icon" aria-hidden="true">🌱</span>เดือนนี้ยังไม่มีรายจ่ายเลย</p>';
 
-    $('#sumTop').textContent = rows.length ? 'จ่ายมากสุด: ' + rows[0].label : '';
+    $('#sumTop').textContent = rows.length ? 'จ่ายมากสุด: ' + ReceiptParser.categoryIcon(rows[0].key) + ' ' + rows[0].label : '';
 
     // แนวโน้ม 6 เดือน
     var keys = [];
@@ -861,12 +1027,13 @@
   function expenseCard(e) {
     return '<article class="ecard" data-id="' + e.id + '">' +
       (e.image ? '<img class="ecard-thumb" src="' + e.image + '" alt="ใบเสร็จ ' + esc(e.merchant) + '">'
-               : '<span class="ecard-thumb" aria-hidden="true">🧾</span>') +
+               : '<span class="ecard-thumb is-cat" aria-hidden="true">' + ReceiptParser.categoryIcon(e.category) + '</span>') +
       '<div class="ecard-main">' +
         '<div class="ecard-title">' + esc(e.merchant) + '</div>' +
         '<div class="ecard-meta">' +
           '<span>' + esc(dateLabel(e.date)) + '</span>' +
-          '<span class="tag">' + esc(ReceiptParser.categoryLabel(e.category)) + '</span>' +
+          '<span class="tag"><span aria-hidden="true">' + ReceiptParser.categoryIcon(e.category) + '</span> ' +
+            esc(ReceiptParser.categoryLabel(e.category)) + '</span>' +
           (e.note ? '<span>' + esc(e.note) + '</span>' : '') +
         '</div>' +
       '</div>' +
@@ -901,7 +1068,7 @@
     var catSel = $('#fCat');
     if (!catSel.options.length) {
       catSel.innerHTML = '<option value="all">ทุกหมวด</option>' +
-        CATS.map(function (c) { return '<option value="' + c.key + '">' + esc(c.label) + '</option>'; }).join('');
+        CATS.map(function (c) { return '<option value="' + c.key + '">' + c.icon + '  ' + esc(c.label) + '</option>'; }).join('');
     }
     fillMonthSelect($('#fMonth'), { allOption: true });
 
@@ -911,7 +1078,7 @@
       : 'ไม่พบรายการ';
     $('#expenseList').innerHTML = list.length
       ? list.map(expenseCard).join('')
-      : '<p class="empty">ยังไม่มีรายจ่ายที่ตรงกับเงื่อนไข — ลองอัปโหลดใบเสร็จในแท็บ “เพิ่มรายจ่าย”</p>';
+      : '<p class="empty"><span class="empty-icon" aria-hidden="true">🔍</span>ไม่เจอรายการที่ตรงกับเงื่อนไข<br><span class="muted">ลองเปลี่ยนตัวกรอง หรือเพิ่มใบเสร็จในแท็บ “เพิ่มรายจ่าย”</span></p>';
   }
 
   ['input', 'change'].forEach(function (evt) {
@@ -1340,6 +1507,7 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (!$('#bgModal').hidden) closeBgModal();
     if (!$('#syncModal').hidden) closeSync();
     if (!$('#bookModal').hidden) closeBookModal();
   });
