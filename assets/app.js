@@ -76,16 +76,45 @@
      ใช้ hash (#) ไม่ใช่ query (?) เพราะข้อความหลัง # ไม่ถูกส่งไปที่เซิร์ฟเวอร์ */
   var SLIP_SEPARATOR = /\n\s*-{3,}\s*\n/;
 
+  function decodeParam(v) {
+    try { return decodeURIComponent(String(v).replace(/\+/g, ' ')); }
+    catch (e) { return String(v); }
+  }
+
+  /* หาสมุดจากชื่อหรือรหัสที่ Shortcut ส่งมา — เทียบชื่อแบบไม่สนช่องว่างและตัวพิมพ์ */
+  function findBookByHint(hint) {
+    var want = String(hint || '').trim();
+    if (!want) return null;
+    var books = ExpenseStore.books();
+    var norm = function (t) { return String(t).replace(/\s+/g, '').toLowerCase(); };
+    var byId = books.filter(function (b) { return b.id === want; })[0];
+    if (byId) return byId;
+    return books.filter(function (b) { return norm(b.name) === norm(want); })[0] || null;
+  }
+
   function importFromHash() {
     var hash = location.hash || '';
     var m = hash.match(/[#&]slips?=([^&]*)/);
     if (!m) return;
+    var bookHint = (hash.match(/[#&]book=([^&]*)/) || [])[1];
     history.replaceState(null, '', location.pathname + location.search);   // กันนำเข้าซ้ำตอนรีเฟรช
 
-    var raw = '';
-    try { raw = decodeURIComponent(m[1].replace(/\+/g, ' ')); }
-    catch (e) { raw = m[1]; }
-    raw = String(raw).slice(0, 60000).trim();
+    var bookNote = '';
+    if (bookHint) {
+      var want = decodeParam(bookHint);
+      var book = findBookByHint(want);
+      if (!book) {
+        bookNote = ' · ไม่พบสมุด “' + want + '” จึงใส่ไว้ในสมุด “' + ExpenseStore.currentBookName() + '”';
+      } else if (book.id !== ExpenseStore.currentBook()) {
+        switchBook(book.id);                       // ต้องสลับก่อนสร้างการ์ด เพราะสลับสมุดแล้วคิวจะถูกล้าง
+        bookNote = ' · เข้าสมุด “' + book.name + '”';
+      } else {
+        bookNote = ' · สมุด “' + book.name + '”';
+      }
+    }
+
+    var raw;
+    raw = decodeParam(m[1]).slice(0, 60000).trim();
     if (!raw) { toast('ไม่พบข้อความใบเสร็จในลิงก์'); return; }
 
     var chunks = raw.split(SLIP_SEPARATOR)
@@ -115,7 +144,7 @@
     if (addTab) addTab.click();
     var found = chunks.filter(function (t) { return ReceiptParser.parse(t).amount != null; }).length;
     toast('รับใบเสร็จจาก Shortcut ' + chunks.length + ' ใบ' +
-      (found < chunks.length ? ' · อ่านยอดได้ ' + found + ' ใบ' : '') + ' — ตรวจแล้วกดบันทึกได้เลย');
+      (found < chunks.length ? ' · อ่านยอดได้ ' + found + ' ใบ' : '') + bookNote + ' — ตรวจแล้วกดบันทึกได้เลย');
   }
 
   /* ---------------- หารบิลกับเพื่อน / ลูกหนี้ ---------------- */
@@ -2121,10 +2150,28 @@
 
   /* ปุ่มคัดลอกลิงก์สำหรับใส่ใน Shortcut — ใช้ที่อยู่จริงของหน้าเว็บที่กำลังเปิดอยู่ */
   (function () {
-    var code = $('#shortcutUrl'), btn = $('#copyShortcutUrl');
+    var code = $('#shortcutUrl'), btn = $('#copyShortcutUrl'), pick = $('#shortcutBook');
     if (!code || !btn) return;
-    var url = location.origin + location.pathname + '#slip=';
-    code.textContent = url;
+    var url = '';
+
+    function refresh() {
+      if (pick) {
+        var current = pick.value;
+        pick.innerHTML = '<option value="">สมุดที่กำลังใช้อยู่ตอนนั้น</option>' +
+          ExpenseStore.books().map(function (b) {
+            return '<option value="' + esc(b.name) + '">' + esc(b.name) + '</option>';
+          }).join('');
+        if (current && pick.querySelector('option[value="' + current.replace(/"/g, '\\"') + '"]')) pick.value = current;
+      }
+      var name = pick ? pick.value : '';
+      url = location.origin + location.pathname + '#' +
+        (name ? 'book=' + encodeURIComponent(name) + '&' : '') + 'slip=';
+      code.textContent = url;
+    }
+    refresh();
+    if (pick) pick.addEventListener('change', refresh);
+    ExpenseStore.onChange(refresh);
+
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
       var done = function () { toast('คัดลอกลิงก์แล้ว — วางต่อท้ายใน Open URLs'); };

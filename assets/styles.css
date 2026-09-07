@@ -901,3 +901,7 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all;
 }
 .shortcut-body .btn { margin-left: 6px; }
+.shortcut-url { display: grid; gap: 8px; margin-top: 12px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); }
+.shortcut-url code { background: var(--surface-1); padding: 8px 10px; border-radius: 8px; display: block; }
+.shortcut-url .btn { justify-self: start; }
+.shortcut-body .btn { margin-left: 0; }
