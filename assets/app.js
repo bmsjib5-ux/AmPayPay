@@ -106,69 +106,183 @@
     })[0] || null;
   }
 
-  /* ---------- สมุดที่อยู่เพื่อน ---------- */
-  function friendsBody() {
-    var list = ExpenseStore.friends.all();
-    return '<p class="chart-sub">เก็บอีเมลเพื่อนไว้ เพื่อส่งยอดหนี้ให้เขาเห็นในแอปของเขาเอง ' +
-        '(เพื่อนต้องใช้เว็บนี้และล็อกอินด้วยอีเมลเดียวกัน)</p>' +
-      '<div class="book-list">' +
-        (list.length ? list.map(function (f) {
-          return '<div class="book-row" data-email="' + esc(f.email) + '">' +
-            '<div class="book-info">' +
-              '<span class="book-name">' + esc(f.name || f.email) + '</span>' +
-              '<span class="book-count">' + esc(f.email) + '</span>' +
-            '</div>' +
-            '<button class="btn btn-ghost btn-sm" data-friend="rename">เปลี่ยนชื่อ</button>' +
-            '<button class="btn btn-ghost btn-sm btn-danger" data-friend="del">ลบ</button>' +
-          '</div>';
-        }).join('') : '<p class="empty"><span class="empty-icon" aria-hidden="true">👋</span>ยังไม่มีเพื่อนในรายชื่อ</p>') +
-      '</div>' +
-      '<div class="grid2" style="margin-top:14px">' +
-        '<label class="field"><span class="field-label">ชื่อเล่น</span>' +
-          '<input type="text" id="newFriendName" placeholder="เช่น เอ"></label>' +
-        '<label class="field"><span class="field-label">อีเมลของเพื่อน</span>' +
-          '<input type="email" id="newFriendEmail" placeholder="friend@example.com" autocomplete="off"></label>' +
-      '</div>' +
-      '<div class="row-actions" style="margin-top:12px">' +
-        '<button class="btn btn-primary btn-sm" data-friend="add">เพิ่มเพื่อน</button>' +
-      '</div>';
+  /* ---------- แท็บเพื่อน: บัตรของฉัน (QR) + รายชื่อเพื่อน ---------- */
+  var PROFILE_KEY = 'expense-book:profile:v1';
+  function profile() {
+    try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}') || {}; } catch (e) { return {}; }
   }
-  function renderFriendsModal() { $('#friendsBody').innerHTML = friendsBody(); }
-  function closeFriendsModal() { $('#friendsModal').hidden = true; }
+  function saveProfile(patch) {
+    var cur = profile();
+    Object.keys(patch).forEach(function (k) { cur[k] = patch[k]; });
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(cur)); } catch (e) {}
+  }
+  function myName() { return String(profile().name || '').trim(); }
 
-  $('#friendsBtn').addEventListener('click', function () {
-    $('#friendsModal').hidden = false;
-    renderFriendsModal();
-  });
-  $('#friendsModal').addEventListener('click', function (ev) {
-    if (ev.target === this) { closeFriendsModal(); return; }
-    var btn = ev.target.closest('[data-friend]');
-    if (!btn) return;
-    var act = btn.dataset.friend;
-    var row = btn.closest('.book-row');
-    var email = row ? row.dataset.email : '';
-    if (act === 'close') { closeFriendsModal(); return; }
-    if (act === 'add') {
-      var res = ExpenseStore.friends.save($('#newFriendEmail').value, $('#newFriendName').value);
-      if (!res.ok) { toast(res.error); return; }
-      renderFriendsModal();
-      toast('เพิ่มเพื่อนแล้ว');
+  /* ลิงก์ในบัตร: เพื่อนสแกนแล้วเปิดแอป จะเพิ่มเราเป็นเพื่อนให้ทันที */
+  function friendLink(email, name) {
+    return location.origin + location.pathname + '#addfriend=' + encodeURIComponent(email) +
+      (name ? '&name=' + encodeURIComponent(name) : '');
+  }
+  function qrSvg(text) {
+    if (typeof qrcode !== 'function') return '';
+    try {
+      var qr = qrcode(0, 'M');
+      qr.addData(text, 'Byte');
+      qr.make();
+      return qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+    } catch (e) { return ''; }
+  }
+
+  function renderMeCard() {
+    var body = $('#meBody');
+    if (!syncReady()) {
+      body.innerHTML = '<p class="banner is-warn" style="margin:0">ต้องล็อกอิน ☁️ ก่อน — อีเมลที่ใช้ล็อกอินคือรหัสประจำตัวของคุณ ' +
+        'เพื่อนใช้อีเมลนี้ส่งยอดหนี้มาหาคุณได้</p>';
       return;
     }
-    if (act === 'rename') {
+    var email = myEmail();
+    var name = myName();
+    var link = friendLink(email, name);
+    var svg = qrSvg(link);
+    body.innerHTML = '<div class="me-body">' +
+        '<div class="me-qr" aria-label="QR สำหรับเพิ่มเพื่อน">' + (svg || '<span class="muted">สร้าง QR ไม่ได้</span>') + '</div>' +
+        '<div class="me-info">' +
+          '<label class="field"><span class="field-label">ชื่อเล่นของฉัน (เพื่อนจะเห็นชื่อนี้)</span>' +
+            '<input type="text" id="myNameInput" value="' + esc(name) + '" placeholder="เช่น แอน" maxlength="40"></label>' +
+          '<div><span class="field-label">รหัสประจำตัว (อีเมลที่ล็อกอิน)</span>' +
+            '<div class="me-id">' + esc(email) + '</div></div>' +
+          '<div class="row-actions">' +
+            '<button class="btn btn-sm" id="shareMeBtn" type="button">📤 แชร์ลิงก์เพิ่มเพื่อน</button>' +
+            '<button class="btn btn-ghost btn-sm" id="copyMeBtn" type="button">คัดลอกอีเมล</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    $('#myNameInput').addEventListener('change', function () {
+      saveProfile({ name: this.value.trim() });
+      renderMeCard();
+      toast('บันทึกชื่อเล่นแล้ว');
+    });
+    $('#shareMeBtn').addEventListener('click', function () {
+      var text = 'เพิ่มฉันเป็นเพื่อนในสมุดรายจ่าย: ' + link;
+      if (navigator.share) {
+        navigator.share({ title: 'เพิ่มเพื่อน', text: text, url: link }).catch(function () {});
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(function () { toast('คัดลอกลิงก์แล้ว ส่งให้เพื่อนได้เลย'); });
+      } else { prompt('คัดลอกลิงก์นี้ส่งให้เพื่อน', link); }
+    });
+    $('#copyMeBtn').addEventListener('click', function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(email).then(function () { toast('คัดลอกอีเมลแล้ว'); });
+      } else { prompt('อีเมลของคุณ', email); }
+    });
+  }
+
+  /* ยอดค้างระหว่างเรากับเพื่อนแต่ละคน ไว้โชว์ในรายชื่อ */
+  function friendBalance(email) {
+    var me = myEmail();
+    var theyOwe = 0, iOwe = 0;
+    ExpenseStore.claims.all().forEach(function (c) {
+      if (c.status === 'confirmed' || c.status === 'cancelled') return;
+      if (c.fromEmail === me && c.toEmail === email) theyOwe += c.amount;
+      if (c.toEmail === me && c.fromEmail === email) iOwe += c.amount;
+    });
+    return { theyOwe: theyOwe, iOwe: iOwe };
+  }
+
+  function renderFriendList() {
+    var list = ExpenseStore.friends.all();
+    $('#friendCount').textContent = list.length ? list.length + ' คน' : '';
+    $('#friendList').innerHTML = list.length ? list.map(function (f) {
+      var bal = friendBalance(f.email);
+      var bits = [];
+      if (bal.theyOwe > 0.005) bits.push('<span class="friend-owed">ค้างเรา ' + esc(fmtMoney(bal.theyOwe)) + '</span>');
+      if (bal.iOwe > 0.005) bits.push('<span class="friend-owe">เราค้าง ' + esc(fmtMoney(bal.iOwe)) + '</span>');
+      return '<div class="book-row friend-row" data-email="' + esc(f.email) + '">' +
+        '<div class="book-info">' +
+          '<span class="book-name">' + esc(f.name || f.email) + '</span>' +
+          '<span class="book-count"><span>' + esc(f.email) + '</span>' + bits.join('') + '</span>' +
+        '</div>' +
+        '<button class="btn btn-ghost btn-sm" data-friend="rename">เปลี่ยนชื่อ</button>' +
+        '<button class="btn btn-ghost btn-sm btn-danger" data-friend="del">ลบ</button>' +
+      '</div>';
+    }).join('') : '<p class="empty"><span class="empty-icon" aria-hidden="true">👋</span>ยังไม่มีเพื่อนในรายชื่อ<br>' +
+      '<span class="muted">ให้เพื่อนสแกน QR ของคุณ หรือใส่อีเมลเพื่อนด้านบน</span></p>';
+  }
+
+  function renderFriendsTab() { renderMeCard(); renderFriendList(); }
+
+  function addFriendFromForm() {
+    var res = ExpenseStore.friends.save($('#newFriendEmail').value, $('#newFriendName').value);
+    if (!res.ok) { toast(res.error); return; }
+    $('#newFriendEmail').value = ''; $('#newFriendName').value = '';
+    renderFriendList();
+    toast('เพิ่ม ' + (res.friend.name || res.friend.email) + ' เป็นเพื่อนแล้ว');
+  }
+  $('#addFriendBtn').addEventListener('click', addFriendFromForm);
+  $('#newFriendEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') addFriendFromForm(); });
+
+  /* วางลิงก์ที่ได้จาก QR ของเพื่อน (กรณีสแกนด้วยแอปอื่นแล้วคัดลอกมา) */
+  $('#pasteFriendBtn').addEventListener('click', function () {
+    var raw = prompt('วางลิงก์หรืออีเมลของเพื่อน');
+    if (raw === null) return;
+    var parsed = parseFriendLink(raw);
+    if (!parsed) { toast('ไม่พบอีเมลในข้อความที่วาง'); return; }
+    var res = ExpenseStore.friends.save(parsed.email, parsed.name);
+    if (!res.ok) { toast(res.error); return; }
+    renderFriendList();
+    toast('เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
+  });
+
+  function parseFriendLink(text) {
+    var str = String(text || '').trim();
+    var m = str.match(/[#&?]addfriend=([^&\s]+)/);
+    if (m) {
+      var name = (str.match(/[#&?]name=([^&\s]+)/) || [])[1];
+      return { email: decodeParam(m[1]).trim().toLowerCase(), name: name ? decodeParam(name).trim() : '' };
+    }
+    var e = str.match(/[^@\s]+@[^@\s]+\.[^@\s]+/);
+    return e ? { email: e[0].toLowerCase(), name: '' } : null;
+  }
+
+  $('#friendList').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-friend]');
+    if (!btn) return;
+    var row = btn.closest('.friend-row');
+    var email = row ? row.dataset.email : '';
+    if (btn.dataset.friend === 'rename') {
       var f = ExpenseStore.friends.get(email);
       var name = prompt('ชื่อเล่นของ ' + email, f ? f.name : '');
       if (name === null) return;
       ExpenseStore.friends.save(email, name);
-      renderFriendsModal();
-      return;
-    }
-    if (act === 'del') {
+      renderFriendList();
+    } else if (btn.dataset.friend === 'del') {
       if (!confirm('ลบ ' + email + ' ออกจากรายชื่อเพื่อน?')) return;
       ExpenseStore.friends.remove(email);
-      renderFriendsModal();
+      renderFriendList();
     }
   });
+
+  $('#friendsBtn').addEventListener('click', function () {
+    var tab = document.querySelector('.tab[data-tab="friends"]');
+    if (tab) tab.click();
+  });
+
+  /* สแกน QR ของเพื่อนด้วยกล้องมือถือ → เปิดลิงก์ #addfriend= มาที่นี่ */
+  function importFriendFromHash() {
+    var hash = location.hash || '';
+    if (!/[#&]addfriend=/.test(hash)) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    var parsed = parseFriendLink(hash);
+    if (!parsed || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(parsed.email)) { toast('ลิงก์เพิ่มเพื่อนไม่ถูกต้อง'); return; }
+    if (parsed.email === myEmail()) { toast('นี่คือบัตรของคุณเอง 🙂'); return; }
+    var already = ExpenseStore.friends.get(parsed.email);
+    if (!already && !confirm('เพิ่ม ' + (parsed.name ? parsed.name + ' (' + parsed.email + ')' : parsed.email) + ' เป็นเพื่อนไหม?')) return;
+    ExpenseStore.friends.save(parsed.email, parsed.name || (already ? already.name : ''));
+    var tab = document.querySelector('.tab[data-tab="friends"]');
+    if (tab) tab.click();
+    toast(already ? (parsed.name || parsed.email) + ' อยู่ในรายชื่อเพื่อนอยู่แล้ว' : 'เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
+  }
 
   /* ---------- ฝั่งลูกหนี้: หนี้ที่เพื่อนส่งมา ---------- */
   function renderIncoming() {
@@ -255,7 +369,7 @@
       note: exp.merchant + ' · ' + dateLabel(exp.date),
       expenseId: expenseId,
       personId: personId,
-      fromName: (ExpenseStore.friends.get(myEmail()) || {}).name || '',
+      fromName: myName(),
       status: existing ? existing.status : 'pending'
     }).then(function () { return CloudSync.syncNow(); })
       .then(function () { renderDebts(); toast('ส่งยอดให้ ' + email + ' แล้ว'); })
@@ -945,7 +1059,7 @@
         t.classList.toggle('is-active', on);
         t.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-      ['add', 'summary', 'list', 'debt'].forEach(function (name) {
+      ['add', 'summary', 'list', 'debt', 'friends'].forEach(function (name) {
         var panel = $('#panel-' + name);
         var on = name === tab.dataset.tab;
         panel.classList.toggle('is-active', on);
@@ -954,6 +1068,7 @@
       if (tab.dataset.tab === 'summary') renderSummary();
       if (tab.dataset.tab === 'list') renderList();
       if (tab.dataset.tab === 'debt') renderDebts();
+      if (tab.dataset.tab === 'friends') renderFriendsTab();
       if (tab.scrollIntoView) tab.scrollIntoView({ inline: 'center', block: 'nearest' });
     });
   });
@@ -2509,7 +2624,8 @@
   renderBudgetAlert();
   renderDebtBadge();
   importFromHash();
-  window.addEventListener('hashchange', importFromHash);
+  importFriendFromHash();
+  window.addEventListener('hashchange', function () { importFromHash(); importFriendFromHash(); });
 
   /* ปุ่มคัดลอกลิงก์สำหรับใส่ใน Shortcut — ใช้ที่อยู่จริงของหน้าเว็บที่กำลังเปิดอยู่ */
   (function () {
@@ -2553,6 +2669,7 @@
   CloudSync.onState(function () {
     renderDebtBadge();
     if ($('#panel-debt').classList.contains('is-active')) renderDebts();
+    if ($('#panel-friends').classList.contains('is-active')) renderFriendsTab();
   });
   if (CloudSync.isConfigured()) {
     var cameFromEmailLink = /access_token=|error_description=/.test(location.hash);
