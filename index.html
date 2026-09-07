@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>สมุดเก็บรายจ่ายของฉัน</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=35">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=35">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=36">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=36">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=35">
-<link rel="manifest" href="manifest.webmanifest?v=35">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=36">
+<link rel="manifest" href="manifest.webmanifest?v=36">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="สมุดรายจ่าย">
 <meta name="application-name" content="สมุดรายจ่าย">
-<link rel="stylesheet" href="assets/styles.css?v=35">
+<link rel="stylesheet" href="assets/styles.css?v=36">
 </head>
 <body>
 <header class="topbar">
@@ -87,7 +87,8 @@
           <li>เพิ่ม <b>ทำซ้ำกับแต่ละรายการ</b> (Repeat with Each) → ข้างในใส่
             <b>แยกข้อความออกจากรูปภาพ</b> (Extract Text from Image) — ใช้ Live Text ของเครื่อง</li>
           <li>ต่อท้าย (นอกลูป) ใส่ <b>รวมข้อความ</b> (Combine Text) โดยตัวคั่นเลือก
-            <b>กำหนดเอง</b> (Custom) แล้วพิมพ์บรรทัดที่มี <code>-----</code></li>
+            <b>กำหนดเอง</b> (Custom) แล้วพิมพ์ <code>###SLIP###</code>
+            <span class="muted">(พิมพ์ติดกันบรรทัดเดียว ไม่ต้องเว้นบรรทัด)</span></li>
           <li>ปิดท้ายด้วย <b>เข้ารหัส URL</b> (URL Encode) แล้ว <b>เปิด URL</b> (Open URLs)
             โดยพิมพ์ลิงก์ข้างล่างนี้ แล้วต่อด้วยผลลัพธ์จากขั้นก่อน</li>
         </ol>
@@ -99,6 +100,10 @@
           <code id="shortcutUrl">https://ampaypay.onrender.com/#slip=</code>
           <button type="button" class="btn btn-sm" id="copyShortcutUrl">คัดลอกลิงก์</button>
         </div>
+        <p class="banner is-warn" style="margin-top:12px">⚠️ คำสั่งลัดจะเปิดลิงก์ใน <b>Safari</b> เสมอ
+          ถ้าคุณเพิ่มแอปนี้ไว้ที่หน้าจอโฮม iOS จะถือว่าเป็นคนละที่เก็บข้อมูลกับ Safari
+          รายการที่เข้ามาทางคำสั่งลัดจะไปอยู่ใน Safari เท่านั้น —
+          ให้เลือกใช้ทางใดทางหนึ่งไปเลย หรือเปิดซิงก์ ☁️ ทั้งสองฝั่งเพื่อให้ข้อมูลตรงกัน</p>
         <p class="muted">ข้อความอยู่หลังเครื่องหมาย <code>#</code> จึง <b>ไม่ถูกส่งไปที่เซิร์ฟเวอร์</b> —
           อ่านและแยกข้อมูลในเครื่องคุณเหมือนเดิม · ใบที่เคยบันทึกแล้วระบบยังกันซ้ำให้อัตโนมัติ ·
           อยากให้ทำเองทุกวันก็ตั้งเป็น <b>ระบบอัตโนมัติ</b> (Automation) แบบ <i>เวลาของวัน</i> (Time of Day) ได้<br>
@@ -238,7 +243,7 @@
 
 <footer class="wrap foot">
   ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
-  <span class="ver">เวอร์ชัน 35</span>
+  <span class="ver">เวอร์ชัน 36</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -282,10 +287,10 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/config.js?v=35"></script>
-<script src="assets/parser.js?v=35"></script>
-<script src="assets/store.js?v=35"></script>
-<script src="assets/sync.js?v=35"></script>
-<script src="assets/app.js?v=35"></script>
+<script src="assets/config.js?v=36"></script>
+<script src="assets/parser.js?v=36"></script>
+<script src="assets/store.js?v=36"></script>
+<script src="assets/sync.js?v=36"></script>
+<script src="assets/app.js?v=36"></script>
 </body>
 </html>
