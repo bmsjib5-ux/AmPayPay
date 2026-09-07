@@ -323,7 +323,21 @@ window.ReceiptParser = (function () {
       all.push({ m: i + 1, text: MONTHS_EN[i] });
     }
     for (var j = 0; j < all.length; j++) if (raw.indexOf(all[j].text) === 0) return all[j].m;
-    // OCR ชอบใส่สระเกินหรือทำสระหาย เช่น "กุย" แทน "ก.ย." — ยอมให้ต่างกัน 1 ตัว
+
+    // OCR ใส่สระเกินมาให้ เช่น "กุย" แทน "ก.ย." — เทียบกันที่โครงพยัญชนะล้วน
+    // (ถ้าโครงพยัญชนะไปตรงกับหลายเดือน เช่น ม.ค./มี.ค. ถือว่าไม่ชัด ปล่อยให้ขั้นถัดไปตัดสิน)
+    var rawSk = skeletonMap(raw).sk;
+    if (rawSk.length >= 2) {
+      var skHits = {};
+      all.forEach(function (cand) {
+        var candSk = skeletonMap(cand.text).sk;
+        if (candSk.length >= 2 && candSk === rawSk) skHits[cand.m] = true;
+      });
+      var skMonths = Object.keys(skHits);
+      if (skMonths.length === 1) return +skMonths[0];
+    }
+
+    // ยังไม่ตรง — ยอมให้ต่างกัน 1 ตัว
     // แต่ต้องได้คำตอบเดียวเท่านั้น ไม่งั้นเสี่ยงสับสนระหว่าง ม.ค. กับ มี.ค.
     var hits = {};
     all.forEach(function (cand) {
