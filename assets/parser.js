@@ -165,9 +165,24 @@ window.ReceiptParser = (function () {
     return /[\s:：,;|()\[\]\-\/]/.test(between);
   }
 
+  /* คำสั้นมาก (โครงพยัญชนะไม่ถึง 4 ตัว) ห้ามเทียบด้วยโครงพยัญชนะ เพราะสระถูกตัดทิ้งหมด
+     "ถึง" จะไปตรงกับ "ถุงเงิน" ได้ ทำให้ตัดชื่อร้านขาด — คำพวกนี้ต้องตรงตัวเต็มเท่านั้น */
+  var SKELETON_MIN = 4;
+
+  function exactFind(line, keyword) {
+    var str = String(line), pos = str.indexOf(keyword);
+    while (pos >= 0) {
+      var before = pos === 0 ? '' : str.charAt(pos - 1);
+      if (!before || /[\s:：,;|()\[\]\-\/]/.test(before)) return pos + keyword.length;
+      pos = str.indexOf(keyword, pos + 1);
+    }
+    return -1;
+  }
+
   function fuzzyFind(line, keyword) {
     var k = skeleton(keyword);
     if (!k) return -1;
+    if (k.length < SKELETON_MIN) return exactFind(line, keyword);
     var m = skeletonMap(line);
     var from = 0, idx;
     while ((idx = m.sk.indexOf(k, from)) >= 0) {              // ตรงตัวก่อน
@@ -315,7 +330,7 @@ window.ReceiptParser = (function () {
   }
 
   function monthIndexFromName(name) {
-    var raw = String(name).toLowerCase().replace(/[.\s]/g, '');
+    var raw = String(name).toLowerCase().replace(/[.,:\s]/g, '');
     var all = [];
     for (var i = 0; i < 12; i++) {
       all.push({ m: i + 1, text: MONTHS_TH[i].replace(/\./g, '') });
@@ -326,6 +341,14 @@ window.ReceiptParser = (function () {
 
     // OCR ใส่สระเกินมาให้ เช่น "กุย" แทน "ก.ย." — เทียบกันที่โครงพยัญชนะล้วน
     // (ถ้าโครงพยัญชนะไปตรงกับหลายเดือน เช่น ม.ค./มี.ค. ถือว่าไม่ชัด ปล่อยให้ขั้นถัดไปตัดสิน)
+    // ชื่อเดือนแบบเต็มที่ OCR อ่านมาไม่ครบ เช่น "กันย" ของ "กันยายน" — ยอมรับถ้าตรงตัวเดียว
+    if (raw.length >= 3) {
+      var pre = {};
+      for (var k = 0; k < 12; k++) if (MONTHS_TH_FULL[k].indexOf(raw) === 0) pre[k + 1] = true;
+      var preMonths = Object.keys(pre);
+      if (preMonths.length === 1) return +preMonths[0];
+    }
+
     var rawSk = skeletonMap(raw).sk;
     if (rawSk.length >= 2) {
       var skHits = {};
@@ -362,7 +385,7 @@ window.ReceiptParser = (function () {
       var d2 = makeDate(+m[1], +m[2], +m[3]);
       if (d2) found.push(d2);
     }
-    var re3 = /\b(\d{1,2})\s*([฀-๿][฀-๿.\s]{1,11}|[A-Za-z]{3,9})\.?\s*(\d{2,4})\b/g;  // 31 ธ.ค. 2567
+    var re3 = /\b(\d{1,2})\s*([฀-๿][฀-๿.,:\s]{1,11}|[A-Za-z]{3,9})[.,:]?\s*(\d{2,4})\b/g;  // 31 ธ.ค. 2567
     while ((m = re3.exec(line)) !== null) {
       var mi = monthIndexFromName(m[2]);
       if (!mi) continue;
