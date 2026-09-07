@@ -71,7 +71,8 @@
   /* ---------------- พื้นหลังของฉัน ----------------
      เก็บไว้ในเครื่องเท่านั้น (ไม่ซิงก์ขึ้นเซิร์ฟเวอร์ เหมือนรูปใบเสร็จ)
      รูปถูกย่อก่อนเก็บ เพราะ localStorage มีพื้นที่จำกัด */
-  var BG_KEY = 'expense-book:bg:v1';
+  var BG_KEY = 'expense-book:bg:v2';
+  var BG_KEY_OLD = 'expense-book:bg:v1';
   var BG_PRESETS = [
     { id: 'none',   label: 'ค่าเริ่มต้น', swatch: 'linear-gradient(135deg,#efe9ff,#ffeede)' },
     { id: 'mint',   label: 'มินต์',      css: 'linear-gradient(160deg,#d8f3e6 0%,#eef7ff 55%,#fdf1e3 100%)', swatch: 'linear-gradient(135deg,#d8f3e6,#fdf1e3)' },
@@ -79,19 +80,24 @@
     { id: 'sky',    label: 'ท้องฟ้า',    css: 'linear-gradient(160deg,#dbe9ff 0%,#e8e2ff 50%,#fde9f3 100%)', swatch: 'linear-gradient(135deg,#dbe9ff,#fde9f3)' },
     { id: 'matcha', label: 'ชาเขียว',    css: 'linear-gradient(160deg,#e6f0d4 0%,#f6f2df 55%,#e3f1ec 100%)', swatch: 'linear-gradient(135deg,#e6f0d4,#e3f1ec)' }
   ];
-  var bgState = { kind: 'none', image: '', preset: '', dim: 62, blur: 3 };
+  var bgState = { kind: 'none', image: '', preset: '', dim: 24, blur: 0, cardSolid: 88 };
 
   function loadBg() {
     try {
       var raw = localStorage.getItem(BG_KEY);
+      var fresh = false;
+      if (!raw) { raw = localStorage.getItem(BG_KEY_OLD); fresh = !!raw; }   // ย้ายจากรูปแบบเดิม
       if (raw) {
         var v = JSON.parse(raw);
         if (v && typeof v === 'object') {
           bgState.kind = v.kind === 'image' || v.kind === 'preset' ? v.kind : 'none';
           bgState.image = typeof v.image === 'string' ? v.image : '';
           bgState.preset = typeof v.preset === 'string' ? v.preset : '';
-          bgState.dim = clampNum(v.dim, 0, 92, 62);
-          bgState.blur = clampNum(v.blur, 0, 16, 3);
+          // ของเดิมตั้งค่าจางไว้มากจนแทบไม่เห็นรูป — ย้ายมาใช้ค่าใหม่ที่เห็นรูปชัด
+          bgState.dim = fresh ? 24 : clampNum(v.dim, 0, 88, 24);
+          bgState.blur = fresh ? 0 : clampNum(v.blur, 0, 16, 0);
+          bgState.cardSolid = clampNum(v.cardSolid, 60, 100, 88);
+          if (fresh) { try { localStorage.removeItem(BG_KEY_OLD); } catch (e2) {} saveBg(); }
         }
       }
     } catch (e) { /* อ่านไม่ได้ก็ใช้ค่าเริ่มต้น */ }
@@ -126,6 +132,7 @@
     root.style.setProperty('--bg-layer', layer);
     root.style.setProperty('--bg-dim', bgState.dim + '%');
     root.style.setProperty('--bg-blur', (bgState.kind === 'image' ? bgState.blur : 0) + 'px');
+    root.style.setProperty('--card-solid', bgState.cardSolid + '%');
   }
 
   /* ย่อรูปลงจนพอใส่ localStorage ได้ — ไล่ลดขนาด/คุณภาพทีละขั้น */
@@ -154,18 +161,27 @@
             (isImg ? '' : '🖼️') + '</span>' +
           '<span class="bg-swatch-label">รูปของฉัน</span></button>' +
       '</div>' +
-      (isImg
+      (bgState.kind !== 'none'
         ? '<div class="bg-sliders">' +
-            '<label class="field"><span class="field-label">ความจางของรูป · ' + bgState.dim + '%</span>' +
-              '<input type="range" min="0" max="92" step="2" data-bg="dim" value="' + bgState.dim + '"></label>' +
-            '<label class="field"><span class="field-label">ความเบลอ · ' + bgState.blur + 'px</span>' +
-              '<input type="range" min="0" max="16" step="1" data-bg="blur" value="' + bgState.blur + '"></label>' +
+            '<label class="field"><span class="field-label">' + bgLabel('dim') + '</span>' +
+              '<input type="range" min="0" max="88" step="2" data-bg="dim" value="' + bgState.dim + '"></label>' +
+            (isImg
+              ? '<label class="field"><span class="field-label">' + bgLabel('blur') + '</span>' +
+                  '<input type="range" min="0" max="16" step="1" data-bg="blur" value="' + bgState.blur + '"></label>'
+              : '') +
+            '<label class="field"><span class="field-label">' + bgLabel('cardSolid') + '</span>' +
+              '<input type="range" min="60" max="100" step="2" data-bg="cardSolid" value="' + bgState.cardSolid + '"></label>' +
           '</div>'
         : '') +
       '<div class="row-actions" style="margin-top:14px">' +
         '<button class="btn btn-primary btn-sm" data-bg="pick">🖼️ เลือกรูปจากเครื่อง</button>' +
         (bgState.kind !== 'none' ? '<button class="btn btn-ghost btn-sm" data-bg="clear">ใช้พื้นหลังเดิม</button>' : '') +
       '</div>';
+  }
+  function bgLabel(which) {
+    if (which === 'dim') return 'จางลง · ' + bgState.dim + '%' + (bgState.dim === 0 ? ' (เห็นรูปเต็มๆ)' : '');
+    if (which === 'blur') return 'เบลอ · ' + bgState.blur + 'px' + (bgState.blur === 0 ? ' (ชัด)' : '');
+    return 'ความทึบของการ์ด · ' + bgState.cardSolid + '%' + (bgState.cardSolid >= 100 ? ' (ทึบสนิท)' : '');
   }
   function renderBgModal() { $('#bgBody').innerHTML = bgModalBody(); }
   function closeBgModal() { $('#bgModal').hidden = true; }
@@ -197,15 +213,12 @@
   $('#bgModal').addEventListener('input', function (ev) {
     var el = ev.target;
     if (el.tagName !== 'INPUT' || !el.dataset.bg) return;
-    if (el.dataset.bg === 'dim') bgState.dim = clampNum(el.value, 0, 92, 62);
-    if (el.dataset.bg === 'blur') bgState.blur = clampNum(el.value, 0, 16, 3);
+    if (el.dataset.bg === 'dim') bgState.dim = clampNum(el.value, 0, 88, 24);
+    if (el.dataset.bg === 'blur') bgState.blur = clampNum(el.value, 0, 16, 0);
+    if (el.dataset.bg === 'cardSolid') bgState.cardSolid = clampNum(el.value, 60, 100, 88);
     applyBg();
     var label = el.previousElementSibling;
-    if (label) {
-      label.textContent = el.dataset.bg === 'dim'
-        ? 'ความจางของรูป · ' + bgState.dim + '%'
-        : 'ความเบลอ · ' + bgState.blur + 'px';
-    }
+    if (label) label.textContent = bgLabel(el.dataset.bg);
   });
   $('#bgModal').addEventListener('change', function (ev) {
     if (ev.target.tagName === 'INPUT' && ev.target.dataset.bg) saveBg();
@@ -219,6 +232,7 @@
       var prev = { kind: bgState.kind, image: bgState.image, preset: bgState.preset };
       bgState.kind = 'image';
       bgState.image = bgDataURL(img);
+      if (bgState.dim > 60) bgState.dim = 24;      // กันกรณีตั้งไว้จางจนดูเหมือนไม่มีอะไรเกิดขึ้น
       if (!saveBg()) {
         bgState.kind = prev.kind; bgState.image = prev.image; bgState.preset = prev.preset;
         applyBg(); renderBgModal();
