@@ -69,6 +69,55 @@
     });
   })();
 
+  /* ---------------- รับข้อความใบเสร็จจาก Shortcuts (iPhone) ----------------
+     เว็บแอปเปิดอัลบั้มรูปเองไม่ได้ (เบราว์เซอร์ห้ามไว้) แต่ Shortcuts บน iPhone เปิดได้
+     จึงให้ Shortcut หยิบรูปจากอัลบั้ม อ่านข้อความด้วย Live Text แล้วส่งมาที่
+     https://<เว็บ>/#slip=<ข้อความ>  แอปจะแยกข้อมูลด้วยตัวแยกเดิมแล้ววางเป็นการ์ดรอบันทึกให้
+     ใช้ hash (#) ไม่ใช่ query (?) เพราะข้อความหลัง # ไม่ถูกส่งไปที่เซิร์ฟเวอร์ */
+  var SLIP_SEPARATOR = /\n\s*-{3,}\s*\n/;
+
+  function importFromHash() {
+    var hash = location.hash || '';
+    var m = hash.match(/[#&]slips?=([^&]*)/);
+    if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search);   // กันนำเข้าซ้ำตอนรีเฟรช
+
+    var raw = '';
+    try { raw = decodeURIComponent(m[1].replace(/\+/g, ' ')); }
+    catch (e) { raw = m[1]; }
+    raw = String(raw).slice(0, 60000).trim();
+    if (!raw) { toast('ไม่พบข้อความใบเสร็จในลิงก์'); return; }
+
+    var chunks = raw.split(SLIP_SEPARATOR)
+      .map(function (t) { return t.trim(); })
+      .filter(function (t) { return t.length >= 8; })
+      .slice(0, 30);
+    if (!chunks.length) { toast('ข้อความสั้นเกินไป อ่านเป็นใบเสร็จไม่ได้'); return; }
+
+    chunks.forEach(function (text) {
+      var parsed = ReceiptParser.parse(text);
+      if (!parsed.date) parsed.date = todayISO();
+      var learned = categoryFromHistory(parsed.merchant);
+      if (learned) parsed.category = learned;
+      else if (parsed.category === 'other') parsed.category = ReceiptParser.guessCategory(parsed.merchant, parsed.note);
+
+      var card = {
+        status: 'done', thumb: null, file: null, parsed: parsed,
+        statusText: parsed.amount != null
+          ? '📲 รับจาก Shortcut แล้ว — ตรวจสอบข้อมูลก่อนบันทึก'
+          : '📲 รับจาก Shortcut แล้ว แต่หายอดเงินไม่เจอ กรุณาใส่เอง'
+      };
+      card.dupHint = findDuplicate({ date: parsed.date, amount: parsed.amount, merchant: parsed.merchant, rawText: text });
+      addCard(card);
+    });
+
+    var addTab = document.querySelector('.tab[data-tab="add"]');
+    if (addTab) addTab.click();
+    var found = chunks.filter(function (t) { return ReceiptParser.parse(t).amount != null; }).length;
+    toast('รับใบเสร็จจาก Shortcut ' + chunks.length + ' ใบ' +
+      (found < chunks.length ? ' · อ่านยอดได้ ' + found + ' ใบ' : '') + ' — ตรวจแล้วกดบันทึกได้เลย');
+  }
+
   /* ---------------- หารบิลกับเพื่อน / ลูกหนี้ ---------------- */
   function splitOf(exp) {
     return (exp && exp.split && Array.isArray(exp.split.people)) ? exp.split.people : [];
@@ -1736,7 +1785,7 @@
     queue.slice().forEach(removeCard);         // ใบเสร็จที่ค้างในคิวเป็นของสมุดเดิม
     $('#ocrStatus').textContent = '';
     renderBookBar();
-  renderDebtBadge();
+    renderDebtBadge();
     renderList();
     renderBudgetAlert();
     if ($('#panel-summary').classList.contains('is-active')) renderSummary();
@@ -2066,6 +2115,29 @@
   renderBookBar();
   renderList();
   renderBudgetAlert();
+  renderDebtBadge();
+  importFromHash();
+  window.addEventListener('hashchange', importFromHash);
+
+  /* ปุ่มคัดลอกลิงก์สำหรับใส่ใน Shortcut — ใช้ที่อยู่จริงของหน้าเว็บที่กำลังเปิดอยู่ */
+  (function () {
+    var code = $('#shortcutUrl'), btn = $('#copyShortcutUrl');
+    if (!code || !btn) return;
+    var url = location.origin + location.pathname + '#slip=';
+    code.textContent = url;
+    btn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var done = function () { toast('คัดลอกลิงก์แล้ว — วางต่อท้ายใน Open URLs'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done, function () { toast('คัดลอกไม่สำเร็จ กดค้างที่ลิงก์เพื่อคัดลอกเอง'); });
+      } else {
+        var r = document.createRange(); r.selectNodeContents(code);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        toast('เลือกลิงก์ไว้ให้แล้ว กดคัดลอกได้เลย');
+      }
+    });
+  })();
+
   renderSyncBadge();
   ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); });
   if (CloudSync.isConfigured()) {
