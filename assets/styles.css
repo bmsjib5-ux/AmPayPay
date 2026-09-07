@@ -690,20 +690,38 @@ body.has-bg::after {
 body.has-bg .rcard, body.has-bg .ecard, body.has-bg .tile,
 body.has-bg .chart-card, body.has-bg .empty, body.has-bg .book-row {
   background-color: color-mix(in srgb, var(--surface-1) var(--card-solid, 88%), transparent);
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
   border-color: var(--border);
 }
 body.has-bg .topbar, body.has-bg .bookbar {
   background-color: color-mix(in srgb, var(--surface-1) calc(var(--card-solid, 88%) - 10%), transparent);
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
 }
 body.has-bg .dropzone {
   background: color-mix(in srgb, var(--surface-1) calc(var(--card-solid, 88%) - 14%), transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(var(--card-blur, 16px));
+  -webkit-backdrop-filter: blur(var(--card-blur, 16px));
 }
+
+/* การ์ดโปร่งมาก — เพิ่มเงาใต้ตัวอักษรและขอบให้ชัดขึ้น เพื่อให้ยังอ่านออกบนรูปที่มีลาย */
+body.bg-sheer .rcard, body.bg-sheer .ecard, body.bg-sheer .tile,
+body.bg-sheer .chart-card, body.bg-sheer .empty, body.bg-sheer .book-row,
+body.bg-sheer .topbar, body.bg-sheer .bookbar, body.bg-sheer .dropzone {
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--bg) 78%, transparent);
+  border-color: color-mix(in srgb, var(--text-primary) 22%, transparent);
+}
+body.bg-sheer .bar-track, body.bg-sheer .meter, body.bg-sheer .trend {
+  background-color: color-mix(in srgb, var(--surface-2) 78%, transparent);
+}
+/* ตัวหนังสือสีจางจะสู้ลายในรูปไม่ไหว — ยกขึ้นมาหนึ่งขั้นเมื่อการ์ดโปร่งมาก */
+body.bg-sheer .muted, body.bg-sheer .chart-sub, body.bg-sheer .tile-label,
+body.bg-sheer .tile-foot, body.bg-sheer .bar-sub, body.bg-sheer .field-label,
+body.bg-sheer .ecard-meta, body.bg-sheer .bar-name, body.bg-sheer .bar-pct,
+body.bg-sheer .dz-sub, body.bg-sheer .book-count, body.bg-sheer .rcard-status,
+body.bg-sheer .btn-ghost, body.bg-sheer .tab { color: var(--text-secondary); }
+body.bg-sheer .btn-ghost, body.bg-sheer .tile-value, body.bg-sheer .bar-value { color: var(--text-primary); }
 /* ตัวหนังสือเล็กๆ ที่วางบนพื้นหลังตรงๆ ต้องมีแผ่นรองบางๆ ไม่งั้นอ่านไม่ออกบนรูปที่มีลาย */
 body.has-bg .hint, body.has-bg .foot {
   background: color-mix(in srgb, var(--surface-1) 72%, transparent);
