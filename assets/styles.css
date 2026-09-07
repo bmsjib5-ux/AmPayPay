@@ -880,3 +880,13 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   .day-col:nth-child(even) .day-num { visibility: hidden; }
   .day-col.is-today .day-num { visibility: visible; }
 }
+
+/* หัวการ์ดที่มีตัวกรองอยู่ข้างชื่อ */
+.chart-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chart-head .section-title { flex: 1; min-width: 0; }
+.chart-filter { max-width: 190px; }
+.chart-filter select { font-size: 13.5px; padding-block: 6px; border-radius: 999px; }
+@media (max-width: 560px) {
+  .chart-filter { flex: 1 1 100%; max-width: none; }
+  .chart-filter select { font-size: 16px; }
+}
