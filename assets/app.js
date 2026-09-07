@@ -2002,6 +2002,43 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
+  /* ล้างข้อมูลทั้งหมดในเบราว์เซอร์นี้ — ถามซ้ำและเตือนเรื่องเซิร์ฟเวอร์ให้ครบก่อน */
+  $('#wipeLocalBtn').addEventListener('click', function () {
+    var loggedIn = syncReady();
+    var warn = 'ล้างข้อมูลในเบราว์เซอร์นี้ทั้งหมดใช่ไหม?\n\n' +
+      '· รายจ่าย ' + ExpenseStore.allWithDeleted().length + ' รายการ · สมุดทั้งหมด · งบประมาณ · เพื่อน · ใบแจ้งหนี้\n' +
+      '· รูปใบเสร็จที่เก็บไว้จะหายไปด้วย และกู้คืนไม่ได้\n\n' +
+      'แนะนำให้กด "💾 สำรองข้อมูล" เก็บไฟล์ไว้ก่อน';
+    if (loggedIn) {
+      warn += '\n\n⚠️ ตอนนี้ล็อกอินอยู่ (' + CloudSync.email() + ') ถ้ายังไม่ได้ล้างข้อมูลบนเซิร์ฟเวอร์ ' +
+        'ข้อมูลจะถูกดึงกลับมาตอนซิงก์ครั้งถัดไป';
+    }
+    if (!confirm(warn)) return;
+    if (!confirm('ยืนยันอีกครั้ง — ลบแล้วกู้คืนไม่ได้')) return;
+
+    ExpenseStore.wipeLocal();
+    ExpenseStore.owner.clear();
+
+    if (confirm('ล้างการตั้งค่าหน้าตาด้วยไหม? (ธีมสว่าง/มืด และรูปพื้นหลัง)')) {
+      try { localStorage.removeItem('expense-book:theme'); } catch (e) {}
+      try { localStorage.removeItem('expense-book:bg:v2'); localStorage.removeItem('expense-book:bg:v1'); } catch (e) {}
+      try { localStorage.removeItem('expense-book:bg-img:v1'); } catch (e) {}
+      try { if (window.indexedDB) indexedDB.deleteDatabase('expense-book-bg'); } catch (e) {}
+    }
+
+    var after = function () {
+      renderList(); renderBudgetAlert(); renderBookBar(); renderDebtBadge();
+      if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+      toast('ล้างข้อมูลในเครื่องนี้แล้ว');
+      setTimeout(function () { location.reload(); }, 900);
+    };
+    if (loggedIn && confirm('ออกจากระบบด้วยไหม? (กันข้อมูลถูกดึงกลับมาจากเซิร์ฟเวอร์)')) {
+      CloudSync.signOut().then(after, after);
+    } else {
+      after();
+    }
+  });
+
   $('#csvBtn').addEventListener('click', function () {
     var list = filtered();
     if (!list.length) { toast('ไม่มีรายการให้ส่งออก'); return; }
