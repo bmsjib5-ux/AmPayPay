@@ -1,19 +1,21 @@
 /* ---------- tokens ---------- */
 :root {
   color-scheme: light;
-  --bg:          #f6f5f2;
-  --surface-1:   #fcfcfb;
-  --surface-2:   #f0efec;
-  --border:      #dedcd6;
-  --border-soft: #e8e6e0;
-  --text-primary:   #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted:     #78766f;
-  --accent:      #2a78d6;
-  --accent-ink:  #1c5cab;
-  --accent-soft: #e7f0fc;
-  --series-1:    #2a78d6;
-  --grid:        #e4e2dc;
+  --bg:          #fbf7f2;
+  --bg-blob-1:   #efe9ff;
+  --bg-blob-2:   #ffeede;
+  --surface-1:   #ffffff;
+  --surface-2:   #f4f0ea;
+  --border:      #e3ddd3;
+  --border-soft: #ede8e0;
+  --text-primary:   #16141c;
+  --text-secondary: #56525f;
+  --text-muted:     #837e8c;
+  --accent:      #6c63e0;
+  --accent-ink:  #4f46b8;
+  --accent-soft: #eeecfd;
+  --series-1:    #6c63e0;
+  --grid:        #e7e1d8;
   --good:        #1baf7a;
   --danger:      #c0392f;
   --ok-ink:      #167f5b;
@@ -24,25 +26,30 @@
   --crit:        #c0392f;
   --crit-ink:    #a12e26;
   --crit-soft:   #fbe9e7;
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(11,11,11,.06), 0 6px 18px rgba(11,11,11,.05);
+  --radius: 16px;
+  --radius-lg: 22px;
+  --shadow: 0 1px 2px rgba(22,20,28,.05), 0 8px 22px rgba(22,20,28,.06);
+  --shadow-lift: 0 2px 6px rgba(22,20,28,.07), 0 14px 34px rgba(22,20,28,.10);
+  --ease: cubic-bezier(.22,.85,.36,1);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg:          #131312;
-    --surface-1:   #1a1a19;
-    --surface-2:   #242422;
-    --border:      #37372f;
-    --border-soft: #2c2c28;
+    --bg:          #14131a;
+    --bg-blob-1:   #211d33;
+    --bg-blob-2:   #2a2020;
+    --surface-1:   #1c1b24;
+    --surface-2:   #26242f;
+    --border:      #3a3747;
+    --border-soft: #2e2c39;
     --text-primary:   #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted:     #97968c;
-    --accent:      #3987e5;
-    --accent-ink:  #86b6ef;
-    --accent-soft: #1b2a3d;
-    --series-1:    #3987e5;
-    --grid:        #33332e;
+    --text-secondary: #c4c0d0;
+    --text-muted:     #9793a4;
+    --accent:      #8b7bf0;
+    --accent-ink:  #b3a6ff;
+    --accent-soft: #262040;
+    --series-1:    #8b7bf0;
+    --grid:        #35323f;
     --good:        #199e70;
     --danger:      #e66767;
     --ok-ink:      #55c79b;
@@ -58,21 +65,31 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg:          #131312;
-  --surface-1:   #1a1a19;
-  --surface-2:   #242422;
-  --border:      #37372f;
-  --border-soft: #2c2c28;
+  --bg:          #14131a;
+  --bg-blob-1:   #211d33;
+  --bg-blob-2:   #2a2020;
+  --surface-1:   #1c1b24;
+  --surface-2:   #26242f;
+  --border:      #3a3747;
+  --border-soft: #2e2c39;
   --text-primary:   #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted:     #97968c;
-  --accent:      #3987e5;
-  --accent-ink:  #86b6ef;
-  --accent-soft: #1b2a3d;
-  --series-1:    #3987e5;
-  --grid:        #33332e;
+  --text-secondary: #c4c0d0;
+  --text-muted:     #9793a4;
+  --accent:      #8b7bf0;
+  --accent-ink:  #b3a6ff;
+  --accent-soft: #262040;
+  --series-1:    #8b7bf0;
+  --grid:        #35323f;
   --good:        #199e70;
   --danger:      #e66767;
+  --ok-ink:      #55c79b;
+  --ok-soft:     #12271f;
+  --warn:        #c98500;
+  --warn-ink:    #e0ac4a;
+  --warn-soft:   #2a2213;
+  --crit:        #e66767;
+  --crit-ink:    #f08d8d;
+  --crit-soft:   #2e1a19;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.3);
 }
 
@@ -433,3 +450,267 @@ input, select, textarea { font-size: 16px; }
 .book-info { flex: 1; min-width: 140px; display: grid; gap: 2px; }
 .book-name { font-weight: 600; }
 .book-count { font-size: 12.5px; color: var(--text-muted); }
+
+/* ==========================================================================
+   หน้าตาแบบเป็นกันเอง + การเคลื่อนไหวที่ลื่นตา
+   ปรับสี/มุมโค้ง/ไอคอน ให้ดูอบอุ่นขึ้น และใส่ทรานซิชันสั้นๆ ทุกจุดที่ผู้ใช้แตะ
+   ========================================================================== */
+
+/* พื้นหลังนุ่มๆ มีแสงสีจางๆ สองมุม แทนพื้นเรียบทึบ */
+body {
+  background:
+    radial-gradient(60vw 42vh at 12% -6%,  var(--bg-blob-1) 0%, transparent 70%),
+    radial-gradient(52vw 38vh at 96% 4%,   var(--bg-blob-2) 0%, transparent 68%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* สลับธีมแล้วสีค่อยๆ ไล่ ไม่กระโดด */
+body, .topbar, .bookbar, .rcard, .ecard, .tile, .chart-card, .modal-card,
+.btn, .icon-btn, input, select, textarea, .tag, .pill, .book-row {
+  transition: background-color .28s var(--ease), border-color .28s var(--ease),
+              color .28s var(--ease), box-shadow .28s var(--ease);
+}
+
+/* ---------- หัวเว็บ ---------- */
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand > span[aria-hidden] {
+  display: inline-block; font-size: 22px; line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(108, 99, 224, .28));
+  animation: bob 3.4s var(--ease) infinite;
+}
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-3px) rotate(4deg); } }
+
+.icon-btn { transition: transform .18s var(--ease), background-color .2s var(--ease), border-color .2s var(--ease); }
+.icon-btn:hover { transform: translateY(-1px) scale(1.06); }
+.icon-btn:active { transform: scale(.94); }
+
+/* ---------- แท็บทรงแคปซูล ---------- */
+.tabs {
+  gap: 6px; padding-block: 8px 10px;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid transparent; border-radius: 999px;
+  padding: 9px 15px; border-bottom: 1px solid transparent;
+  transition: background-color .2s var(--ease), color .2s var(--ease),
+              border-color .2s var(--ease), transform .18s var(--ease);
+}
+.tab .tab-ic { font-size: 15px; line-height: 1; }
+.tab:hover { background: var(--surface-2); border-bottom-color: transparent; }
+.tab:active { transform: scale(.97); }
+.tab.is-active {
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.tab.is-active .tab-ic { transform: scale(1.1); }
+
+/* ---------- สลับแท็บให้ค่อยๆ ปรากฏ ---------- */
+.panel.is-active { animation: panel-in .34s var(--ease) both; }
+@keyframes panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------- ปุ่มกดแล้วรู้สึกได้ ---------- */
+.btn {
+  border-radius: 12px;
+  transition: transform .16s var(--ease), background-color .2s var(--ease),
+              border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(.97); }
+.btn-primary {
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.btn-primary:hover { box-shadow: 0 5px 16px color-mix(in srgb, var(--accent) 38%, transparent); }
+
+/* ---------- ช่องกรอก ---------- */
+input, select, textarea { border-radius: 12px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: var(--accent);
+}
+
+/* ---------- แถบสมุด ---------- */
+.bookbar { background: color-mix(in srgb, var(--surface-1) 72%, transparent); backdrop-filter: blur(8px); }
+.bookbar-icon { font-size: 17px; }
+.bookbar select { border-radius: 999px; padding-inline: 14px; }
+
+/* ---------- กล่องลากรูป ---------- */
+.dropzone {
+  border-radius: var(--radius-lg); border-width: 2px;
+  background:
+    radial-gradient(80% 120% at 50% -10%, var(--accent-soft) 0%, transparent 62%),
+    var(--surface-1);
+  transition: border-color .22s var(--ease), background-color .22s var(--ease), transform .22s var(--ease);
+}
+.dropzone:hover { transform: translateY(-2px); }
+.dropzone.is-over { transform: scale(1.01); }
+.dz-icon { font-size: 40px; animation: bob 3s var(--ease) infinite; }
+.dz-title { font-size: 16px; }
+
+/* ---------- การ์ด ---------- */
+.rcard, .ecard, .tile, .chart-card, .modal-card, .book-row { border-radius: var(--radius); }
+.rcard { border-radius: var(--radius-lg); }
+.ecard:hover, .tile:hover, .chart-card:hover { box-shadow: var(--shadow-lift); }
+.ecard { transition: box-shadow .24s var(--ease), transform .24s var(--ease); }
+.ecard:hover { transform: translateY(-2px); }
+.rcard { animation: card-in .38s var(--ease) both; }
+@keyframes card-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* รูปย่อในรายการ: ถ้าไม่มีรูปใบเสร็จ ใช้ไอคอนหมวดบนพื้นสีอ่อนแทน */
+.ecard-thumb { border-radius: 14px; }
+.ecard-thumb.is-cat {
+  background: var(--accent-soft); font-size: 24px; color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.ecard-title { letter-spacing: -.005em; }
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 9px; }
+
+/* ---------- การ์ดตัวเลขสรุป ---------- */
+.tile {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--accent-soft) 55%, transparent) 0%, transparent 58%),
+    var(--surface-1);
+}
+.tile-value { letter-spacing: -.025em; }
+
+/* ---------- กราฟ ---------- */
+.bar-icon { margin-right: 6px; }
+.bar-track { height: 15px; border-radius: 999px; }
+.bar-fill {
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--series-1) 78%, #fff 22%), var(--series-1));
+  transform-origin: left center; animation: grow-x .55s var(--ease) both;
+}
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.trend-bar {
+  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--series-1) 80%, #fff 20%), var(--series-1));
+  transform-origin: bottom center; animation: grow-y .55s var(--ease) both;
+}
+@keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.meter { height: 14px; }
+.meter-fill { animation: grow-x .6s var(--ease) both; }
+
+.rank li { border-bottom-style: dotted; }
+.rank li:hover .r-name { color: var(--accent-ink); }
+
+/* ---------- ป้ายสถานะ / แบนเนอร์ ---------- */
+.chip { padding: 4px 12px; }
+.banner { border-radius: var(--radius); animation: panel-in .3s var(--ease) both; }
+
+/* ---------- สถานะว่าง ---------- */
+.empty {
+  border-radius: var(--radius-lg); border-width: 2px; line-height: 1.9;
+  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
+}
+.empty-icon { display: block; font-size: 34px; margin-bottom: 6px; animation: bob 3.2s var(--ease) infinite; }
+
+/* ---------- ป็อปอัป ---------- */
+.modal { animation: fade-in .2s var(--ease) both; backdrop-filter: blur(3px); }
+.modal-card { border-radius: var(--radius-lg); animation: modal-in .3s var(--ease) both; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+
+/* ---------- ข้อความแจ้งเตือนสั้นๆ ---------- */
+.toast {
+  border-radius: 16px; padding: 12px 18px; font-weight: 550;
+  animation: toast-in .34s var(--ease) both;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 14px) scale(.94); }
+  to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* ---------- แถบความคืบหน้าตอนอ่านใบเสร็จ ---------- */
+.progress { height: 6px; }
+.progress > i { background: linear-gradient(90deg, var(--accent), var(--accent-ink)); }
+
+/* เลื่อนหน้าแบบนุ่ม เวลาแอปพาไปยังส่วนอื่น */
+html { scroll-behavior: smooth; }
+
+/* เคารพผู้ที่ตั้งค่าลดการเคลื่อนไหวไว้ */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* ---------- จอมือถือ: แท็บทรงแคปซูลต้องพอดีจอ ไม่โดนตัดขอบ ---------- */
+@media (max-width: 560px) {
+  /* มีปุ่มไอคอนสามปุ่มแล้ว ชื่อแอปต้องยังอยู่บรรทัดเดียว */
+  .topbar-inner { gap: 6px; }
+  .brand { font-size: 15.5px; min-width: 0; }
+  .brand > span[aria-hidden] { font-size: 19px; }
+
+  .tabs { gap: 5px; padding-block: 6px 9px; }
+  .tab { padding: 8px 11px; font-size: 13.5px; gap: 5px; }
+  .tab .tab-ic { font-size: 14px; }
+
+  /* ปุ่มส่งออก/สำรองข้อมูล ใช้ไม่บ่อย ย่อลงให้เหลือบรรทัดเดียว */
+  .list-actions .btn { padding: 7px 11px; font-size: 13.5px; }
+  .dz-title { font-size: 15px; }
+  .dz-icon { font-size: 34px; }
+}
+@media (max-width: 400px) {
+  .tab { padding: 7px 9px; font-size: 12.5px; gap: 4px; }
+  .tab .tab-ic { font-size: 13px; }
+  .brand { font-size: 14px; }
+  .brand > span[aria-hidden] { font-size: 17px; }
+}
+/* จอแคบมาก (iPhone SE รุ่นแรก) — ตัดไอคอนแท็บออกเพื่อให้ครบสามแท็บพอดีจอ */
+@media (max-width: 360px) {
+  .tab .tab-ic { display: none; }
+  .tab { padding: 7px 8px; font-size: 12.5px; }
+}
+
+/* ---------- พื้นหลังที่ผู้ใช้เลือกเอง ---------- */
+body.has-bg { background: none; }
+body.has-bg::before,
+body.has-bg::after { content: ''; position: fixed; inset: 0; pointer-events: none; }
+body.has-bg::before {
+  z-index: -2;
+  background: var(--bg-layer) center / cover no-repeat;
+  background-attachment: fixed;
+}
+body.has-bg-image::before {
+  filter: blur(var(--bg-blur, 0px));
+  transform: scale(1.08);            /* กันขอบจางตอนเบลอ */
+}
+body.has-bg::after {
+  z-index: -1;
+  background: color-mix(in srgb, var(--bg) var(--bg-dim, 62%), transparent);
+  backdrop-filter: saturate(1.05);
+}
+/* มีรูปพื้นหลังแล้ว การ์ดต้องยังอ่านง่าย — เพิ่มความทึบและขอบให้ชัดขึ้น */
+body.has-bg .rcard, body.has-bg .ecard, body.has-bg .tile,
+body.has-bg .chart-card, body.has-bg .empty, body.has-bg .book-row {
+  background-color: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  backdrop-filter: blur(6px);
+  border-color: var(--border);
+}
+body.has-bg .topbar, body.has-bg .bookbar { backdrop-filter: blur(12px); }
+body.has-bg .foot, body.has-bg .hint { text-shadow: 0 1px 2px color-mix(in srgb, var(--bg) 70%, transparent); }
+
+/* ตัวเลือกพื้นหลังในกล่อง 🎨 */
+.bg-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 10px; margin-top: 14px; }
+.bg-swatch {
+  appearance: none; font: inherit; cursor: pointer; padding: 6px 4px 8px;
+  background: none; border: 1px solid transparent; border-radius: 14px;
+  display: grid; gap: 6px; justify-items: center; color: var(--text-secondary);
+  transition: transform .18s var(--ease), border-color .2s var(--ease), background-color .2s var(--ease);
+}
+.bg-swatch:hover { background: var(--surface-2); transform: translateY(-2px); }
+.bg-swatch.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.bg-swatch-chip {
+  width: 100%; aspect-ratio: 1 / 1; max-width: 62px; border-radius: 12px;
+  border: 1px solid var(--border-soft); box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.bg-swatch-photo { background: var(--surface-2) center / cover no-repeat; }
+.bg-swatch-label { font-size: 12px; font-weight: 550; }
+.bg-sliders { display: grid; gap: 12px; margin-top: 16px; }
+.bg-sliders input[type="range"] { width: 100%; accent-color: var(--accent); padding: 0; border: 0; background: none; min-height: 28px; }
