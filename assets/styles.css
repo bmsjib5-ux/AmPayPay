@@ -890,3 +890,14 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   .chart-filter { flex: 1 1 100%; max-width: none; }
   .chart-filter select { font-size: 16px; }
 }
+
+/* ---------- วิธีตั้ง Shortcut ให้ดึงใบเสร็จจากอัลบั้ม ---------- */
+.shortcut-help { margin-top: 18px; border-top: 0; padding-top: 0; }
+.shortcut-help > summary { font-weight: 600; color: var(--text-primary); font-size: 14px; }
+.shortcut-body { margin-top: 10px; font-size: 13.5px; line-height: 1.8; color: var(--text-secondary); }
+.shortcut-body ol { margin: 10px 0; padding-left: 20px; display: grid; gap: 7px; }
+.shortcut-body code {
+  background: var(--surface-2); border-radius: 6px; padding: 2px 6px; font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all;
+}
+.shortcut-body .btn { margin-left: 6px; }
