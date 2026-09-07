@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>สมุดเก็บรายจ่ายของฉัน</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=39">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=39">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=40">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=40">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=39">
-<link rel="manifest" href="manifest.webmanifest?v=39">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=40">
+<link rel="manifest" href="manifest.webmanifest?v=40">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="สมุดรายจ่าย">
 <meta name="application-name" content="สมุดรายจ่าย">
-<link rel="stylesheet" href="assets/styles.css?v=39">
+<link rel="stylesheet" href="assets/styles.css?v=40">
 </head>
 <body>
 <header class="topbar">
@@ -32,6 +32,7 @@
     <button class="tab" role="tab" aria-selected="false" data-tab="summary"><span class="tab-ic" aria-hidden="true">📊</span><span class="tab-full">สรุปรายจ่าย</span><span class="tab-short">สรุป</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="list"><span class="tab-ic" aria-hidden="true">🗂️</span><span class="tab-full">รายการทั้งหมด</span><span class="tab-short">รายการ</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="debt"><span class="tab-ic" aria-hidden="true">🧑‍🤝‍🧑</span>ลูกหนี้<span id="debtBadge" class="pill" hidden></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="friends"><span class="tab-ic" aria-hidden="true">👥</span>เพื่อน</button>
   </nav>
 </header>
 
@@ -213,6 +214,37 @@
     <div id="expenseList" class="cards"></div>
   </section>
 
+  <!-- ---------- แท็บ: เพื่อน ---------- -->
+  <section id="panel-friends" class="panel" role="tabpanel" aria-label="เพื่อน" hidden>
+    <section class="chart-card me-card">
+      <div class="me-head">
+        <h2 class="section-title">🪪 บัตรของฉัน</h2>
+        <p class="chart-sub">ให้เพื่อนสแกน QR นี้ด้วยกล้องมือถือ จะเพิ่มคุณเป็นเพื่อนในแอปของเขาทันที</p>
+      </div>
+      <div id="meBody"></div>
+    </section>
+
+    <section class="chart-card">
+      <h2 class="section-title">➕ เพิ่มเพื่อน</h2>
+      <p class="chart-sub">สแกน QR ของเพื่อนด้วยกล้องมือถือ หรือใส่อีเมลที่เขาใช้ล็อกอินแอปนี้</p>
+      <div class="grid2" style="margin-top:12px">
+        <label class="field"><span class="field-label">ชื่อเล่น</span>
+          <input type="text" id="newFriendName" placeholder="เช่น เอ"></label>
+        <label class="field"><span class="field-label">อีเมลของเพื่อน</span>
+          <input type="email" id="newFriendEmail" placeholder="friend@example.com" autocomplete="off"></label>
+      </div>
+      <div class="row-actions" style="margin-top:12px">
+        <button class="btn btn-primary btn-sm" id="addFriendBtn" type="button">เพิ่มเพื่อน</button>
+        <button class="btn btn-ghost btn-sm" id="pasteFriendBtn" type="button">วางลิงก์จาก QR</button>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <h2 class="section-title">👥 รายชื่อเพื่อน <span id="friendCount" class="pill"></span></h2>
+      <div id="friendList" class="book-list"></div>
+    </section>
+  </section>
+
   <!-- ---------- แท็บ: ลูกหนี้ ---------- -->
   <section id="panel-debt" class="panel" role="tabpanel" aria-label="ลูกหนี้" hidden>
     <div class="tiles">
@@ -245,8 +277,8 @@
     </section>
 
     <div class="row-actions" style="margin-bottom:14px">
-      <button id="friendsBtn" class="btn btn-sm" type="button">👥 จัดการเพื่อน</button>
-      <button id="claimSyncBtn" class="btn btn-ghost btn-sm" type="button">🔄 อัปเดตกับเพื่อน</button>
+      <button id="claimSyncBtn" class="btn btn-sm" type="button">🔄 อัปเดตกับเพื่อน</button>
+      <button id="friendsBtn" class="btn btn-ghost btn-sm" type="button">👥 ไปที่รายชื่อเพื่อน</button>
     </div>
 
     <div id="debtList" class="cards"></div>
@@ -260,7 +292,7 @@
 
 <footer class="wrap foot">
   ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
-  <span class="ver">เวอร์ชัน 39</span>
+  <span class="ver">เวอร์ชัน 40</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -270,16 +302,6 @@
       <button class="btn btn-ghost btn-sm" type="button" data-book="close" aria-label="ปิด">✕</button>
     </div>
     <div id="bookBody"></div>
-  </div>
-</div>
-
-<div id="friendsModal" class="modal" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="friendsTitle">
-    <div class="modal-head">
-      <h2 id="friendsTitle" class="section-title">👥 เพื่อน</h2>
-      <button class="btn btn-ghost btn-sm" type="button" data-friend="close" aria-label="ปิด">✕</button>
-    </div>
-    <div id="friendsBody"></div>
   </div>
 </div>
 
@@ -314,10 +336,11 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/config.js?v=39"></script>
-<script src="assets/parser.js?v=39"></script>
-<script src="assets/store.js?v=39"></script>
-<script src="assets/sync.js?v=39"></script>
-<script src="assets/app.js?v=39"></script>
+<script src="assets/vendor/qrcode.js?v=40"></script>
+<script src="assets/config.js?v=40"></script>
+<script src="assets/parser.js?v=40"></script>
+<script src="assets/store.js?v=40"></script>
+<script src="assets/sync.js?v=40"></script>
+<script src="assets/app.js?v=40"></script>
 </body>
 </html>
