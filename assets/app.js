@@ -1395,6 +1395,7 @@
     $('#sumTop').textContent = rows.length ? 'จ่ายมากสุด: ' + ReceiptParser.categoryIcon(rows[0].key) + ' ' + rows[0].label : '';
 
     // รายจ่ายรายวันของเดือนที่เลือก
+    dailyView = { key: key, rows: inMonth };
     renderDaily(key, inMonth);
 
     // แนวโน้ม 6 เดือน
@@ -1448,7 +1449,23 @@
   }
   var WEEKDAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
-  function renderDaily(key, inMonth) {
+  var dayCatFilter = 'all';
+  var dailyView = null;
+
+  function renderDaily(key, monthRows) {
+    var sel = $('#dayCat');
+    if (sel && !sel.options.length) {
+      sel.innerHTML = '<option value="all">ทุกหมวด</option>' +
+        CATS.map(function (c) { return '<option value="' + c.key + '">' + c.icon + '  ' + esc(c.label) + '</option>'; }).join('');
+    }
+    if (sel) {
+      if (!sel.querySelector('option[value="' + dayCatFilter + '"]')) dayCatFilter = 'all';
+      sel.value = dayCatFilter;
+    }
+    var inMonth = dayCatFilter === 'all'
+      ? monthRows
+      : monthRows.filter(function (e) { return e.category === dayCatFilter; });
+
     var n = daysInMonth(key);
     var parts = key.split('-');
     var totals = new Array(n + 1).join('0').split('').map(Number);   // index 0 = วันที่ 1
@@ -1466,15 +1483,19 @@
     // วันที่ผ่านมาแล้วในเดือนนี้ ใช้หารหาค่าเฉลี่ยที่มีความหมายจริง
     var elapsed = todayDay ? todayDay : n;
 
+    var scope = dayCatFilter === 'all' ? '' : 'เฉพาะ' + ReceiptParser.categoryLabel(dayCatFilter) + ' · ';
     var sub = [];
     if (sum > 0) {
+      sub.push('รวม ' + fmtMoney(sum));
       sub.push('เฉลี่ยวันละ ' + fmtMoney(sum / elapsed));
       sub.push('มีรายจ่าย ' + spentDays + ' จาก ' + elapsed + ' วัน');
       if (todayDay) sub.push('วันนี้ ' + fmtMoney(totals[todayDay - 1]));
     } else {
-      sub.push('ยังไม่มีรายจ่ายในเดือนนี้');
+      sub.push(dayCatFilter === 'all'
+        ? 'ยังไม่มีรายจ่ายในเดือนนี้'
+        : 'เดือนนี้ยังไม่มีรายจ่ายในหมวดนี้');
     }
-    $('#daySub').textContent = sub.join(' · ');
+    $('#daySub').textContent = scope + sub.join(' · ');
 
     $('#dayChart').innerHTML = totals.map(function (v, i) {
       var day = i + 1;
@@ -1500,6 +1521,11 @@
         }).join('')
       : '';
   }
+
+  $('#dayCat').addEventListener('change', function () {
+    dayCatFilter = this.value || 'all';
+    if (dailyView) renderDaily(dailyView.key, dailyView.rows);
+  });
 
   $('#sumMonth').addEventListener('change', renderSummary);
 
