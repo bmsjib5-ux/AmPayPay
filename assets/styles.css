@@ -685,15 +685,42 @@ body.has-bg::after {
   background: color-mix(in srgb, var(--bg) var(--bg-dim, 62%), transparent);
   backdrop-filter: saturate(1.05);
 }
-/* มีรูปพื้นหลังแล้ว การ์ดต้องยังอ่านง่าย — เพิ่มความทึบและขอบให้ชัดขึ้น */
+/* มีพื้นหลังแล้วการ์ดกลายเป็นกระจกฝ้า — เห็นรูปทะลุขึ้นมา แต่ตัวหนังสือยังอ่านง่าย
+   ความทึบปรับได้เองในกล่อง 🎨 (--card-solid) */
 body.has-bg .rcard, body.has-bg .ecard, body.has-bg .tile,
 body.has-bg .chart-card, body.has-bg .empty, body.has-bg .book-row {
-  background-color: color-mix(in srgb, var(--surface-1) 94%, transparent);
-  backdrop-filter: blur(6px);
+  background-color: color-mix(in srgb, var(--surface-1) var(--card-solid, 88%), transparent);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
   border-color: var(--border);
 }
-body.has-bg .topbar, body.has-bg .bookbar { backdrop-filter: blur(12px); }
-body.has-bg .foot, body.has-bg .hint { text-shadow: 0 1px 2px color-mix(in srgb, var(--bg) 70%, transparent); }
+body.has-bg .topbar, body.has-bg .bookbar {
+  background-color: color-mix(in srgb, var(--surface-1) calc(var(--card-solid, 88%) - 10%), transparent);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+}
+body.has-bg .dropzone {
+  background: color-mix(in srgb, var(--surface-1) calc(var(--card-solid, 88%) - 14%), transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+/* ตัวหนังสือเล็กๆ ที่วางบนพื้นหลังตรงๆ ต้องมีแผ่นรองบางๆ ไม่งั้นอ่านไม่ออกบนรูปที่มีลาย */
+body.has-bg .hint, body.has-bg .foot {
+  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: var(--radius);
+  padding-block: 12px;
+  color: var(--text-secondary);
+}
+body.has-bg .hint { padding-inline: 14px; }
+
+/* กล่องแต่งพื้นหลังต้องไม่บังหน้าจอ ผู้ใช้จะได้เห็นผลทันทีตอนลากแถบเลื่อน */
+#bgModal { background: transparent; backdrop-filter: none; align-items: flex-end; }
+/* กล่องต้องทึบเสมอ ไม่งั้นตัวหนังสือของหน้าจะทะลุขึ้นมาปนกับข้อความในกล่อง */
+.modal-card { background-color: var(--surface-1); }
+#bgModal .modal-card { box-shadow: 0 10px 50px rgba(0, 0, 0, .3); border-color: var(--border); }
+@media (min-width: 561px) { #bgModal { align-items: center; } }
 
 /* ตัวเลือกพื้นหลังในกล่อง 🎨 */
 .bg-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 10px; margin-top: 14px; }
