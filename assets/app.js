@@ -68,6 +68,43 @@
     });
   })();
 
+  /* ---------------- ดูรูปใบเสร็จแบบขยาย ---------------- */
+  var viewerURL = '';
+  function openViewer(src, alt) {
+    var pic = $('#imgModalPic');
+    pic.src = src;
+    pic.alt = alt || 'รูปใบเสร็จขยาย';
+    $('#imgModal').hidden = false;
+  }
+  function closeViewer() {
+    $('#imgModal').hidden = true;
+    $('#imgModalPic').removeAttribute('src');
+    if (viewerURL) { URL.revokeObjectURL(viewerURL); viewerURL = ''; }
+  }
+  function zoomFrom(img) {
+    var cardEl = img.closest('.rcard');
+    var card = cardEl && queue.filter(function (c) { return c.el === cardEl; })[0];
+    if (card && card.file) {                     // ใบที่ยังอยู่ในคิว มีไฟล์ต้นฉบับ จึงขยายได้เต็มความละเอียด
+      if (viewerURL) URL.revokeObjectURL(viewerURL);
+      viewerURL = URL.createObjectURL(card.file);
+      openViewer(viewerURL, img.alt);
+      return;
+    }
+    openViewer(img.src, img.alt);                // รายการที่บันทึกแล้ว ใช้รูปย่อที่เก็บไว้
+  }
+  document.addEventListener('click', function (ev) {
+    var img = ev.target.closest('img.zoomable');
+    if (img) { ev.preventDefault(); ev.stopPropagation(); zoomFrom(img); }
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    var img = ev.target.closest && ev.target.closest('img.zoomable');
+    if (img) { ev.preventDefault(); zoomFrom(img); }
+  });
+  $('#imgModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-img="close"]') || ev.target.id === 'imgModalPic') closeViewer();
+  });
+
   /* ---------------- พื้นหลังของฉัน ----------------
      เก็บไว้ในเครื่องเท่านั้น (ไม่ซิงก์ขึ้นเซิร์ฟเวอร์ เหมือนรูปใบเสร็จ)
      รูปถูกย่อก่อนเก็บ เพราะ localStorage มีพื้นที่จำกัด */
@@ -394,6 +431,17 @@
     return out;
   }
 
+  /* สร้างรูปสำหรับ OCR ใหม่จากไฟล์ต้นฉบับ — ใช้ตอนกด "ลองอ่านใหม่" และตอนถอยไปใช้รูปที่เล็กลง
+     (มือถือที่หน่วยความจำจำกัดอาจอ่านรูปใหญ่ไม่ไหว) */
+  function ensureOcrSrc(card, small) {
+    if (card.ocrSrc && !small) return Promise.resolve(card.ocrSrc);
+    if (!card.file) return Promise.resolve(card.ocrSrc);
+    return loadImage(card.file).then(function (img) {
+      card.ocrSrc = small ? resizeToDataURL(img, 1100, 0.85) : preprocessForOCR(img);
+      return card.ocrSrc;
+    });
+  }
+
   function readReceipt(worker, card, src) {
     return recognizeWith(worker, src, '6').then(function (text1) {
       var first = ReceiptParser.parse(text1);
@@ -495,7 +543,9 @@
   function cardTemplate(card) {
     var p = card.parsed || {};
     return '' +
-      '<div class="rcard-thumb">' + (card.thumb ? '<img src="' + card.thumb + '" alt="รูปใบเสร็จ">' : '📄') + '</div>' +
+      '<div class="rcard-thumb">' + (card.thumb
+        ? '<img class="zoomable" src="' + card.thumb + '" alt="รูปใบเสร็จ — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">'
+        : '📄') + '</div>' +
       '<div class="rcard-body">' +
         '<div class="rcard-status' + (card.status === 'error' ? ' is-error' : '') + '">' +
           '<span>' + esc(card.statusText || '') + '</span>' +
@@ -527,12 +577,28 @@
           '<details class="raw"><summary>ดูข้อความที่อ่านได้จากใบเสร็จ</summary><pre>' +
             esc(p.text || '(ไม่พบข้อความ)') + '</pre></details>'
         ) : '') +
-        (card.status === 'error' ? '<div class="row-actions">' +
+        (card.status === 'error' ? errorHelp(card) + '<div class="row-actions">' +
           '<button class="btn btn-sm" data-act="retry">ลองอ่านใหม่</button>' +
           '<button class="btn btn-sm" data-act="manual">กรอกเอง</button>' +
           '<button class="btn btn-ghost btn-sm" data-act="drop">ทิ้งใบนี้</button>' +
         '</div>' : '') +
       '</div>';
+  }
+
+  /* บอกสาเหตุที่อ่านไม่ผ่าน พร้อมทางออก — ผู้ใช้จะได้ไม่ติดอยู่แค่คำว่า "ไม่สำเร็จ" */
+  function errorHelp(card) {
+    var detail = card.errorDetail || '';
+    var hint;
+    if (/tesseract|network|fetch|โหลด/i.test(detail)) {
+      hint = 'ดูเหมือนโหลดตัวอ่านข้อความไม่สำเร็จ — ครั้งแรกต้องต่ออินเทอร์เน็ตเพื่อดาวน์โหลดชุดภาษาไทย (~5 MB) ' +
+             'ลองเช็กสัญญาณแล้วกด “ลองอ่านใหม่” หรือกด “กรอกเอง” เพื่อใส่ยอดเองไปก่อน';
+    } else if (/memory|allocation|abort|rangeerror|out of/i.test(detail)) {
+      hint = 'รูปอาจใหญ่เกินไปสำหรับเครื่องนี้ ลองปิดแท็บอื่นแล้วกด “ลองอ่านใหม่” หรือถ่าย/ครอปรูปให้เล็กลง';
+    } else {
+      hint = 'กด “ลองอ่านใหม่” อีกครั้ง ถ้ายังไม่ได้ให้กด “กรอกเอง” เพื่อใส่ข้อมูลด้วยตัวเอง (รูปยังถูกเก็บไว้กับรายการ)';
+    }
+    return '<p class="rcard-status is-error"><span>' + esc(hint) + '</span></p>' +
+      (detail ? '<details class="raw"><summary>รายละเอียดข้อผิดพลาด</summary><pre>' + esc(detail) + '</pre></details>' : '');
   }
 
   function renderCard(card) {
@@ -598,7 +664,11 @@
       if (savedDate) toast(saveToast(savedDate, 'บันทึกรายจ่ายแล้ว'));
     }
     else if (act === 'drop') removeCard(card);
-    else if (act === 'retry') { card.status = 'queued'; card.statusText = 'รออ่าน…'; renderCard(card); pump(); }
+    else if (act === 'retry') {
+      card.status = 'queued'; card.statusText = 'รออ่าน…';
+      card.errorDetail = ''; card.triedSmall = false;
+      renderCard(card); pump();
+    }
     else if (act === 'manual') {
       card.status = 'done';
       card.parsed = { date: todayISO(), merchant: '', amount: null, category: 'other', items: [], text: '', confident: false };
@@ -654,8 +724,18 @@
       queue.filter(function (c) { return c.status === 'done'; }).length + '/' + queue.length + ' เสร็จแล้ว)';
 
     getWorker()
-      .then(function (worker) { return readReceipt(worker, next, next.ocrSrc); })
+      .then(function (worker) {
+        return ensureOcrSrc(next, false)
+          .then(function (src) { return readReceipt(worker, next, src); })
+          .catch(function (err) {
+            if (next.triedSmall || !next.file) throw err;
+            next.triedSmall = true;
+            setProgress(next, 0.15, 'รูปใหญ่เกินไป — กำลังลองใหม่ด้วยรูปที่เล็กลง…');
+            return ensureOcrSrc(next, true).then(function (src) { return readReceipt(worker, next, src); });
+          });
+      })
       .then(function (parsed) {
+        next.dateGuessed = !parsed.date;
         if (!parsed.date) parsed.date = todayISO();
         var learned = categoryFromHistory(parsed.merchant);
         if (learned) parsed.category = learned;
@@ -667,17 +747,19 @@
           ? (parsed.isSlip ? 'อ่านสลิปโอนเงินแล้ว — ตรวจสอบข้อมูลก่อนบันทึก'
                            : 'อ่านใบเสร็จแล้ว — ตรวจสอบข้อมูลก่อนบันทึก')
           : 'อ่านข้อความได้ แต่หายอดเงินไม่เจอ';
+        if (next.dateGuessed) next.statusText += ' · อ่านวันที่ไม่เจอ ใส่วันนี้ไว้ก่อน';
         renderCard(next);
       })
       .catch(function (err) {
         next.status = 'error';
-        next.statusText = 'อ่านไม่สำเร็จ: ' + (err && err.message ? err.message : 'ไม่ทราบสาเหตุ');
+        next.statusText = 'อ่านไม่สำเร็จ';
+        next.errorDetail = (err && err.message) ? String(err.message) : 'ไม่ทราบสาเหตุ';
         renderCard(next);
       })
       .then(function () {
         activeCard = null;
         processing = false;
-        next.ocrSrc = null;
+        next.ocrSrc = null;      // คืนหน่วยความจำ — สร้างใหม่จาก card.file ได้ถ้าต้องอ่านซ้ำ
         pump();
       });
   }
@@ -688,7 +770,8 @@
     // เรียงรูปที่ถ่ายล่าสุดขึ้นก่อน (เว็บสั่งการเรียงในหน้าต่างเลือกรูปของเครื่องไม่ได้ แต่จัดลำดับหลังเลือกได้)
     images.sort(function (a, b) { return (b.lastModified || 0) - (a.lastModified || 0); });
     images.forEach(function (file) {
-      var card = { status: 'queued', statusText: 'รออ่าน… (' + file.name + ')', fileName: file.name, thumb: null, ocrSrc: null, parsed: null };
+      var card = { status: 'queued', statusText: 'รออ่าน… (' + file.name + ')', fileName: file.name,
+                   file: file, thumb: null, ocrSrc: null, parsed: null, triedSmall: false };
       addCard(card);
       loadImage(file).then(function (img) {
         card.thumb = resizeToDataURL(img, 360, 0.62);   // เก็บคู่กับรายการ
@@ -1040,7 +1123,7 @@
 
   function expenseCard(e) {
     return '<article class="ecard" data-id="' + e.id + '">' +
-      (e.image ? '<img class="ecard-thumb" src="' + e.image + '" alt="ใบเสร็จ ' + esc(e.merchant) + '">'
+      (e.image ? '<img class="ecard-thumb zoomable" src="' + e.image + '" alt="ใบเสร็จ ' + esc(e.merchant) + ' — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">'
                : '<span class="ecard-thumb is-cat" aria-hidden="true">' + ReceiptParser.categoryIcon(e.category) + '</span>') +
       '<div class="ecard-main">' +
         '<div class="ecard-title">' + esc(e.merchant) + '</div>' +
@@ -1521,6 +1604,7 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (!$('#imgModal').hidden) { closeViewer(); return; }
     if (!$('#bgModal').hidden) closeBgModal();
     if (!$('#syncModal').hidden) closeSync();
     if (!$('#bookModal').hidden) closeBookModal();
