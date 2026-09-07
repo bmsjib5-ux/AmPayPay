@@ -110,6 +110,37 @@
      รูปถูกย่อก่อนเก็บ เพราะ localStorage มีพื้นที่จำกัด */
   var BG_KEY = 'expense-book:bg:v2';
   var BG_KEY_OLD = 'expense-book:bg:v1';
+  var BG_IMG_KEY = 'expense-book:bg-img:v1';       // ที่เก็บสำรอง ใช้เมื่อเครื่องไม่มี IndexedDB
+  /* iOS Safari ให้พื้นที่ localStorage แค่ ~5 MB และนับเป็น UTF-16 (2 ไบต์ต่อตัวอักษร)
+     รูปพื้นหลังจึงมักใส่ไม่ลงบน iPhone ทั้งที่ลงได้สบายบน Android
+     เก็บรูปไว้ใน IndexedDB ซึ่งมีพื้นที่มากกว่ามาก แล้วเหลือแค่ค่าตั้งค่าเล็กๆ ไว้ใน localStorage */
+  var BG_DB = 'expense-book-bg', BG_STORE = 'img', BG_ROW = 'current';
+
+  function bgDB() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('เครื่องนี้ไม่รองรับ IndexedDB')); return; }
+      var req;
+      try { req = indexedDB.open(BG_DB, 1); } catch (e) { reject(e); return; }
+      req.onupgradeneeded = function () {
+        if (!req.result.objectStoreNames.contains(BG_STORE)) req.result.createObjectStore(BG_STORE);
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = req.onblocked = function () { reject(req.error || new Error('เปิดที่เก็บรูปไม่ได้')); };
+    });
+  }
+  function bgIDB(mode, run) {
+    return bgDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(BG_STORE, mode);
+        var out = run(tx.objectStore(BG_STORE));
+        tx.oncomplete = function () { db.close(); resolve(out && 'result' in out ? out.result : true); };
+        tx.onerror = tx.onabort = function () { db.close(); reject(tx.error || new Error('เขียนที่เก็บรูปไม่สำเร็จ')); };
+      });
+    });
+  }
+  function bgImgPut(url) { return bgIDB('readwrite', function (st) { return st.put(url, BG_ROW); }); }
+  function bgImgGet() { return bgIDB('readonly',  function (st) { return st.get(BG_ROW); }); }
+  function bgImgDel() { return bgIDB('readwrite', function (st) { return st.delete(BG_ROW); }); }
   var BG_PRESETS = [
     { id: 'none',   label: 'ค่าเริ่มต้น', swatch: 'linear-gradient(135deg,#efe9ff,#ffeede)' },
     { id: 'mint',   label: 'มินต์',      css: 'linear-gradient(160deg,#d8f3e6 0%,#eef7ff 55%,#fdf1e3 100%)', swatch: 'linear-gradient(135deg,#d8f3e6,#fdf1e3)' },
@@ -120,6 +151,7 @@
   var bgState = { kind: 'none', image: '', preset: '', dim: 24, blur: 0, cardSolid: 88 };
 
   function loadBg() {
+    var embedded = '';
     try {
       var raw = localStorage.getItem(BG_KEY);
       var fresh = false;
@@ -128,27 +160,58 @@
         var v = JSON.parse(raw);
         if (v && typeof v === 'object') {
           bgState.kind = v.kind === 'image' || v.kind === 'preset' ? v.kind : 'none';
-          bgState.image = typeof v.image === 'string' ? v.image : '';
+          embedded = typeof v.image === 'string' ? v.image : '';    // รุ่นเก่าฝังรูปไว้ในนี้
           bgState.preset = typeof v.preset === 'string' ? v.preset : '';
           // ของเดิมตั้งค่าจางไว้มากจนแทบไม่เห็นรูป — ย้ายมาใช้ค่าใหม่ที่เห็นรูปชัด
           bgState.dim = fresh ? 24 : clampNum(v.dim, 0, 88, 24);
           bgState.blur = fresh ? 0 : clampNum(v.blur, 0, 16, 0);
           bgState.cardSolid = clampNum(v.cardSolid, 60, 100, 88);
-          if (fresh) { try { localStorage.removeItem(BG_KEY_OLD); } catch (e2) {} saveBg(); }
+          if (fresh) { try { localStorage.removeItem(BG_KEY_OLD); } catch (e2) {} }
         }
       }
+      if (!embedded) embedded = localStorage.getItem(BG_IMG_KEY) || '';
     } catch (e) { /* อ่านไม่ได้ก็ใช้ค่าเริ่มต้น */ }
-    applyBg();
+
+    bgState.image = embedded;
+    applyBg();                                   // ชุดสีสำเร็จรูปขึ้นทันที ไม่ต้องรอ
+
+    if (embedded) saveBg();                      // เขียนกลับโดยไม่ฝังรูป คืนพื้นที่ localStorage
+    if (bgState.kind !== 'image') return;
+
+    bgImgGet().then(function (url) {
+      if (url) { bgState.image = url; applyBg(); return; }
+      if (embedded) return bgImgPut(embedded);   // ย้ายรูปเดิมเข้า IndexedDB
+      bgState.kind = 'none'; applyBg(); saveBg();   // ไม่มีรูปให้ใช้แล้ว
+    }).catch(function () { /* ไม่มี IndexedDB ก็ใช้รูปจากที่เก็บสำรองที่โหลดไว้แล้ว */ });
   }
   function clampNum(v, lo, hi, dflt) {
     var n = Number(v);
     return isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
   }
+  /* เก็บเฉพาะค่าตั้งค่า (ไม่กี่ร้อยไบต์) ส่วนรูปอยู่ใน IndexedDB */
   function saveBg() {
     try {
-      localStorage.setItem(BG_KEY, JSON.stringify(bgState));
+      localStorage.setItem(BG_KEY, JSON.stringify({
+        kind: bgState.kind, preset: bgState.preset,
+        dim: bgState.dim, blur: bgState.blur, cardSolid: bgState.cardSolid
+      }));
       return true;
     } catch (e) { return false; }
+  }
+
+  function forgetBgImage() {
+    bgImgDel().catch(function () {});
+    try { localStorage.removeItem(BG_IMG_KEY); } catch (e) {}
+  }
+
+  /* ที่เก็บสำรองเมื่อไม่มี IndexedDB — ย่อลงเรื่อยๆ จนกว่าจะเขียนลง localStorage ได้จริง */
+  function saveImageFallback(img) {
+    var steps = [[1200, 0.62], [900, 0.55], [700, 0.5], [520, 0.45]];
+    for (var i = 0; i < steps.length; i++) {
+      var url = resizeToDataURL(img, steps[i][0], steps[i][1]);
+      try { localStorage.setItem(BG_IMG_KEY, url); return url; } catch (e) { /* ยังใหญ่ไป ย่ออีก */ }
+    }
+    return '';
   }
   function presetById(id) {
     for (var i = 0; i < BG_PRESETS.length; i++) if (BG_PRESETS[i].id === id) return BG_PRESETS[i];
@@ -174,13 +237,13 @@
 
   /* ย่อรูปลงจนพอใส่ localStorage ได้ — ไล่ลดขนาด/คุณภาพทีละขั้น */
   function bgDataURL(img) {
-    var sizes = [1600, 1280, 1024, 800];
-    var quality = [0.72, 0.66, 0.6, 0.55];
+    var sizes = [1400, 1100, 900, 700];
+    var quality = [0.68, 0.62, 0.58, 0.52];
     for (var i = 0; i < sizes.length; i++) {
       var url = resizeToDataURL(img, sizes[i], quality[i]);
-      if (url.length < 1700000) return url;
+      if (url.length < 1200000) return url;
     }
-    return resizeToDataURL(img, 640, 0.5);
+    return resizeToDataURL(img, 560, 0.48);
   }
 
   function bgModalBody() {
@@ -236,6 +299,7 @@
     if (act === 'pick') { $('#bgInput').click(); return; }
     if (act === 'clear') {
       bgState.kind = 'none'; bgState.image = '';
+      forgetBgImage();
       saveBg(); applyBg(); renderBgModal();
       toast('กลับไปใช้พื้นหลังเดิมแล้ว');
       return;
@@ -265,20 +329,31 @@
     this.value = '';
     if (!file) return;
     toast('กำลังย่อรูป…');
+    var prev = { kind: bgState.kind, image: bgState.image, preset: bgState.preset };
     loadImage(file).then(function (img) {
-      var prev = { kind: bgState.kind, image: bgState.image, preset: bgState.preset };
+      var url = bgDataURL(img);
+      return bgImgPut(url)
+        .then(function () { return url; })
+        .catch(function () {                      // ไม่มี IndexedDB หรือเขียนไม่ได้ — ถอยไปที่เก็บสำรอง
+          var small = saveImageFallback(img);
+          if (!small) throw new Error('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม');
+          return small;
+        });
+    }).then(function (url) {
       bgState.kind = 'image';
-      bgState.image = bgDataURL(img);
+      bgState.image = url;
       if (bgState.dim > 60) bgState.dim = 24;      // กันกรณีตั้งไว้จางจนดูเหมือนไม่มีอะไรเกิดขึ้น
-      if (!saveBg()) {
-        bgState.kind = prev.kind; bgState.image = prev.image; bgState.preset = prev.preset;
-        applyBg(); renderBgModal();
-        toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — ลองลบรายการเก่าหรือใช้รูปที่เล็กลง');
-        return;
-      }
+      saveBg();
       applyBg(); renderBgModal();
       toast('เปลี่ยนพื้นหลังแล้ว 🎨');
-    }).catch(function () { toast('เปิดไฟล์รูปไม่ได้'); });
+    }).catch(function (err) {
+      bgState.kind = prev.kind; bgState.image = prev.image; bgState.preset = prev.preset;
+      applyBg(); renderBgModal();
+      var msg = err && err.message ? err.message : '';
+      toast(/พื้นที่/.test(msg)
+        ? 'พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — ลองลบรายการเก่าหรือใช้รูปที่เล็กลง'
+        : 'ตั้งรูปพื้นหลังไม่สำเร็จ' + (msg ? ': ' + msg : ''));
+    });
   });
 
   loadBg();
