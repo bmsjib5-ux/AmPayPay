@@ -128,7 +128,19 @@ window.CloudSync = (function () {
     if (/password should be at least|weak password/i.test(msg)) return 'รหัสผ่านสั้นเกินไป ต้องอย่างน้อย 6 ตัวอักษร';
     if (/token has expired|invalid|expired/i.test(msg)) return 'รหัสไม่ถูกต้องหรือหมดอายุ กรุณาขอรหัสใหม่';
     if (/rate|too many/i.test(msg)) return 'ขอรหัสถี่เกินไป รอสักครู่แล้วลองใหม่';
-    if (/relation .* does not exist|schema cache/i.test(msg)) return 'ยังไม่ได้สร้างตารางใน Supabase — รันไฟล์ supabase/schema.sql ก่อน';
+    // ยังไม่เคยรัน schema.sql เลย
+    if (/could not find the table|relation .* does not exist/i.test(msg)) {
+      var tbl = (msg.match(/'public\.(\w+)'/) || msg.match(/relation "?(\w+)"? does not exist/i) || [])[1];
+      return 'ยังไม่ได้สร้างตาราง' + (tbl ? ' "' + tbl + '"' : '') + ' ใน Supabase — ' +
+        'เปิด SQL Editor แล้วรันไฟล์ supabase/schema.sql ทั้งไฟล์';
+    }
+    // เคยรันแล้วแต่เป็นเวอร์ชันเก่า ตารางมีแต่คอลัมน์ยังไม่ครบ
+    if (/does not exist|schema cache/i.test(msg) && /column/i.test(msg)) {
+      var col = (msg.match(/column ([\w.]+) does not exist/i) || msg.match(/find the '([^']+)' column/i) || [])[1];
+      return 'ตารางใน Supabase ยังเป็นโครงเวอร์ชันเก่า' + (col ? ' (ขาดคอลัมน์ ' + col + ')' : '') +
+        ' — เปิด SQL Editor แล้วรันไฟล์ supabase/schema.sql ซ้ำอีกครั้ง รันซ้ำได้ ข้อมูลเดิมไม่หาย';
+    }
+    if (/schema cache/i.test(msg)) return 'โครงตารางใน Supabase ไม่ตรงกับแอป — รันไฟล์ supabase/schema.sql ซ้ำอีกครั้ง';
     if (/failed to fetch|network/i.test(msg)) return 'ต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ต';
     return msg;
   }
