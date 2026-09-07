@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>สมุดเก็บรายจ่ายของฉัน</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=30">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=30">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=31">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=31">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=30">
-<link rel="manifest" href="manifest.webmanifest?v=30">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=31">
+<link rel="manifest" href="manifest.webmanifest?v=31">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="สมุดรายจ่าย">
 <meta name="application-name" content="สมุดรายจ่าย">
-<link rel="stylesheet" href="assets/styles.css?v=30">
+<link rel="stylesheet" href="assets/styles.css?v=31">
 </head>
 <body>
 <header class="topbar">
@@ -28,9 +28,10 @@
     <button id="themeBtn" class="icon-btn" type="button" title="สลับธีมสว่าง/มืด" aria-label="สลับธีม">🌗</button>
   </div>
   <nav class="wrap tabs" role="tablist" aria-label="เมนูหลัก">
-    <button class="tab is-active" role="tab" aria-selected="true" data-tab="add"><span class="tab-ic" aria-hidden="true">📸</span>เพิ่มรายจ่าย</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="summary"><span class="tab-ic" aria-hidden="true">📊</span>สรุปรายจ่าย</button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="list"><span class="tab-ic" aria-hidden="true">🗂️</span>รายการทั้งหมด</button>
+    <button class="tab is-active" role="tab" aria-selected="true" data-tab="add"><span class="tab-ic" aria-hidden="true">📸</span><span class="tab-full">เพิ่มรายจ่าย</span><span class="tab-short">เพิ่ม</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="summary"><span class="tab-ic" aria-hidden="true">📊</span><span class="tab-full">สรุปรายจ่าย</span><span class="tab-short">สรุป</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="list"><span class="tab-ic" aria-hidden="true">🗂️</span><span class="tab-full">รายการทั้งหมด</span><span class="tab-short">รายการ</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="debt"><span class="tab-ic" aria-hidden="true">🧑‍🤝‍🧑</span>ลูกหนี้<span id="debtBadge" class="pill" hidden></span></button>
   </nav>
 </header>
 
@@ -109,6 +110,17 @@
       </div>
     </div>
 
+    <p id="debtNote" class="banner is-ok" hidden></p>
+
+    <figure class="chart-card">
+      <figcaption>
+        <h2 class="section-title">📅 รายจ่ายรายวัน</h2>
+        <p class="chart-sub" id="daySub">ยอดรวมของแต่ละวันในเดือนนี้</p>
+      </figcaption>
+      <div id="dayChart" class="days"></div>
+      <ol id="dayTop" class="rank day-top"></ol>
+    </figure>
+
     <figure class="chart-card">
       <figcaption>
         <h2 class="section-title">🍰 รายจ่ายแยกตามหมวด</h2>
@@ -157,11 +169,39 @@
     </div>
     <div id="expenseList" class="cards"></div>
   </section>
+
+  <!-- ---------- แท็บ: ลูกหนี้ ---------- -->
+  <section id="panel-debt" class="panel" role="tabpanel" aria-label="ลูกหนี้" hidden>
+    <div class="tiles">
+      <div class="tile">
+        <span class="tile-label">เพื่อนค้างจ่ายรวม</span>
+        <strong id="debtTotal" class="tile-value">฿0</strong>
+        <span id="debtFoot" class="tile-foot"></span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">จำนวนคนที่ค้าง</span>
+        <strong id="debtPeople" class="tile-value">0</strong>
+        <span class="tile-foot">นับเฉพาะที่ยังไม่จ่ายคืน</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">ได้คืนแล้วทั้งหมด</span>
+        <strong id="debtPaid" class="tile-value">฿0</strong>
+        <span class="tile-foot">ยอดที่เพื่อนจ่ายคืนแล้ว</span>
+      </div>
+    </div>
+
+    <div id="debtList" class="cards"></div>
+
+    <p class="hint">
+      วิธีใช้: ตอนบันทึกรายจ่าย เปิดหัวข้อ “➗ หารกับเพื่อน / ออกให้ก่อน” ใส่ชื่อเพื่อนกับยอดที่เขาต้องคืน ·
+      ยอดรายจ่ายยังนับเต็มจำนวนที่คุณจ่ายจริง ส่วนที่เพื่อนค้างจะมาโผล่ในหน้านี้
+    </p>
+  </section>
 </main>
 
 <footer class="wrap foot">
   ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
-  <span class="ver">เวอร์ชัน 30</span>
+  <span class="ver">เวอร์ชัน 31</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -205,10 +245,10 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/config.js?v=30"></script>
-<script src="assets/parser.js?v=30"></script>
-<script src="assets/store.js?v=30"></script>
-<script src="assets/sync.js?v=30"></script>
-<script src="assets/app.js?v=30"></script>
+<script src="assets/config.js?v=31"></script>
+<script src="assets/parser.js?v=31"></script>
+<script src="assets/store.js?v=31"></script>
+<script src="assets/sync.js?v=31"></script>
+<script src="assets/app.js?v=31"></script>
 </body>
 </html>

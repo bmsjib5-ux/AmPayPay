@@ -3,6 +3,7 @@
   'use strict';
 
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var CATS = ReceiptParser.categories;
   var money = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 2 });
   var moneyShort = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
@@ -67,6 +68,239 @@
       toast(next === 'system' ? 'ธีม: ตามระบบ' : next === 'light' ? 'ธีม: สว่าง' : 'ธีม: มืด');
     });
   })();
+
+  /* ---------------- หารบิลกับเพื่อน / ลูกหนี้ ---------------- */
+  function splitOf(exp) {
+    return (exp && exp.split && Array.isArray(exp.split.people)) ? exp.split.people : [];
+  }
+  function owedOf(exp) {                                  // ยอดที่ยังไม่ได้คืน
+    return splitOf(exp).reduce(function (sum, p) { return sum + (p.paid ? 0 : p.amount); }, 0);
+  }
+  function lentOf(exp) {                                  // ยอดที่ออกให้เพื่อนทั้งหมด (รวมที่คืนแล้ว)
+    return splitOf(exp).reduce(function (sum, p) { return sum + p.amount; }, 0);
+  }
+  function myShare(exp) {
+    return Math.max(0, (Number(exp.amount) || 0) - lentOf(exp));
+  }
+
+  /* กล่องหารบิลในฟอร์ม — ใช้ได้ทั้งตอนบันทึกใหม่และตอนแก้ไขรายการเดิม */
+  function splitBox(exp, open) {
+    var people = splitOf(exp);
+    return '<details class="raw split-box"' + (open || people.length ? ' open' : '') + '>' +
+      '<summary>➗ หารกับเพื่อน / ออกให้ก่อน' +
+        (people.length ? ' <span class="pill">' + people.length + ' คน</span>' : '') + '</summary>' +
+      '<div class="split-body">' +
+        '<div class="row-actions split-tools">' +
+          '<label class="field"><span class="field-label">หารกี่คน (รวมคุณ)</span>' +
+            '<input type="number" class="split-n" min="2" max="20" step="1" value="' +
+              (people.length ? people.length + 1 : 2) + '"></label>' +
+          '<button type="button" class="btn btn-sm" data-split="even">แบ่งเท่ากัน</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-split="add">+ เพิ่มคน</button>' +
+        '</div>' +
+        '<div class="split-rows">' + people.map(splitRow).join('') + '</div>' +
+        '<p class="split-foot muted"></p>' +
+      '</div>' +
+    '</details>';
+  }
+  function splitRow(p) {
+    p = p || {};
+    return '<div class="split-row" data-pid="' + esc(p.id || '') + '">' +
+      '<input type="text" class="sp-name" placeholder="ชื่อเพื่อน" value="' + esc(p.name || '') + '">' +
+      '<input type="number" class="sp-amt" min="0" step="0.01" placeholder="0.00" value="' +
+        (p.amount != null ? p.amount : '') + '">' +
+      '<label class="sp-paid"><input type="checkbox" class="sp-cb"' + (p.paid ? ' checked' : '') + '> คืนแล้ว</label>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-split="del" aria-label="ลบคนนี้">✕</button>' +
+    '</div>';
+  }
+  function readSplit(scope) {
+    var people = [];
+    $$('.split-row', scope).forEach(function (row) {
+      var amount = ReceiptParser.toNumber($('.sp-amt', row).value);
+      if (!amount || amount <= 0) return;
+      people.push({
+        id: row.dataset.pid || '',
+        name: $('.sp-name', row).value,
+        amount: amount,
+        paid: $('.sp-cb', row).checked
+      });
+    });
+    return { people: people };
+  }
+  function totalInForm(scope) {
+    var el = $('[data-f="amount"]', scope) || $('[data-ef="amount"]', scope);
+    return el ? (ReceiptParser.toNumber(el.value) || 0) : 0;
+  }
+  function refreshSplitFoot(box) {
+    var foot = $('.split-foot', box);
+    if (!foot) return;
+    var scope = box.closest('.rcard, .ecard') || box;
+    var total = totalInForm(scope);
+    var people = readSplit(box).people;
+    var lent = people.reduce(function (a, p) { return a + p.amount; }, 0);
+    var owed = people.reduce(function (a, p) { return a + (p.paid ? 0 : p.amount); }, 0);
+    if (!people.length) { foot.textContent = 'ใส่ชื่อเพื่อนกับยอดที่เขาต้องคืน แล้วยอดค้างจะไปโผล่ในแท็บ “ลูกหนี้”'; return; }
+    var mine = total - lent;
+    foot.textContent = 'ส่วนของคุณ ' + fmtMoney(Math.max(0, mine)) + ' · ออกให้เพื่อน ' + fmtMoney(lent) +
+      ' · ยังค้าง ' + fmtMoney(owed) + (mine < -0.005 ? ' ⚠️ ยอดหารเกินยอดบิล' : '');
+  }
+  function splitEven(box) {
+    var scope = box.closest('.rcard, .ecard') || box;
+    var total = totalInForm(scope);
+    var n = Math.max(2, Math.min(20, parseInt($('.split-n', box).value, 10) || 2));
+    var rowsEl = $('.split-rows', box);
+    var rows = $$('.split-row', rowsEl);
+    while (rows.length < n - 1) { rowsEl.insertAdjacentHTML('beforeend', splitRow({})); rows = $$('.split-row', rowsEl); }
+    while (rows.length > n - 1) { rows.pop().remove(); }
+    if (!total) { toast('ใส่จำนวนเงินก่อน แล้วกด “แบ่งเท่ากัน” อีกครั้ง'); refreshSplitFoot(box); return; }
+    var each = Math.round((total / n) * 100) / 100;
+    $$('.split-row', rowsEl).forEach(function (row) { $('.sp-amt', row).value = each; });
+    refreshSplitFoot(box);
+  }
+
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-split]');
+    if (!btn) return;
+    var box = btn.closest('.split-box');
+    if (!box) return;
+    ev.preventDefault();
+    var act = btn.dataset.split;
+    if (act === 'even') splitEven(box);
+    else if (act === 'add') { $('.split-rows', box).insertAdjacentHTML('beforeend', splitRow({})); refreshSplitFoot(box); }
+    else if (act === 'del') { btn.closest('.split-row').remove(); refreshSplitFoot(box); }
+  });
+  ['input', 'change'].forEach(function (evt) {
+    document.addEventListener(evt, function (ev) {
+      var box = ev.target.closest && ev.target.closest('.split-box');
+      if (box) { refreshSplitFoot(box); return; }
+      if (ev.target.matches && ev.target.matches('[data-f="amount"], [data-ef="amount"]')) {
+        var scope = ev.target.closest('.rcard, .ecard');
+        var b = scope && $('.split-box', scope);
+        if (b) refreshSplitFoot(b);
+      }
+    });
+  });
+
+  /* ---------------- แท็บลูกหนี้: รวมยอดค้างรายคน ---------------- */
+  function debtGroups() {
+    var byName = {};
+    ExpenseStore.all().forEach(function (e) {
+      splitOf(e).forEach(function (p) {
+        var key = p.name.trim().toLowerCase() || 'เพื่อน';
+        if (!byName[key]) byName[key] = { name: p.name.trim() || 'เพื่อน', owed: 0, paid: 0, items: [] };
+        var g = byName[key];
+        if (p.paid) g.paid += p.amount; else g.owed += p.amount;
+        g.items.push({ expenseId: e.id, personId: p.id, date: e.date, merchant: e.merchant,
+                       amount: p.amount, paid: p.paid, total: e.amount });
+      });
+    });
+    return Object.keys(byName).map(function (k) { return byName[k]; })
+      .map(function (g) {
+        g.items.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+        return g;
+      })
+      .sort(function (a, b) { return (b.owed - a.owed) || (b.paid - a.paid); });
+  }
+
+  function debtRow(it) {
+    return '<div class="debt-item' + (it.paid ? ' is-paid' : '') + '" data-eid="' + esc(it.expenseId) +
+        '" data-pid="' + esc(it.personId) + '">' +
+      '<div class="debt-item-main">' +
+        '<span class="debt-item-name">' + esc(it.merchant) + '</span>' +
+        '<span class="debt-item-meta">' + esc(dateLabel(it.date)) + ' · บิลรวม ' + esc(moneyShort.format(it.total)) + '</span>' +
+      '</div>' +
+      '<span class="debt-item-amount">' + fmtMoney(it.amount) + '</span>' +
+      '<button class="btn btn-sm' + (it.paid ? ' btn-ghost' : ' btn-primary') + '" data-debt="' +
+        (it.paid ? 'unpay' : 'pay') + '">' + (it.paid ? 'ยกเลิก' : 'รับเงินแล้ว') + '</button>' +
+    '</div>';
+  }
+
+  function renderDebts() {
+    var groups = debtGroups();
+    var owing = groups.filter(function (g) { return g.owed > 0.005; });
+    var totalOwed = groups.reduce(function (a, g) { return a + g.owed; }, 0);
+    var totalPaid = groups.reduce(function (a, g) { return a + g.paid; }, 0);
+
+    $('#debtTotal').textContent = fmtMoney(totalOwed);
+    $('#debtPeople').textContent = String(owing.length);
+    $('#debtPaid').textContent = fmtMoney(totalPaid);
+    $('#debtFoot').textContent = owing.length
+      ? 'ค้างมากสุด: ' + owing[0].name + ' ' + fmtMoney(owing[0].owed)
+      : (totalPaid ? 'เคลียร์ครบแล้ว 🎉' : 'ยังไม่มีรายการที่ออกให้เพื่อน');
+
+    if (!groups.length) {
+      $('#debtList').innerHTML = '<p class="empty"><span class="empty-icon" aria-hidden="true">🧑‍🤝‍🧑</span>' +
+        'ยังไม่มีลูกหนี้<br><span class="muted">ตอนบันทึกรายจ่าย เปิด “➗ หารกับเพื่อน / ออกให้ก่อน” ' +
+        'ใส่ชื่อเพื่อนกับยอดที่เขาต้องคืน</span></p>';
+      renderDebtBadge();
+      return;
+    }
+
+    $('#debtList').innerHTML = groups.map(function (g) {
+      var unpaid = g.items.filter(function (i) { return !i.paid; });
+      var paidItems = g.items.filter(function (i) { return i.paid; });
+      return '<section class="debt-card' + (g.owed > 0.005 ? '' : ' is-clear') + '" data-name="' + esc(g.name) + '">' +
+        '<header class="debt-head">' +
+          '<div>' +
+            '<h3 class="debt-name">' + (g.owed > 0.005 ? '🧑‍🤝‍🧑 ' : '✅ ') + esc(g.name) + '</h3>' +
+            '<p class="debt-sub">' + (g.owed > 0.005
+              ? 'ค้าง ' + unpaid.length + ' รายการ'
+              : 'จ่ายคืนครบแล้ว ' + paidItems.length + ' รายการ') +
+              (g.paid > 0.005 && g.owed > 0.005 ? ' · คืนแล้ว ' + fmtMoney(g.paid) : '') + '</p>' +
+          '</div>' +
+          '<span class="debt-total' + (g.owed > 0.005 ? ' is-owed' : '') + '">' + fmtMoney(g.owed) + '</span>' +
+          (g.owed > 0.005
+            ? '<button class="btn btn-sm" data-debt="payall">รับครบแล้ว</button>'
+            : '') +
+        '</header>' +
+        (unpaid.length ? '<div class="debt-items">' + unpaid.map(debtRow).join('') + '</div>' : '') +
+        (paidItems.length
+          ? '<details class="raw"><summary>ที่จ่ายคืนแล้ว ' + paidItems.length + ' รายการ (' + fmtMoney(g.paid) + ')</summary>' +
+            '<div class="debt-items">' + paidItems.map(debtRow).join('') + '</div></details>'
+          : '') +
+      '</section>';
+    }).join('');
+    renderDebtBadge();
+  }
+
+  function setPaid(expenseId, personId, paid) {
+    var exp = ExpenseStore.get(expenseId);
+    if (!exp) return false;
+    var people = splitOf(exp).map(function (p) {
+      return p.id === personId ? Object.assign({}, p, { paid: paid, paidAt: paid ? Date.now() : null }) : p;
+    });
+    ExpenseStore.update(expenseId, { split: { people: people } });
+    return true;
+  }
+
+  $('#debtList').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-debt]');
+    if (!btn) return;
+    var act = btn.dataset.debt;
+    if (act === 'payall') {
+      var cardEl = btn.closest('.debt-card');
+      var rows = $$('.debt-item:not(.is-paid)', cardEl);
+      if (!rows.length) return;
+      if (!confirm('บันทึกว่า "' + cardEl.dataset.name + '" จ่ายคืนครบทุกรายการแล้วใช่ไหม?')) return;
+      rows.forEach(function (row) { setPaid(row.dataset.eid, row.dataset.pid, true); });
+      toast('เคลียร์ยอดของ ' + cardEl.dataset.name + ' แล้ว 🎉');
+    } else {
+      var row = btn.closest('.debt-item');
+      if (!row) return;
+      setPaid(row.dataset.eid, row.dataset.pid, act === 'pay');
+      toast(act === 'pay' ? 'บันทึกว่าได้รับเงินคืนแล้ว' : 'ย้อนกลับเป็นยังค้างจ่าย');
+    }
+    renderDebts();
+    renderList();
+  });
+
+  /* ป้ายตัวเลขบนแท็บ ให้เห็นยอดค้างโดยไม่ต้องเข้าไปดู */
+  function renderDebtBadge() {
+    var badge = $('#debtBadge');
+    if (!badge) return;
+    var owed = ExpenseStore.all().reduce(function (a, e) { return a + owedOf(e); }, 0);
+    badge.hidden = owed <= 0.005;
+    badge.textContent = owed > 0.005 ? moneyShort.format(owed) : '';
+  }
 
   /* ---------------- ดูรูปใบเสร็จแบบขยาย ---------------- */
   var viewerURL = '';
@@ -376,7 +610,7 @@
         t.classList.toggle('is-active', on);
         t.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-      ['add', 'summary', 'list'].forEach(function (name) {
+      ['add', 'summary', 'list', 'debt'].forEach(function (name) {
         var panel = $('#panel-' + name);
         var on = name === tab.dataset.tab;
         panel.classList.toggle('is-active', on);
@@ -384,6 +618,8 @@
       });
       if (tab.dataset.tab === 'summary') renderSummary();
       if (tab.dataset.tab === 'list') renderList();
+      if (tab.dataset.tab === 'debt') renderDebts();
+      if (tab.scrollIntoView) tab.scrollIntoView({ inline: 'center', block: 'nearest' });
     });
   });
 
@@ -649,6 +885,7 @@
           '</div>' +
           '<label class="field"><span class="field-label">บันทึกช่วยจำ</span>' +
             '<input type="text" data-f="note" value="' + esc(p.note || '') + '" placeholder="เช่น เลี้ยงข้าวทีม"></label>' +
+          splitBox(card.draftSplit ? { split: card.draftSplit } : null) +
           (card.dupHint
             ? '<p class="banner is-warn" style="margin:0">⚠️ ' + esc(duplicateText(card.dupHint)) + '</p>'
             : '') +
@@ -728,7 +965,8 @@
       note: f.note,
       items: (card.parsed && card.parsed.items) || [],
       rawText: (card.parsed && card.parsed.text) || '',
-      image: card.thumb || null
+      image: card.thumb || null,
+      split: readSplit(card.el)
     });
     if (!res.result.ok) toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — บันทึกข้อมูลแล้วแต่ต้องลบรูปย่อบางส่วนออก');
     removeCard(card);
@@ -1116,6 +1354,19 @@
       cmp.textContent = 'ยังไม่มีข้อมูลเดือนก่อนไว้เทียบ';
     }
 
+    // ออกให้เพื่อนไปเท่าไหร่ในเดือนนี้ — ยอดรวมยังนับเต็ม แต่บอกไว้ให้เห็นภาพจริง
+    var lentMonth = inMonth.reduce(function (a, e) { return a + lentOf(e); }, 0);
+    var owedMonth = inMonth.reduce(function (a, e) { return a + owedOf(e); }, 0);
+    var note = $('#debtNote');
+    note.hidden = lentMonth <= 0.005;
+    if (!note.hidden) {
+      note.innerHTML = '🧑‍🤝‍🧑 เดือนนี้ออกให้เพื่อนไปก่อน <strong>' + esc(fmtMoney(lentMonth)) + '</strong> · ' +
+        (owedMonth > 0.005
+          ? 'ยังค้างอยู่ <strong>' + esc(fmtMoney(owedMonth)) + '</strong> · หักแล้วเป็นของคุณจริง ' +
+            esc(fmtMoney(Math.max(0, total - lentMonth)))
+          : 'ได้คืนครบแล้ว 🎉');
+    }
+
     // แยกตามหมวด
     var byCat = {};
     inMonth.forEach(function (e) { byCat[e.category] = (byCat[e.category] || 0) + (Number(e.amount) || 0); });
@@ -1142,6 +1393,9 @@
     }).join('') : '<p class="empty"><span class="empty-icon" aria-hidden="true">🌱</span>เดือนนี้ยังไม่มีรายจ่ายเลย</p>';
 
     $('#sumTop').textContent = rows.length ? 'จ่ายมากสุด: ' + ReceiptParser.categoryIcon(rows[0].key) + ' ' + rows[0].label : '';
+
+    // รายจ่ายรายวันของเดือนที่เลือก
+    renderDaily(key, inMonth);
 
     // แนวโน้ม 6 เดือน
     var keys = [];
@@ -1182,6 +1436,71 @@
     }).join('') : '<li class="muted">ยังไม่มีข้อมูล</li>';
   }
 
+  /* ---------------- สรุปรายจ่ายรายวัน ---------------- */
+  function daysInMonth(key) {
+    var parts = key.split('-');
+    return new Date(+parts[0], +parts[1], 0).getDate();
+  }
+  function dayLabelShort(key, day) {
+    var parts = key.split('-');
+    var d = new Date(+parts[0], +parts[1] - 1, day);
+    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+  }
+  var WEEKDAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+  function renderDaily(key, inMonth) {
+    var n = daysInMonth(key);
+    var parts = key.split('-');
+    var totals = new Array(n + 1).join('0').split('').map(Number);   // index 0 = วันที่ 1
+    var counts = totals.slice();
+    inMonth.forEach(function (e) {
+      var d = parseInt((e.date || '').slice(8, 10), 10);
+      if (d >= 1 && d <= n) { totals[d - 1] += Number(e.amount) || 0; counts[d - 1]++; }
+    });
+
+    var todayKey = monthKey(todayISO());
+    var todayDay = todayKey === key ? new Date().getDate() : 0;
+    var max = Math.max.apply(null, totals.concat([1]));
+    var spentDays = totals.filter(function (v) { return v > 0; }).length;
+    var sum = totals.reduce(function (a, v) { return a + v; }, 0);
+    // วันที่ผ่านมาแล้วในเดือนนี้ ใช้หารหาค่าเฉลี่ยที่มีความหมายจริง
+    var elapsed = todayDay ? todayDay : n;
+
+    var sub = [];
+    if (sum > 0) {
+      sub.push('เฉลี่ยวันละ ' + fmtMoney(sum / elapsed));
+      sub.push('มีรายจ่าย ' + spentDays + ' จาก ' + elapsed + ' วัน');
+      if (todayDay) sub.push('วันนี้ ' + fmtMoney(totals[todayDay - 1]));
+    } else {
+      sub.push('ยังไม่มีรายจ่ายในเดือนนี้');
+    }
+    $('#daySub').textContent = sub.join(' · ');
+
+    $('#dayChart').innerHTML = totals.map(function (v, i) {
+      var day = i + 1;
+      var future = todayDay && day > todayDay;
+      var wd = WEEKDAYS_TH[new Date(+parts[0], +parts[1] - 1, day).getDay()];
+      var h = v > 0 ? Math.max(3, Math.round(v / max * 92)) : 0;
+      return '<div class="day-col' + (day === todayDay ? ' is-today' : '') + (future ? ' is-future' : '') + '"' +
+          ' title="' + esc(dayLabelShort(key, day) + ' (' + wd + ') · ' + (v ? fmtMoney(v) : 'ไม่มีรายจ่าย')) + '">' +
+        '<span class="day-bar" style="height:' + h + 'px"></span>' +
+        '<span class="day-num">' + day + '</span>' +
+      '</div>';
+    }).join('');
+
+    var top = totals.map(function (v, i) { return { day: i + 1, value: v, count: counts[i] }; })
+      .filter(function (d) { return d.value > 0; })
+      .sort(function (a, b) { return b.value - a.value; })
+      .slice(0, 3);
+    $('#dayTop').innerHTML = top.length
+      ? top.map(function (d, i) {
+          return '<li><span class="r-name">' + (i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : '🥉 ') +
+            esc(dayLabelShort(key, d.day)) + ' <span class="muted">· ' + d.count + ' รายการ</span></span>' +
+            '<span class="r-amount">' + fmtMoney(d.value) + '</span></li>';
+        }).join('')
+      : '';
+  }
+
   $('#sumMonth').addEventListener('change', renderSummary);
 
   /* ---------------- รายการทั้งหมด ---------------- */
@@ -1216,6 +1535,9 @@
           '<span>' + esc(dateLabel(e.date)) + '</span>' +
           '<span class="tag"><span aria-hidden="true">' + ReceiptParser.categoryIcon(e.category) + '</span> ' +
             esc(ReceiptParser.categoryLabel(e.category)) + '</span>' +
+          (owedOf(e) > 0
+            ? '<span class="tag is-debt">🧑‍🤝‍🧑 เพื่อนค้าง ' + esc(moneyShort.format(owedOf(e))) + '</span>'
+            : (lentOf(e) > 0 ? '<span class="tag is-settled">✓ ได้คืนครบแล้ว</span>' : '')) +
           (e.note ? '<span>' + esc(e.note) + '</span>' : '') +
         '</div>' +
       '</div>' +
@@ -1238,6 +1560,7 @@
         '<label class="field"><span class="field-label">หมวด</span><select data-ef="category">' + catOptions(e.category) + '</select></label>' +
       '</div>' +
       '<label class="field"><span class="field-label">บันทึกช่วยจำ</span><input type="text" data-ef="note" value="' + esc(e.note) + '"></label>' +
+      splitBox(e) +
       (e.rawText ? '<details class="raw"><summary>ข้อความจากใบเสร็จ</summary><pre>' + esc(e.rawText) + '</pre></details>' : '') +
       '<div class="row-actions">' +
         '<button class="btn btn-primary btn-sm" data-eact="save">บันทึกการแก้ไข</button>' +
@@ -1296,9 +1619,11 @@
       var amount = ReceiptParser.toNumber(patch.amount);
       if (!amount || amount <= 0) { toast('จำนวนเงินต้องมากกว่า 0'); return; }
       patch.amount = amount;
+      patch.split = readSplit(card);
       ExpenseStore.update(id, patch);
       renderList();
       renderBudgetAlert();
+      renderDebtBadge();
       toast(saveToast(patch.date, 'แก้ไขเรียบร้อย'));
     }
   });
@@ -1319,9 +1644,13 @@
   $('#csvBtn').addEventListener('click', function () {
     var list = filtered();
     if (!list.length) { toast('ไม่มีรายการให้ส่งออก'); return; }
-    var head = ['วันที่', 'ร้าน/ผู้ขาย', 'หมวด', 'จำนวนเงิน', 'บันทึกช่วยจำ'];
+    var head = ['วันที่', 'ร้าน/ผู้ขาย', 'หมวด', 'จำนวนเงิน', 'ส่วนของฉัน', 'ออกให้เพื่อน', 'เพื่อนยังค้าง', 'ลูกหนี้', 'บันทึกช่วยจำ'];
     var rows = list.map(function (e) {
-      return [e.date, e.merchant, ReceiptParser.categoryLabel(e.category), (Number(e.amount) || 0).toFixed(2), e.note];
+      var names = splitOf(e).map(function (p) {
+        return p.name + ' ' + p.amount.toFixed(2) + (p.paid ? ' (คืนแล้ว)' : ' (ค้าง)');
+      }).join(' · ');
+      return [e.date, e.merchant, ReceiptParser.categoryLabel(e.category), (Number(e.amount) || 0).toFixed(2),
+              myShare(e).toFixed(2), lentOf(e).toFixed(2), owedOf(e).toFixed(2), names, e.note];
     });
     var csv = [head].concat(rows).map(function (r) {
       return r.map(function (cell) { return '"' + String(cell == null ? '' : cell).replace(/"/g, '""') + '"'; }).join(',');
@@ -1381,6 +1710,7 @@
     queue.slice().forEach(removeCard);         // ใบเสร็จที่ค้างในคิวเป็นของสมุดเดิม
     $('#ocrStatus').textContent = '';
     renderBookBar();
+  renderDebtBadge();
     renderList();
     renderBudgetAlert();
     if ($('#panel-summary').classList.contains('is-active')) renderSummary();
@@ -1711,7 +2041,7 @@
   renderList();
   renderBudgetAlert();
   renderSyncBadge();
-  ExpenseStore.onChange(function () { renderBookBar(); });
+  ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); });
   if (CloudSync.isConfigured()) {
     var cameFromEmailLink = /access_token=|error_description=/.test(location.hash);
     CloudSync.init().then(function (session) {
