@@ -9,6 +9,10 @@ window.ExpenseStore = (function () {
   var CURRENT_KEY = 'expense-book:currentBook';
   var SYNC_KEY = 'expense-book:lastSync';
   var DIRTY_KEY = 'expense-book:dirty';
+  var FRIENDS_KEY = 'expense-book:friends:v1';
+  var CLAIMS_KEY = 'expense-book:claims:v1';    // สำเนาใบแจ้งหนี้จากเซิร์ฟเวอร์ (เซิร์ฟเวอร์เป็นตัวจริง)
+  var CLAIMS_SEEN_KEY = 'expense-book:claimsSeen:v1';
+  var OWNER_KEY = 'expense-book:owner:v1';        // ข้อมูลในเครื่องนี้เป็นของบัญชีไหน
   var DEFAULT_BOOK = 'b_default';
 
   var cache = null;
@@ -111,7 +115,14 @@ window.ExpenseStore = (function () {
   /* ---------- จำว่าอะไรแก้ในเครื่องแล้วยังไม่ได้ส่งขึ้นเซิร์ฟเวอร์ ---------- */
   function readDirty() {
     var d = readJSON(DIRTY_KEY, {});
-    return { ids: (d && d.ids) || {}, books: (d && d.books) || {}, budgets: (d && d.budgets) || {} };
+    return { ids: (d && d.ids) || {}, books: (d && d.books) || {},
+             budgets: (d && d.budgets) || {}, friends: (d && d.friends) || {} };
+  }
+
+  function markFriendDirty(email) {
+    var d = readDirty();
+    d.friends[email] = 1;
+    writeJSON(DIRTY_KEY, d);
   }
 
   function markDirty(id) {
@@ -433,6 +444,117 @@ window.ExpenseStore = (function () {
         if (!keepTimestamp) markBudgetDirty(id);
         return true;
       }
+    },
+
+    /* ---------- เพื่อน: สมุดที่อยู่ส่วนตัว ใช้เลือกตอนหารบิล ---------- */
+    friends: {
+      all: function () {
+        return readJSON(FRIENDS_KEY, []).filter(function (f) { return !f.deleted; })
+          .sort(function (a, b) { return (a.name || a.email).localeCompare(b.name || b.email, 'th'); });
+      },
+      allWithDeleted: function () { return readJSON(FRIENDS_KEY, []); },
+      get: function (email) {
+        var key = String(email || '').trim().toLowerCase();
+        return this.all().filter(function (f) { return f.email === key; })[0] || null;
+      },
+      save: function (email, name) {
+        var key = String(email || '').trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(key)) return { ok: false, error: 'อีเมลไม่ถูกต้อง' };
+        var list = readJSON(FRIENDS_KEY, []).slice();
+        var now = Date.now();
+        var found = false;
+        list = list.map(function (f) {
+          if (f.email !== key) return f;
+          found = true;
+          return { email: key, name: String(name || f.name || '').trim().slice(0, 60), deleted: false,
+                   createdAt: f.createdAt || now, updatedAt: now };
+        });
+        if (!found) list.push({ email: key, name: String(name || '').trim().slice(0, 60), deleted: false,
+                                createdAt: now, updatedAt: now });
+        writeJSON(FRIENDS_KEY, list);
+        markFriendDirty(key);
+        notify();
+        return { ok: true, friend: { email: key, name: String(name || '').trim() } };
+      },
+      remove: function (email) {
+        var key = String(email || '').trim().toLowerCase();
+        var list = readJSON(FRIENDS_KEY, []).map(function (f) {
+          return f.email === key ? Object.assign({}, f, { deleted: true, updatedAt: Date.now() }) : f;
+        });
+        writeJSON(FRIENDS_KEY, list);
+        markFriendDirty(key);
+        notify();
+        return { ok: true };
+      },
+      pending: function () {
+        var d = readDirty();
+        var by = {};
+        readJSON(FRIENDS_KEY, []).forEach(function (f) { by[f.email] = f; });
+        return Object.keys(d.friends || {}).map(function (e) { return by[e]; }).filter(Boolean);
+      },
+      clearPending: function (emails) {
+        var d = readDirty();
+        (emails || []).forEach(function (e) { delete d.friends[e]; });
+        writeJSON(DIRTY_KEY, d);
+      },
+      mergeRemote: function (rows) {
+        var list = readJSON(FRIENDS_KEY, []).slice();
+        var by = {};
+        list.forEach(function (f, i) { by[f.email] = i; });
+        (rows || []).forEach(function (row) {
+          var i = by[row.email];
+          if (i === undefined) { list.push(row); by[row.email] = list.length - 1; }
+          else if ((row.updatedAt || 0) >= (list[i].updatedAt || 0)) list[i] = row;
+        });
+        writeJSON(FRIENDS_KEY, list);
+        notify();
+      }
+    },
+
+    /* ---------- ใบแจ้งหนี้ระหว่างเพื่อน (เซิร์ฟเวอร์เป็นตัวจริง เก็บสำเนาไว้ดูตอนออฟไลน์) ---------- */
+    claims: {
+      all: function () { return readJSON(CLAIMS_KEY, []); },
+      replaceAll: function (rows) { writeJSON(CLAIMS_KEY, rows || []); notify(); },
+      /* จำว่าเคยเห็นใบไหนแล้ว เพื่อโชว์ว่า "มีอะไรใหม่" */
+      seen: {
+        get: function () { return readJSON(CLAIMS_SEEN_KEY, {}); },
+        mark: function (ids) {
+          var m = readJSON(CLAIMS_SEEN_KEY, {});
+          (ids || []).forEach(function (id) { m[id] = Date.now(); });
+          writeJSON(CLAIMS_SEEN_KEY, m);
+        }
+      }
+    },
+
+    /* ---------- เจ้าของข้อมูลในเครื่องนี้ ----------
+       กันกรณีสลับบัญชีบนเครื่องเดียวกันแล้วข้อมูลของคนเก่าค้างอยู่ (หรือถูกส่งเข้าบัญชีใหม่) */
+    owner: {
+      get: function () { return readJSON(OWNER_KEY, null); },
+      set: function (userId, email) {
+        writeJSON(OWNER_KEY, { userId: userId || '', email: String(email || '').toLowerCase() });
+      },
+      clear: function () { try { localStorage.removeItem(OWNER_KEY); } catch (e) {} }
+    },
+
+    /* ล้างข้อมูลของบัญชีเดิมออกจากเครื่อง (ของยังอยู่บนเซิร์ฟเวอร์ของบัญชีนั้น) */
+    wipeLocal: function () {
+      [KEY, BOOKS_KEY, CURRENT_KEY, BUDGET_KEY, DIRTY_KEY, SYNC_KEY, FRIENDS_KEY, CLAIMS_KEY, CLAIMS_SEEN_KEY]
+        .forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+      cache = null;
+      booksCache = null;
+      notify();
+    },
+
+    /* ย้ายข้อมูลในเครื่องเข้าบัญชีใหม่: ทำเครื่องหมายทุกอย่างว่ายังไม่ได้ส่งขึ้น */
+    markAllDirty: function () {
+      var d = { ids: {}, books: {}, budgets: {}, friends: {} };
+      readJSON(KEY, []).forEach(function (r) { d.ids[r.id] = 1; });
+      readJSON(BOOKS_KEY, []).forEach(function (b) { d.books[b.id] = 1; });
+      var budgets = readBudgets();
+      Object.keys(budgets).forEach(function (bookId) { d.budgets[bookId] = 1; });
+      readJSON(FRIENDS_KEY, []).forEach(function (f) { d.friends[f.email] = 1; });
+      writeJSON(DIRTY_KEY, d);
+      try { localStorage.setItem(SYNC_KEY, '0'); } catch (e) {}
     },
 
     theme: {

@@ -905,3 +905,12 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .shortcut-url code { background: var(--surface-1); padding: 8px 10px; border-radius: 8px; display: block; }
 .shortcut-url .btn { justify-self: start; }
 .shortcut-body .btn { margin-left: 0; }
+
+/* ---------- เพื่อน / ใบแจ้งหนี้ระหว่างกัน ---------- */
+.debt-item-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.debt-item-meta .chip { font-size: 11.5px; padding: 1px 8px; }
+#incomingCard .debt-item:first-child { border-top: 0; padding-top: 0; }
+@media (max-width: 560px) {
+  .debt-item-actions { grid-area: btn; }
+  .debt-item-actions .btn { flex: 0 0 auto; }
+}

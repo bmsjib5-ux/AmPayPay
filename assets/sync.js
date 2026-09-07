@@ -9,6 +9,8 @@ window.CloudSync = (function () {
   var session = null;
   var listeners = [];
   var syncing = false;
+  var featureNote = '';
+  var guard = null;          // ฟังก์ชันที่แอปตั้งไว้ ถ้าคืนข้อความ = ห้ามซิงก์
 
   function config() {
     var c = window.SUPABASE_CONFIG || {};
@@ -93,6 +95,37 @@ window.CloudSync = (function () {
       items: Array.isArray(row.items) ? row.items : [],
       split: (row.split && Array.isArray(row.split.people)) ? row.split : { people: [] },
       rawText: row.raw_text || '',
+      deleted: !!row.deleted,
+      createdAt: Date.parse(row.created_at) || Date.now(),
+      updatedAt: Date.parse(row.updated_at) || Date.now()
+    };
+  }
+
+  /* ส่วนเสริมที่ถ้าเซิร์ฟเวอร์ยังไม่มีตารางรองรับ ให้ข้ามไปเงียบๆ แทนที่จะล้มทั้งการซิงก์ */
+  function optional(promise) {
+    return promise.catch(function (err) {
+      var msg = (err && err.message) || '';
+      if (/ยังไม่ได้สร้างตาราง|ไม่มีตาราง|does not exist|schema cache|โครงตาราง|โครงเวอร์ชันเก่า/i.test(msg)) {
+        featureNote = 'ระบบเพื่อน/ใบแจ้งหนี้ยังใช้ไม่ได้ — รันไฟล์ supabase/schema.sql ซ้ำอีกครั้งก่อน';
+        return null;
+      }
+      throw err;
+    });
+  }
+
+  function claimToLocal(row) {
+    return {
+      id: row.id,
+      fromUser: row.from_user,
+      fromEmail: String(row.from_email || '').toLowerCase(),
+      fromName: row.from_name || '',
+      toEmail: String(row.to_email || '').toLowerCase(),
+      amount: Number(row.amount) || 0,
+      note: row.note || '',
+      expenseId: row.expense_id || '',
+      personId: row.person_id || '',
+      status: row.status || 'pending',
+      reply: row.reply || '',
       deleted: !!row.deleted,
       createdAt: Date.parse(row.created_at) || Date.now(),
       updatedAt: Date.parse(row.updated_at) || Date.now()
@@ -223,10 +256,102 @@ window.CloudSync = (function () {
 
     /* ดึงของใหม่จากเซิร์ฟเวอร์ รวมกับของในเครื่อง แล้วส่งของที่แก้ในเครื่องขึ้นไป
        ครอบคลุมทั้งสมุด รายจ่าย และงบประมาณของทุกสมุด */
+    /* ---------- เพื่อน: ข้อมูลส่วนตัว ซิงก์แบบเดียวกับสมุด ---------- */
+    syncFriends: function (c, userId) {
+      return c.from('friends').select('*').eq('user_id', userId).then(function (res) {
+        if (res.error) throw new Error(friendly(res.error));
+        ExpenseStore.friends.mergeRemote((res.data || []).map(function (row) {
+          return {
+            email: String(row.email || '').toLowerCase(),
+            name: row.name || '',
+            deleted: !!row.deleted,
+            createdAt: Date.parse(row.created_at) || Date.now(),
+            updatedAt: Date.parse(row.updated_at) || Date.now()
+          };
+        }));
+        var pending = ExpenseStore.friends.pending();
+        if (!pending.length) return 0;
+        return c.from('friends').upsert(pending.map(function (f) {
+          return {
+            user_id: userId, email: f.email, name: f.name || '', deleted: !!f.deleted,
+            created_at: new Date(f.createdAt || Date.now()).toISOString(),
+            updated_at: new Date(f.updatedAt || Date.now()).toISOString()
+          };
+        }), { onConflict: 'user_id,email' }).then(function (up) {
+          if (up.error) throw new Error(friendly(up.error));
+          ExpenseStore.friends.clearPending(pending.map(function (f) { return f.email; }));
+          return pending.length;
+        });
+      });
+    },
+
+    /* ---------- ใบแจ้งหนี้: มีสองฝ่าย จึงดึงใหม่ทั้งชุดทุกครั้ง ---------- */
+    syncClaims: function (c) {
+      var email = (session && session.user && session.user.email) || '';
+      return c.from('debt_claims').select('*')
+        .or('from_user.eq.' + session.user.id + ',to_email.eq.' + email)
+        .then(function (res) {
+          if (res.error) throw new Error(friendly(res.error));
+          var rows = (res.data || []).map(claimToLocal)
+            .filter(function (r) { return !r.deleted; })
+            .sort(function (a, b) { return b.updatedAt - a.updatedAt; });
+          var before = {};
+          ExpenseStore.claims.all().forEach(function (r) { before[r.id] = r.status; });
+          ExpenseStore.claims.replaceAll(rows);
+          var changed = rows.filter(function (r) { return before[r.id] !== r.status; });
+          return { total: rows.length, changed: changed.length };
+        });
+    },
+
+    sendClaim: function (claim) {
+      return getClient().then(function (c) {
+        if (!session || !session.user) throw new Error('ยังไม่ได้ล็อกอิน');
+        var row = {
+          id: claim.id,
+          from_user: session.user.id,
+          from_email: session.user.email || '',
+          from_name: claim.fromName || '',
+          to_email: String(claim.toEmail || '').trim().toLowerCase(),
+          amount: Number(claim.amount) || 0,
+          note: claim.note || '',
+          expense_id: claim.expenseId || '',
+          person_id: claim.personId || '',
+          status: claim.status || 'pending',
+          reply: claim.reply || '',
+          deleted: false,
+          updated_at: new Date().toISOString()
+        };
+        return c.from('debt_claims').upsert(row, { onConflict: 'id' }).then(function (up) {
+          if (up.error) throw new Error(friendly(up.error));
+          return claimToLocal(row);
+        });
+      });
+    },
+
+    /* ลูกหนี้กดว่าจ่ายแล้ว / เจ้าหนี้ยืนยันรับเงิน — เซิร์ฟเวอร์มี trigger คุมว่าใครแก้อะไรได้ */
+    updateClaim: function (id, patch) {
+      return getClient().then(function (c) {
+        var row = { updated_at: new Date().toISOString() };
+        if (patch.status) row.status = patch.status;
+        if (patch.reply !== undefined) row.reply = String(patch.reply || '').slice(0, 200);
+        if (patch.deleted !== undefined) row.deleted = !!patch.deleted;
+        return c.from('debt_claims').update(row).eq('id', id).then(function (up) {
+          if (up.error) throw new Error(friendly(up.error));
+          return true;
+        });
+      });
+    },
+
+    /* ให้แอปห้ามซิงก์ได้ เช่น ตอนข้อมูลในเครื่องเป็นของอีกบัญชีและยังไม่ได้ตัดสินใจ */
+    setGuard: function (fn) { guard = fn; },
+
     syncNow: function () {
       if (!isConfigured()) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า Supabase'));
+      var blocked = guard ? guard() : null;
+      if (blocked) return Promise.reject(new Error(blocked));
       if (syncing) return Promise.resolve({ skipped: true });
       var startedAt = Date.now();
+      featureNote = '';
       var since = ExpenseStore.lastSync.get();
       var sinceISO = since ? new Date(since).toISOString() : null;
       var userId, c;
@@ -274,6 +399,14 @@ window.CloudSync = (function () {
       }).then(function () {
         return api.syncBudgets(c, userId);
       }).then(function () {
+        // ตารางเพื่อน/ใบแจ้งหนี้เพิ่งมาในเวอร์ชันหลัง ถ้าใครยังไม่ได้รัน schema.sql ใหม่
+        // ต้องไม่ทำให้การซิงก์รายจ่ายทั้งหมดพังตามไปด้วย
+        return optional(api.syncFriends(c, userId).then(function (n) { counts.pushed += n; }));
+      }).then(function () {
+        return optional(api.syncClaims(c));   // ใบแจ้งหนี้ดึงใหม่ทั้งหมดเสมอ เพราะอีกฝ่ายแก้ได้
+      }).then(function (claimInfo) {
+        counts.claims = claimInfo;
+        counts.note = featureNote;
         ExpenseStore.lastSync.set(startedAt - 5000);   // เผื่อเวลาคลาดเคลื่อนเล็กน้อย
         syncing = false;
         emit();

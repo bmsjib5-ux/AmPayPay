@@ -69,6 +69,223 @@
     });
   })();
 
+  /* ---------------- เพื่อน + ใบแจ้งหนี้ระหว่างกัน ----------------
+     ฝั่งเจ้าหนี้: กด "ส่งให้เพื่อน" ในแท็บลูกหนี้ → สร้างใบแจ้งหนี้ในเซิร์ฟเวอร์
+     ฝั่งลูกหนี้: เห็นใน "หนี้ที่ฉันต้องจ่าย" → กด "จ่ายแล้ว" พร้อมข้อความ
+     ฝั่งเจ้าหนี้: เห็นว่าเพื่อนแจ้งจ่ายแล้ว → กด "ยืนยันได้รับ" → ตัดยอดในรายการจริง */
+  var CLAIM_LABEL = {
+    pending:   { text: 'รอจ่าย',           chip: 'is-warn' },
+    paid:      { text: 'เพื่อนแจ้งว่าจ่ายแล้ว', chip: 'is-warn' },
+    confirmed: { text: 'ได้รับเงินแล้ว',    chip: 'is-ok' },
+    cancelled: { text: 'ยกเลิกแล้ว',        chip: '' }
+  };
+
+  function syncReady() {
+    return CloudSync.isConfigured() && !!CloudSync.user();
+  }
+  function myEmail() { return (CloudSync.email() || '').toLowerCase(); }
+
+  function claimsFor(kind) {
+    var me = myEmail();
+    return ExpenseStore.claims.all().filter(function (c) {
+      return kind === 'out' ? c.toEmail !== me || c.fromEmail === me && c.toEmail === me
+                            : c.toEmail === me && c.fromEmail !== me;
+    });
+  }
+  function outgoingClaims() {
+    var me = myEmail();
+    return ExpenseStore.claims.all().filter(function (c) { return c.fromEmail === me; });
+  }
+  function incomingClaims() {
+    var me = myEmail();
+    return ExpenseStore.claims.all().filter(function (c) { return c.toEmail === me && c.fromEmail !== me; });
+  }
+  function claimOfPerson(expenseId, personId) {
+    return outgoingClaims().filter(function (c) {
+      return c.expenseId === expenseId && c.personId === personId && c.status !== 'cancelled';
+    })[0] || null;
+  }
+
+  /* ---------- สมุดที่อยู่เพื่อน ---------- */
+  function friendsBody() {
+    var list = ExpenseStore.friends.all();
+    return '<p class="chart-sub">เก็บอีเมลเพื่อนไว้ เพื่อส่งยอดหนี้ให้เขาเห็นในแอปของเขาเอง ' +
+        '(เพื่อนต้องใช้เว็บนี้และล็อกอินด้วยอีเมลเดียวกัน)</p>' +
+      '<div class="book-list">' +
+        (list.length ? list.map(function (f) {
+          return '<div class="book-row" data-email="' + esc(f.email) + '">' +
+            '<div class="book-info">' +
+              '<span class="book-name">' + esc(f.name || f.email) + '</span>' +
+              '<span class="book-count">' + esc(f.email) + '</span>' +
+            '</div>' +
+            '<button class="btn btn-ghost btn-sm" data-friend="rename">เปลี่ยนชื่อ</button>' +
+            '<button class="btn btn-ghost btn-sm btn-danger" data-friend="del">ลบ</button>' +
+          '</div>';
+        }).join('') : '<p class="empty"><span class="empty-icon" aria-hidden="true">👋</span>ยังไม่มีเพื่อนในรายชื่อ</p>') +
+      '</div>' +
+      '<div class="grid2" style="margin-top:14px">' +
+        '<label class="field"><span class="field-label">ชื่อเล่น</span>' +
+          '<input type="text" id="newFriendName" placeholder="เช่น เอ"></label>' +
+        '<label class="field"><span class="field-label">อีเมลของเพื่อน</span>' +
+          '<input type="email" id="newFriendEmail" placeholder="friend@example.com" autocomplete="off"></label>' +
+      '</div>' +
+      '<div class="row-actions" style="margin-top:12px">' +
+        '<button class="btn btn-primary btn-sm" data-friend="add">เพิ่มเพื่อน</button>' +
+      '</div>';
+  }
+  function renderFriendsModal() { $('#friendsBody').innerHTML = friendsBody(); }
+  function closeFriendsModal() { $('#friendsModal').hidden = true; }
+
+  $('#friendsBtn').addEventListener('click', function () {
+    $('#friendsModal').hidden = false;
+    renderFriendsModal();
+  });
+  $('#friendsModal').addEventListener('click', function (ev) {
+    if (ev.target === this) { closeFriendsModal(); return; }
+    var btn = ev.target.closest('[data-friend]');
+    if (!btn) return;
+    var act = btn.dataset.friend;
+    var row = btn.closest('.book-row');
+    var email = row ? row.dataset.email : '';
+    if (act === 'close') { closeFriendsModal(); return; }
+    if (act === 'add') {
+      var res = ExpenseStore.friends.save($('#newFriendEmail').value, $('#newFriendName').value);
+      if (!res.ok) { toast(res.error); return; }
+      renderFriendsModal();
+      toast('เพิ่มเพื่อนแล้ว');
+      return;
+    }
+    if (act === 'rename') {
+      var f = ExpenseStore.friends.get(email);
+      var name = prompt('ชื่อเล่นของ ' + email, f ? f.name : '');
+      if (name === null) return;
+      ExpenseStore.friends.save(email, name);
+      renderFriendsModal();
+      return;
+    }
+    if (act === 'del') {
+      if (!confirm('ลบ ' + email + ' ออกจากรายชื่อเพื่อน?')) return;
+      ExpenseStore.friends.remove(email);
+      renderFriendsModal();
+    }
+  });
+
+  /* ---------- ฝั่งลูกหนี้: หนี้ที่เพื่อนส่งมา ---------- */
+  function renderIncoming() {
+    var card = $('#incomingCard');
+    if (!syncReady()) { card.hidden = true; return; }
+    var list = incomingClaims().filter(function (c) { return c.status !== 'cancelled'; });
+    card.hidden = !list.length;
+    if (!list.length) return;
+
+    var owed = list.filter(function (c) { return c.status !== 'confirmed'; })
+      .reduce(function (a, c) { return a + c.amount; }, 0);
+    $('#incomingTotal').textContent = fmtMoney(owed);
+    $('#incomingSub').textContent = owed > 0.005
+      ? 'คุณต้องจ่ายคืนเพื่อนรวม ' + fmtMoney(owed)
+      : 'เคลียร์ครบแล้ว 🎉';
+
+    $('#incomingList').innerHTML = list.map(function (c) {
+      var who = c.fromName || c.fromEmail;
+      var st = CLAIM_LABEL[c.status] || CLAIM_LABEL.pending;
+      return '<div class="debt-item' + (c.status === 'confirmed' ? ' is-paid' : '') + '" data-cid="' + esc(c.id) + '">' +
+        '<div class="debt-item-main">' +
+          '<span class="debt-item-name">' + esc(who) + '</span>' +
+          '<span class="debt-item-meta">' + esc(c.note || 'ไม่ได้ระบุรายการ') +
+            ' · <span class="chip ' + st.chip + '">' + esc(c.status === 'paid' ? 'แจ้งว่าจ่ายแล้ว' : st.text) + '</span>' +
+            (c.reply ? ' · “' + esc(c.reply) + '”' : '') + '</span>' +
+        '</div>' +
+        '<span class="debt-item-amount">' + fmtMoney(c.amount) + '</span>' +
+        (c.status === 'pending'
+          ? '<button class="btn btn-primary btn-sm" data-claim="pay">จ่ายแล้ว แจ้งเพื่อน</button>'
+          : c.status === 'paid'
+            ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
+            : '<span class="chip is-ok">เรียบร้อย</span>') +
+      '</div>';
+    }).join('');
+  }
+
+  $('#incomingList').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-claim]');
+    if (!btn) return;
+    var id = btn.closest('.debt-item').dataset.cid;
+    var act = btn.dataset.claim;
+    if (act === 'pay') {
+      var reply = prompt('ข้อความถึงเพื่อน (ไม่ใส่ก็ได้)', 'โอนคืนแล้วนะ');
+      if (reply === null) return;
+      btn.disabled = true;
+      CloudSync.updateClaim(id, { status: 'paid', reply: reply })
+        .then(function () { return CloudSync.syncNow(); })
+        .then(function () { renderDebts(); toast('แจ้งเพื่อนแล้วว่าจ่ายคืนแล้ว'); })
+        .catch(function (e) { btn.disabled = false; toast('ส่งไม่สำเร็จ: ' + e.message); });
+    } else if (act === 'unpay') {
+      btn.disabled = true;
+      CloudSync.updateClaim(id, { status: 'pending', reply: '' })
+        .then(function () { return CloudSync.syncNow(); })
+        .then(function () { renderDebts(); toast('ยกเลิกการแจ้งแล้ว'); })
+        .catch(function (e) { btn.disabled = false; toast('ส่งไม่สำเร็จ: ' + e.message); });
+    }
+  });
+
+  /* ---------- ฝั่งเจ้าหนี้: ส่งยอดให้เพื่อน / ยืนยันรับเงิน ---------- */
+  function sendClaimFor(expenseId, personId) {
+    var exp = ExpenseStore.get(expenseId);
+    if (!exp) return;
+    var person = splitOf(exp).filter(function (p) { return p.id === personId; })[0];
+    if (!person) return;
+    if (!syncReady()) { toast('ต้องเปิดซิงก์ ☁️ และล็อกอินก่อน จึงจะส่งยอดให้เพื่อนได้'); return; }
+
+    var friends = ExpenseStore.friends.all();
+    var guess = friends.filter(function (f) {
+      return (f.name || '').trim() && (f.name || '').trim() === person.name.trim();
+    })[0];
+    var email = prompt('ส่งยอด ' + fmtMoney(person.amount) + ' ของ "' + person.name + '" ไปที่อีเมลไหน?' +
+      (friends.length ? '\n\nเพื่อนในรายชื่อ: ' + friends.map(function (f) { return f.name || f.email; }).join(', ') : ''),
+      guess ? guess.email : '');
+    if (email === null) return;
+    email = String(email).trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('อีเมลไม่ถูกต้อง'); return; }
+    ExpenseStore.friends.save(email, person.name);
+
+    var existing = claimOfPerson(expenseId, personId);
+    CloudSync.sendClaim({
+      id: existing ? existing.id : ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+      toEmail: email,
+      amount: person.amount,
+      note: exp.merchant + ' · ' + dateLabel(exp.date),
+      expenseId: expenseId,
+      personId: personId,
+      fromName: (ExpenseStore.friends.get(myEmail()) || {}).name || '',
+      status: existing ? existing.status : 'pending'
+    }).then(function () { return CloudSync.syncNow(); })
+      .then(function () { renderDebts(); toast('ส่งยอดให้ ' + email + ' แล้ว'); })
+      .catch(function (e) { toast('ส่งไม่สำเร็จ: ' + e.message); });
+  }
+
+  function confirmClaim(id) {
+    var claim = ExpenseStore.claims.all().filter(function (c) { return c.id === id; })[0];
+    if (!claim) return;
+    CloudSync.updateClaim(id, { status: 'confirmed' }).then(function () {
+      if (claim.expenseId && claim.personId) setPaid(claim.expenseId, claim.personId, true);
+      return CloudSync.syncNow();
+    }).then(function () {
+      renderDebts(); renderList();
+      toast('ยืนยันรับเงินแล้ว ตัดยอดค้างให้เรียบร้อย');
+    }).catch(function (e) { toast('ยืนยันไม่สำเร็จ: ' + e.message); });
+  }
+
+  $('#claimSyncBtn').addEventListener('click', function () {
+    if (!syncReady()) { toast('ต้องเปิดซิงก์ ☁️ และล็อกอินก่อน'); return; }
+    var btn = this;
+    btn.disabled = true;
+    CloudSync.syncNow().then(function (res) {
+      renderDebts();
+      var n = res && res.claims ? res.claims.changed : 0;
+      toast(n ? 'มีอัปเดตจากเพื่อน ' + n + ' รายการ' : 'อัปเดตแล้ว ยังไม่มีอะไรเปลี่ยน');
+    }).catch(function (e) { toast('อัปเดตไม่สำเร็จ: ' + e.message); })
+      .then(function () { btn.disabled = false; });
+  });
+
   /* ---------------- รับข้อความใบเสร็จจาก Shortcuts (iPhone) ----------------
      เว็บแอปเปิดอัลบั้มรูปเองไม่ได้ (เบราว์เซอร์ห้ามไว้) แต่ Shortcuts บน iPhone เปิดได้
      จึงให้ Shortcut หยิบรูปจากอัลบั้ม อ่านข้อความด้วย Live Text แล้วส่งมาที่
@@ -284,19 +501,36 @@
   }
 
   function debtRow(it) {
+    var claim = claimOfPerson(it.expenseId, it.personId);
+    var claimBits = '';
+    if (claim) {
+      var st = CLAIM_LABEL[claim.status] || CLAIM_LABEL.pending;
+      claimBits = ' · <span class="chip ' + st.chip + '">📨 ' + esc(st.text) + '</span>' +
+        (claim.reply ? ' “' + esc(claim.reply) + '”' : '');
+    }
+    var extra = '';
+    if (!it.paid && syncReady()) {
+      extra = claim && claim.status === 'paid'
+        ? '<button class="btn btn-sm btn-primary" data-debt="confirm" data-cid="' + esc(claim.id) + '">ยืนยันได้รับ</button>'
+        : '<button class="btn btn-sm" data-debt="send">' + (claim ? 'ส่งซ้ำ' : '📨 ส่งให้เพื่อน') + '</button>';
+    }
     return '<div class="debt-item' + (it.paid ? ' is-paid' : '') + '" data-eid="' + esc(it.expenseId) +
         '" data-pid="' + esc(it.personId) + '">' +
       '<div class="debt-item-main">' +
         '<span class="debt-item-name">' + esc(it.merchant) + '</span>' +
-        '<span class="debt-item-meta">' + esc(dateLabel(it.date)) + ' · บิลรวม ' + esc(moneyShort.format(it.total)) + '</span>' +
+        '<span class="debt-item-meta">' + esc(dateLabel(it.date)) + ' · บิลรวม ' + esc(moneyShort.format(it.total)) +
+          claimBits + '</span>' +
       '</div>' +
       '<span class="debt-item-amount">' + fmtMoney(it.amount) + '</span>' +
-      '<button class="btn btn-sm' + (it.paid ? ' btn-ghost' : ' btn-primary') + '" data-debt="' +
-        (it.paid ? 'unpay' : 'pay') + '">' + (it.paid ? 'ยกเลิก' : 'รับเงินแล้ว') + '</button>' +
+      '<span class="debt-item-actions">' + extra +
+        '<button class="btn btn-sm' + (it.paid ? ' btn-ghost' : '') + '" data-debt="' +
+          (it.paid ? 'unpay' : 'pay') + '">' + (it.paid ? 'ยกเลิก' : 'รับเงินแล้ว') + '</button>' +
+      '</span>' +
     '</div>';
   }
 
   function renderDebts() {
+    renderIncoming();
     var groups = debtGroups();
     var owing = groups.filter(function (g) { return g.owed > 0.005; });
     var totalOwed = groups.reduce(function (a, g) { return a + g.owed; }, 0);
@@ -365,6 +599,13 @@
       if (!confirm('บันทึกว่า "' + cardEl.dataset.name + '" จ่ายคืนครบทุกรายการแล้วใช่ไหม?')) return;
       rows.forEach(function (row) { setPaid(row.dataset.eid, row.dataset.pid, true); });
       toast('เคลียร์ยอดของ ' + cardEl.dataset.name + ' แล้ว 🎉');
+    } else if (act === 'send') {
+      var sendRow = btn.closest('.debt-item');
+      sendClaimFor(sendRow.dataset.eid, sendRow.dataset.pid);
+      return;
+    } else if (act === 'confirm') {
+      confirmClaim(btn.dataset.cid);
+      return;
     } else {
       var row = btn.closest('.debt-item');
       if (!row) return;
@@ -380,8 +621,20 @@
     var badge = $('#debtBadge');
     if (!badge) return;
     var owed = ExpenseStore.all().reduce(function (a, e) { return a + owedOf(e); }, 0);
-    badge.hidden = owed <= 0.005;
-    badge.textContent = owed > 0.005 ? moneyShort.format(owed) : '';
+    var mine = incomingClaims().reduce(function (a, c) {
+      return a + (c.status === 'pending' || c.status === 'paid' ? c.amount : 0);
+    }, 0);
+    var news = incomingClaims().filter(function (c) { return c.status === 'pending'; }).length +
+      outgoingClaims().filter(function (c) { return c.status === 'paid'; }).length;
+    badge.hidden = owed <= 0.005 && mine <= 0.005;
+    var parts = [];
+    if (owed > 0.005) parts.push('+' + moneyShort.format(owed));   // เพื่อนค้างเรา
+    if (mine > 0.005) parts.push('−' + moneyShort.format(mine));   // เราค้างเพื่อน
+    badge.textContent = badge.hidden ? '' : parts.join(' ') + (news ? ' •' : '');
+    badge.title = (owed > 0.005 ? 'เพื่อนค้างคุณ ' + fmtMoney(owed) : '') +
+      (owed > 0.005 && mine > 0.005 ? ' · ' : '') +
+      (mine > 0.005 ? 'คุณค้างเพื่อน ' + fmtMoney(mine) : '') +
+      (news ? ' · มีอัปเดตจากเพื่อน ' + news + ' รายการ' : '');
   }
 
   /* ---------------- ดูรูปใบเสร็จแบบขยาย ---------------- */
@@ -1935,6 +2188,24 @@
       return;
     }
 
+    var conflict = CloudSync.user() ? ownerConflict() : null;
+    if (conflict) {
+      body.innerHTML = '<p class="banner is-warn" style="margin:0 0 12px">⚠️ เครื่องนี้มีข้อมูลของบัญชี <strong>' +
+          esc(conflict.email || conflict.userId) + '</strong> ค้างอยู่ แต่ตอนนี้ล็อกอินเป็น <strong>' +
+          esc(CloudSync.email()) + '</strong></p>' +
+        '<p class="chart-sub">เลือกก่อนว่าจะเอาข้อมูลในเครื่องยังไง — ระบบจะยังไม่ซิงก์จนกว่าจะเลือก ' +
+          'เพื่อไม่ให้ข้อมูลสองบัญชีปนกัน</p>' +
+        '<div class="row-actions" style="margin-top:14px;flex-direction:column;align-items:stretch">' +
+          '<button class="btn btn-primary btn-sm" data-sync="wipe">ล้างข้อมูลในเครื่อง แล้วดึงของบัญชีนี้มาแทน</button>' +
+          '<button class="btn btn-sm" data-sync="adopt">ย้ายข้อมูลในเครื่องเข้าบัญชี ' + esc(CloudSync.email()) + '</button>' +
+          '<button class="btn btn-ghost btn-sm" data-sync="backup">ดาวน์โหลดสำรองข้อมูลก่อน</button>' +
+          '<button class="btn btn-ghost btn-sm" data-sync="signout">ออกจากระบบ (ยังไม่ตัดสินใจ)</button>' +
+        '</div>' +
+        '<p class="budget-foot">“ล้างข้อมูลในเครื่อง” ลบเฉพาะสำเนาในเบราว์เซอร์นี้ ' +
+          'ข้อมูลของบัญชีเดิมที่เคยซิงก์ขึ้นไปแล้วยังอยู่ครบบนเซิร์ฟเวอร์</p>' + note;
+      return;
+    }
+
     if (CloudSync.user()) {
       body.innerHTML = '<p class="chart-sub">ล็อกอินเป็น <strong>' + esc(CloudSync.email()) + '</strong></p>' +
         '<p class="budget-foot">' + esc(syncTimeLabel()) + '</p>' + msg +
@@ -2007,8 +2278,36 @@
     if ($('#panel-summary').classList.contains('is-active')) renderSummary();
   }
 
+  /* ข้อมูลในเครื่องเป็นของบัญชีไหน — กันข้อมูลของคนก่อนหน้าปนเข้าบัญชีใหม่บนเครื่องเดียวกัน */
+  function localHasData() {
+    return ExpenseStore.allWithDeleted().length > 0 || ExpenseStore.friends.allWithDeleted().length > 0;
+  }
+  function ownerConflict() {
+    var user = CloudSync.user();
+    if (!user) return null;
+    var owner = ExpenseStore.owner.get();
+    if (!owner || !owner.userId) return null;                 // ยังไม่เคยผูกกับบัญชีไหน
+    if (owner.userId === user.id) return null;                // บัญชีเดิม ปกติ
+    return owner;                                             // คนละบัญชี ต้องให้ผู้ใช้ตัดสินใจก่อน
+  }
+  function claimOwnership() {
+    var user = CloudSync.user();
+    if (user) ExpenseStore.owner.set(user.id, user.email);
+  }
+
+  /* กันทุกทางที่เรียกซิงก์ ไม่ใช่แค่ปุ่มเดียว */
+  CloudSync.setGuard(function () {
+    var c = ownerConflict();
+    return c ? 'ข้อมูลในเครื่องนี้เป็นของบัญชี ' + (c.email || c.userId) + ' — เปิด ☁️ แล้วเลือกก่อนว่าจะเก็บหรือล้าง' : null;
+  });
+
   function runSync(silent) {
     if (!CloudSync.isConfigured() || !CloudSync.user()) return;
+    if (ownerConflict()) {                                    // ยังไม่ได้ตัดสินใจ — ห้ามซิงก์เด็ดขาด
+      if (!silent) { $('#syncModal').hidden = false; renderSyncModal(); }
+      return;
+    }
+    claimOwnership();
     syncUI.busy = true;
     syncUI.error = '';
     renderSyncModal();
@@ -2016,7 +2315,8 @@
       syncUI.busy = false;
       lastSyncFinished = Date.now();
       if (!counts || !counts.skipped) {
-        syncUI.message = 'ซิงก์เรียบร้อย · รับมา ' + (counts.pulled || 0) + ' รายการ · ส่งขึ้น ' + (counts.pushed || 0) + ' รายการ';
+        syncUI.message = 'ซิงก์เรียบร้อย · รับมา ' + (counts.pulled || 0) + ' รายการ · ส่งขึ้น ' + (counts.pushed || 0) + ' รายการ' +
+          (counts.note ? ' · ' + counts.note : '');
         refreshAfterSync();
         if (!silent && (counts.pulled || counts.pushed)) toast(syncUI.message);
       }
@@ -2075,10 +2375,32 @@
     }
     if (act === 'back') { syncUI.step = 'maillink'; syncUI.error = ''; syncUI.message = ''; renderSyncModal(); return; }
     if (act === 'now') { runSync(false); return; }
+    if (act === 'wipe') {
+      if (!confirm('ล้างข้อมูลในเบราว์เซอร์นี้ทั้งหมด แล้วดึงของบัญชี ' + CloudSync.email() + ' มาแทนใช่ไหม?\n' +
+                   '(ข้อมูลของบัญชีเดิมที่เคยซิงก์ขึ้นไปแล้วยังอยู่บนเซิร์ฟเวอร์)')) return;
+      ExpenseStore.wipeLocal();
+      claimOwnership();
+      syncUI.message = 'ล้างข้อมูลเดิมแล้ว กำลังดึงข้อมูลของบัญชีนี้…';
+      renderSyncModal();
+      runSync(false);
+      refreshAfterSync();
+      return;
+    }
+    if (act === 'adopt') {
+      if (!confirm('ย้ายข้อมูลทั้งหมดในเครื่องนี้เข้าบัญชี ' + CloudSync.email() + ' ใช่ไหม?')) return;
+      ExpenseStore.markAllDirty();
+      claimOwnership();
+      syncUI.message = 'กำลังย้ายข้อมูลเข้าบัญชีนี้…';
+      renderSyncModal();
+      runSync(false);
+      return;
+    }
+    if (act === 'backup') { $('#backupBtn').click(); return; }
     if (act === 'signout') {
       CloudSync.signOut().then(function () {
         syncUI.step = 'password';
         syncUI.message = 'ออกจากระบบแล้ว (ข้อมูลในเครื่องยังอยู่ครบ)';
+        syncUI.error = '';
         renderSyncModal();
         renderSyncBadge();
       });
@@ -2191,6 +2513,10 @@
 
   renderSyncBadge();
   ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); });
+  CloudSync.onState(function () {
+    renderDebtBadge();
+    if ($('#panel-debt').classList.contains('is-active')) renderDebts();
+  });
   if (CloudSync.isConfigured()) {
     var cameFromEmailLink = /access_token=|error_description=/.test(location.hash);
     CloudSync.init().then(function (session) {
