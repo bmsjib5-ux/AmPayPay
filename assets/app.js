@@ -148,7 +148,7 @@
     { id: 'sky',    label: 'ท้องฟ้า',    css: 'linear-gradient(160deg,#dbe9ff 0%,#e8e2ff 50%,#fde9f3 100%)', swatch: 'linear-gradient(135deg,#dbe9ff,#fde9f3)' },
     { id: 'matcha', label: 'ชาเขียว',    css: 'linear-gradient(160deg,#e6f0d4 0%,#f6f2df 55%,#e3f1ec 100%)', swatch: 'linear-gradient(135deg,#e6f0d4,#e3f1ec)' }
   ];
-  var bgState = { kind: 'none', image: '', preset: '', dim: 24, blur: 0, cardSolid: 88 };   // cardSolid 20–100%
+  var bgState = { kind: 'none', image: '', preset: '', dim: 24, blur: 0, cardSolid: 88, cardBlur: 8 };
 
   function loadBg() {
     var embedded = '';
@@ -166,6 +166,7 @@
           bgState.dim = fresh ? 24 : clampNum(v.dim, 0, 88, 24);
           bgState.blur = fresh ? 0 : clampNum(v.blur, 0, 16, 0);
           bgState.cardSolid = clampNum(v.cardSolid, 20, 100, 88);
+          bgState.cardBlur = clampNum(v.cardBlur, 0, 40, 8);
           if (fresh) { try { localStorage.removeItem(BG_KEY_OLD); } catch (e2) {} }
         }
       }
@@ -193,7 +194,8 @@
     try {
       localStorage.setItem(BG_KEY, JSON.stringify({
         kind: bgState.kind, preset: bgState.preset,
-        dim: bgState.dim, blur: bgState.blur, cardSolid: bgState.cardSolid
+        dim: bgState.dim, blur: bgState.blur,
+        cardSolid: bgState.cardSolid, cardBlur: bgState.cardBlur
       }));
       return true;
     } catch (e) { return false; }
@@ -233,9 +235,8 @@
     root.style.setProperty('--bg-dim', bgState.dim + '%');
     root.style.setProperty('--bg-blur', (bgState.kind === 'image' ? bgState.blur : 0) + 'px');
     root.style.setProperty('--card-solid', bgState.cardSolid + '%');
-    // ยิ่งการ์ดโปร่ง ยิ่งต้องเบลอฉากหลังแรงขึ้น ไม่งั้นลายในรูปจะกวนตัวหนังสือ
-    root.style.setProperty('--card-blur', Math.round(14 + (88 - bgState.cardSolid) * 0.42) + 'px');
-    body.classList.toggle('bg-sheer', bgState.cardSolid < 62);
+    root.style.setProperty('--card-blur', bgState.cardBlur + 'px');
+    body.classList.toggle('bg-sheer', bgState.cardSolid < 70);
   }
 
   /* ย่อรูปลงจนพอใส่ localStorage ได้ — ไล่ลดขนาด/คุณภาพทีละขั้น */
@@ -274,6 +275,8 @@
               : '') +
             '<label class="field"><span class="field-label">' + bgLabel('cardSolid') + '</span>' +
               '<input type="range" min="20" max="100" step="2" data-bg="cardSolid" value="' + bgState.cardSolid + '"></label>' +
+            '<label class="field"><span class="field-label">' + bgLabel('cardBlur') + '</span>' +
+              '<input type="range" min="0" max="40" step="1" data-bg="cardBlur" value="' + bgState.cardBlur + '"></label>' +
           '</div>'
         : '') +
       '<div class="row-actions" style="margin-top:14px">' +
@@ -282,8 +285,10 @@
       '</div>';
   }
   function bgLabel(which) {
-    if (which === 'dim') return 'จางลง · ' + bgState.dim + '%' + (bgState.dim === 0 ? ' (เห็นรูปเต็มๆ)' : '');
-    if (which === 'blur') return 'เบลอ · ' + bgState.blur + 'px' + (bgState.blur === 0 ? ' (ชัด)' : '');
+    if (which === 'dim') return 'ความจางของรูป · ' + bgState.dim + '%' + (bgState.dim === 0 ? ' (เห็นรูปเต็มๆ)' : '');
+    if (which === 'blur') return 'เบลอรูปพื้นหลัง · ' + bgState.blur + 'px' + (bgState.blur === 0 ? ' (ชัด)' : '');
+    if (which === 'cardBlur') return 'ฝ้าหลังการ์ด · ' + bgState.cardBlur + 'px' +
+      (bgState.cardBlur === 0 ? ' (เห็นรูปชัดผ่านการ์ด)' : bgState.cardBlur >= 30 ? ' (ฝ้าจัด)' : '');
     return 'ความทึบของการ์ด · ' + bgState.cardSolid + '%' +
       (bgState.cardSolid >= 100 ? ' (ทึบสนิท)' : bgState.cardSolid <= 30 ? ' (โปร่งมาก)' : '');
   }
@@ -321,6 +326,7 @@
     if (el.dataset.bg === 'dim') bgState.dim = clampNum(el.value, 0, 88, 24);
     if (el.dataset.bg === 'blur') bgState.blur = clampNum(el.value, 0, 16, 0);
     if (el.dataset.bg === 'cardSolid') bgState.cardSolid = clampNum(el.value, 20, 100, 88);
+    if (el.dataset.bg === 'cardBlur') bgState.cardBlur = clampNum(el.value, 0, 40, 8);
     applyBg();
     var label = el.previousElementSibling;
     if (label) label.textContent = bgLabel(el.dataset.bg);
