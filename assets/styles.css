@@ -1056,3 +1056,18 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .send-options .action-card:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 .ac-sub { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; text-align: center; }
 .action-card.is-primary .ac-sub { color: rgba(255, 255, 255, .85); }
+
+/* แท็บเพื่อน: สองการ์ดทางเข้า (บัตรของฉัน / เพิ่มเพื่อน) */
+.friends-grid { grid-template-columns: repeat(2, 1fr); margin: 0 0 14px; }
+.friends-grid .action-card { min-height: 108px; }
+.friends-grid .ac-ic { font-size: 32px; }
+.friends-grid .ac-label { font-size: 15px; }
+#meModal .modal-card { max-width: 520px; }
+
+/* รูปย่อใบเสร็จในหนี้ที่ฉันต้องจ่าย (กดขยายได้) */
+.debt-item.has-img { grid-template-columns: 56px minmax(0, 1fr) auto auto; }
+.claim-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border-soft); cursor: zoom-in; background: #fff; }
+@media (max-width: 560px) {
+  .debt-item.has-img { grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-areas: "img main amount" "btn btn btn"; }
+  .debt-item.has-img .claim-thumb { grid-area: img; }
+}

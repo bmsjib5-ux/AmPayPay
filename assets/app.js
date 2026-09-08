@@ -225,13 +225,29 @@
       '<span class="muted">ให้เพื่อนสแกน QR ของคุณ หรือใส่อีเมลเพื่อนด้านบน</span></p>';
   }
 
-  function renderFriendsTab() { renderMeCard(); renderFriendList(); }
+  function renderFriendsTab() { renderFriendList(); if (!$('#meModal').hidden) renderMeCard(); }
+  function openMeModal() { renderMeCard(); $('#meModal').hidden = false; }
+  function closeMeModal() { $('#meModal').hidden = true; }
+  function openAddFriendModal() {
+    $('#addFriendModal').hidden = false;
+    setTimeout(function () { $('#newFriendEmail').focus(); }, 50);
+  }
+  function closeAddFriendModal() { $('#addFriendModal').hidden = true; }
+  $('#openMeCard').addEventListener('click', openMeModal);
+  $('#openAddFriend').addEventListener('click', openAddFriendModal);
+  $('#meModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-me="close"]')) closeMeModal();
+  });
+  $('#addFriendModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-addfriend="close"]')) closeAddFriendModal();
+  });
 
   function addFriendFromForm() {
     var res = ExpenseStore.friends.save($('#newFriendEmail').value, $('#newFriendName').value);
     if (!res.ok) { toast(res.error); return; }
     $('#newFriendEmail').value = ''; $('#newFriendName').value = '';
     renderFriendList();
+    closeAddFriendModal();
     toast('เพิ่ม ' + (res.friend.name || res.friend.email) + ' เป็นเพื่อนแล้ว');
   }
   $('#addFriendBtn').addEventListener('click', addFriendFromForm);
@@ -246,6 +262,7 @@
     var res = ExpenseStore.friends.save(parsed.email, parsed.name);
     if (!res.ok) { toast(res.error); return; }
     renderFriendList();
+    closeAddFriendModal();
     toast('เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
   });
 
@@ -645,7 +662,8 @@
     $('#incomingList').innerHTML = list.map(function (c) {
       var who = c.fromName || c.fromEmail;
       var st = CLAIM_LABEL[c.status] || CLAIM_LABEL.pending;
-      return '<div class="debt-item' + (c.status === 'confirmed' ? ' is-paid' : '') + '" data-cid="' + esc(c.id) + '">' +
+      return '<div class="debt-item' + (c.status === 'confirmed' ? ' is-paid' : '') + (c.image ? ' has-img' : '') + '" data-cid="' + esc(c.id) + '">' +
+        (c.image ? '<img class="claim-thumb zoomable" src="' + c.image + '" alt="ใบเสร็จจาก ' + esc(who) + ' — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">' : '') +
         '<div class="debt-item-main">' +
           '<span class="debt-item-name">' + esc(who) + '</span>' +
           '<span class="debt-item-meta">' + esc(c.note || 'ไม่ได้ระบุรายการ') +
@@ -706,6 +724,7 @@
       amount: c.amount,
       category: ReceiptParser.guessCategory(info.merchant, ''),
       note: 'หารกับ ' + who + ' (เพื่อนออกให้ก่อน)',
+      image: c.image || null,
       claimId: c.id
     });
     renderIncoming();
@@ -809,6 +828,7 @@
       personId: ctx.personId,
       fromName: myName(),
       promptpay: myPromptPay(),
+      image: ctx.exp.image || '',
       status: existing ? existing.status : 'pending'
     }).then(function () { return CloudSync.syncNow(); })
       .then(function () { renderDebts(); return true; })
@@ -868,7 +888,7 @@
         personId: p.id,
         fromName: myName(),
         promptpay: myPromptPay(),
-      promptpay: myPromptPay(),
+        image: exp.image || '',
         status: existing ? existing.status : 'pending'
       });
     });
@@ -3166,6 +3186,8 @@
     if (!$('#bellModal').hidden) closeBell();
     if (!$('#payModal').hidden) closePayModal();
     if (!$('#sendModal').hidden) closeSendModal();
+    if (!$('#meModal').hidden) closeMeModal();
+    if (!$('#addFriendModal').hidden) closeAddFriendModal();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
