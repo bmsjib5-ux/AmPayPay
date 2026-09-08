@@ -71,22 +71,38 @@ export async function planNotification(body: WebhookBody): Promise<{ subs: SubRo
   return null;
 }
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-webhook-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+};
+const json = (obj: unknown, status = 200) =>
+  new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
 Deno.serve(async (req: Request) => {
-  if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
   const secret = Deno.env.get('WEBHOOK_SECRET') ?? '';
-  if (secret && req.headers.get('x-webhook-secret') !== secret) return new Response('forbidden', { status: 403 });
+  const vapidOk = !!(Deno.env.get('VAPID_PUBLIC_KEY') && Deno.env.get('VAPID_PRIVATE_KEY'));
+
+  /* ปุ่ม "ตรวจการตั้งค่า" ในแอปยิงมาแบบนี้ เพื่อดูว่าฟังก์ชันขึ้นแล้วและใส่ secrets ครบไหม (ไม่ต้องรู้รหัสลับ) */
+  const url = new URL(req.url);
+  if (url.searchParams.get('ping') === '1') {
+    return json({ ok: true, version: 2, vapid: vapidOk, secret: !!secret, subject: !!Deno.env.get('VAPID_SUBJECT') });
+  }
+  if (secret && req.headers.get('x-webhook-secret') !== secret) return json({ error: 'forbidden' }, 403);
 
   const vapid: VapidKeys = {
     publicKey: Deno.env.get('VAPID_PUBLIC_KEY') ?? '',
     privateKey: Deno.env.get('VAPID_PRIVATE_KEY') ?? '',
     subject: Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@example.com'
   };
-  if (!vapid.publicKey || !vapid.privateKey) return new Response('missing VAPID keys', { status: 500 });
+  if (!vapid.publicKey || !vapid.privateKey) return json({ error: 'missing VAPID keys' }, 500);
 
   let body: WebhookBody;
-  try { body = await req.json(); } catch { return new Response('bad json', { status: 400 }); }
+  try { body = await req.json(); } catch { return json({ error: 'bad json' }, 400); }
   const plan = await planNotification(body);
-  if (!plan || !plan.subs.length) return Response.json({ sent: 0 });
+  if (!plan || !plan.subs.length) return json({ sent: 0 });
 
   const payload = JSON.stringify({ title: plan.title, body: plan.text, url: '/#bell', tag: 'claim-' + (body.record?.id ?? '') });
   let sent = 0, dropped = 0;
@@ -101,5 +117,5 @@ Deno.serve(async (req: Request) => {
       else console.error('push failed', status, s.endpoint.slice(0, 60));
     } catch (e) { console.error('push error', e); }
   }));
-  return Response.json({ sent, dropped });
+  return json({ sent, dropped });
 });

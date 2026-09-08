@@ -471,6 +471,24 @@
       var onBtn = $('#pushOnBtn'), offBtn = $('#pushOffBtn');
       if (onBtn) onBtn.addEventListener('click', function () { onBtn.disabled = true; enablePush(); });
       if (offBtn) offBtn.addEventListener('click', function () { offBtn.disabled = true; disablePush(); });
+      $('.row-actions', box).insertAdjacentHTML('beforeend',
+        '<button class="btn btn-ghost btn-sm" type="button" id="pushCheckBtn">🩺 ตรวจการตั้งค่า</button>');
+      $('#pushCheckBtn').addEventListener('click', function () {
+        var b = this; b.disabled = true; b.textContent = '⏳ กำลังตรวจ…';
+        var old = $('#pushCheck'); if (old) old.remove();
+        CloudSync.checkPushSetup().then(function (r) {
+          var rows = [
+            [r.table, 'ตาราง push_subscriptions', r.table ? 'มีแล้ว' : 'ยังไม่มี — รันไฟล์ supabase/schema.sql ซ้ำใน SQL Editor'],
+            [r.fn, 'Edge Function push-notify', r.fnDetail || ''],
+            [Notification.permission === 'granted', 'สิทธิ์แจ้งเตือนของเบราว์เซอร์', Notification.permission === 'granted' ? 'อนุญาตแล้ว' : 'ยังไม่อนุญาต'],
+            [r.mine, 'เครื่องนี้ลงทะเบียนรับ push', r.mine ? 'มีแถวของบัญชีนี้แล้ว' : 'ยังไม่มี — กด “เปิดแจ้งเตือนตอนปิดแอป” หลังแก้ข้อข้างบนแล้ว']
+          ];
+          box.insertAdjacentHTML('beforeend', '<div id="pushCheck" class="push-hint">' + rows.map(function (x) {
+            return '<div>' + (x[0] ? '✅' : '❌') + ' <b>' + esc(x[1]) + '</b> — ' + esc(x[2]) + '</div>';
+          }).join('') + '<div class="muted" style="margin-top:6px">ยังตรวจ Database Webhook จากในแอปไม่ได้ — ดูที่ Database → Webhooks ว่ามี hook ของตาราง debt_claims (Insert+Update) ชี้ไป push-notify และมี header x-webhook-secret</div></div>');
+          b.disabled = false; b.textContent = '🩺 ตรวจการตั้งค่า';
+        }).catch(function (e) { toast('ตรวจไม่สำเร็จ: ' + e.message); b.disabled = false; b.textContent = '🩺 ตรวจการตั้งค่า'; });
+      });
     });
   }
   /* ข้อความจาก service worker: push มาตอนแอปเปิดอยู่ → ซิงก์ทันที · แตะแจ้งเตือน → เปิดกระดิ่ง */

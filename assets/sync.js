@@ -390,6 +390,32 @@ window.CloudSync = (function () {
         });
       });
     },
+    /* ตรวจว่าฝั่ง Supabase พร้อมสำหรับ push หรือยัง (ตาราง / Edge Function / secrets) */
+    checkPushSetup: function () {
+      var out = { table: null, fn: null, fnDetail: '', mine: null };
+      return getClient().then(function (c) {
+        return c.from('push_subscriptions').select('endpoint').limit(1).then(function (res) {
+          out.table = !res.error;
+          if (res.error) out.tableDetail = friendly(res.error);
+          out.mine = !res.error && (res.data || []).length > 0;
+        });
+      }).then(function () {
+        var cfg = config();
+        var url = String(cfg.url || '').replace(/\/$/, '') + '/functions/v1/push-notify?ping=1';
+        return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+          .then(function (r) {
+            if (r.status === 401) { out.fn = false; out.fnDetail = 'ฟังก์ชันยังเปิด Verify JWT อยู่ — ปิดในหน้า Edge Functions → push-notify → Details'; return; }
+            if (r.status === 404) { out.fn = false; out.fnDetail = 'ไม่พบฟังก์ชันชื่อ push-notify — ยังไม่ได้ deploy หรือชื่อไม่ตรง'; return; }
+            return r.json().then(function (j) {
+              if (j && j.ok) {
+                out.fn = !!j.vapid && !!j.secret;
+                out.fnDetail = !j.vapid ? 'deploy แล้ว แต่ยังไม่ได้ใส่ VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY ใน Secrets'
+                  : !j.secret ? 'deploy แล้ว แต่ยังไม่ได้ใส่ WEBHOOK_SECRET ใน Secrets' : 'พร้อมใช้งาน';
+              } else { out.fn = false; out.fnDetail = 'ฟังก์ชันตอบ ' + r.status + ' — อาจเป็นโค้ดเวอร์ชันเก่า ให้วางไฟล์ index.ts ล่าสุดแล้ว deploy ใหม่'; }
+            }, function () { out.fn = false; out.fnDetail = 'ฟังก์ชันตอบ ' + r.status + ' — ให้วางไฟล์ index.ts ล่าสุดแล้ว deploy ใหม่'; });
+          }, function () { out.fn = false; out.fnDetail = 'เรียกฟังก์ชันไม่ได้ (ไม่พบ หรือเป็นโค้ดเวอร์ชันเก่าที่ไม่ตอบ CORS) — ให้วาง index.ts ล่าสุดแล้ว deploy ใหม่'; });
+      }).then(function () { return out; });
+    },
     removePushSubscription: function (endpoint) {
       return getClient().then(function (c) {
         return c.from('push_subscriptions').delete().eq('endpoint', endpoint).then(function (res) {
