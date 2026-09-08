@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'self'; form-action 'none'">
+<title>นโยบายความเป็นส่วนตัว — AmPayPay</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+<style>
+  :root { color-scheme: light dark; --ink: #241f2b; --muted: #6b6478; --bg: #fbf7f2; --card: #fff; --line: #e7e0d8; --brand: #6c4cf1; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #efeaf6; --muted: #a9a1b8; --bg: #161320; --card: #1f1b2b; --line: #322c42; --brand: #a996ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Sarabun", sans-serif; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 64px; }
+  h1 { font-size: 26px; line-height: 1.35; margin: 0 0 6px; }
+  h2 { font-size: 18px; margin: 30px 0 8px; }
+  .lead { color: var(--muted); margin: 0 0 26px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; margin: 18px 0; }
+  ul { padding-inline-start: 22px; margin: 8px 0; }
+  li { margin: 5px 0; }
+  code { background: color-mix(in srgb, var(--brand) 12%, transparent); padding: 1px 6px; border-radius: 6px; font-size: 14px; }
+  a { color: var(--brand); }
+  .foot { color: var(--muted); font-size: 14px; margin-top: 34px; border-top: 1px solid var(--line); padding-top: 16px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>นโยบายความเป็นส่วนตัว — AmPayPay</h1>
+<p class="lead">ปรับปรุงล่าสุด 8 กันยายน 2569 (2026)</p>
+
+<div class="card">
+  <p style="margin:0">AmPayPay เป็นแอปบันทึกรายจ่ายที่ทำงานในเครื่องของคุณเป็นหลัก
+  <b>ไม่มีโฆษณา ไม่มีตัวเก็บสถิติผู้ใช้ (analytics) และไม่ขายหรือแลกเปลี่ยนข้อมูลกับใคร</b></p>
+</div>
+
+<h2>1. ข้อมูลที่เก็บในเครื่องคุณ</h2>
+<p>ตามค่าเริ่มต้น ข้อมูลทั้งหมดอยู่ในเบราว์เซอร์ของเครื่องคุณเท่านั้น (localStorage) ไม่ถูกส่งออกไปไหน ได้แก่</p>
+<ul>
+  <li>รายการรายจ่าย: วันที่ · ชื่อร้าน · จำนวนเงิน · หมวด · บันทึกช่วยจำ</li>
+  <li>รูปใบเสร็จที่คุณเลือกหรือถ่าย</li>
+  <li>งบประมาณ สมุดบัญชี รายชื่อเพื่อน ธีมและรูปพื้นหลังที่ตั้งไว้</li>
+  <li>ชื่อเล่นและหมายเลขพร้อมเพย์ของคุณ (ถ้ากรอกไว้)</li>
+</ul>
+<p>ลบได้เองทุกเมื่อจากปุ่ม <b>“ล้างข้อมูล”</b> ในแอป หรือลบข้อมูลเว็บไซต์ในเบราว์เซอร์ — ลบแล้วข้อมูลในเครื่องหายทันที</p>
+
+<h2>2. การอ่านใบเสร็จ (OCR)</h2>
+<p>การอ่านตัวหนังสือจากรูปทำงาน<b>ในเครื่องคุณทั้งหมด</b> รูปใบเสร็จไม่ถูกอัปโหลดไปเซิร์ฟเวอร์ใด ๆ
+แอปดาวน์โหลดเฉพาะ “ไฟล์ภาษาไทย/อังกฤษ” ของตัวอ่านจาก CDN สาธารณะ
+(<code>cdn.jsdelivr.net</code> และ <code>tessdata.projectnaptha.com</code>) ซึ่งเป็นการโหลดไฟล์เท่านั้น ไม่มีข้อมูลส่วนตัวของคุณส่งไปด้วย</p>
+
+<h2>3. ถ้าคุณเปิดใช้งาน “ซิงก์ ☁️” (ไม่บังคับ)</h2>
+<p>เมื่อคุณสมัคร/ล็อกอินเพื่อใช้หลายเครื่องหรือหารบิลกับเพื่อน ข้อมูลต่อไปนี้จะถูกเก็บบนฐานข้อมูล Supabase ที่เจ้าของแอปดูแล</p>
+<table>
+  <tr><th>ข้อมูล</th><th>ใช้ทำอะไร</th></tr>
+  <tr><td>อีเมล</td><td>ยืนยันตัวตน · ใช้จับคู่เพื่อน/ใบแจ้งหนี้ — <b>เก็บแบบเข้ารหัส</b> ในฐานข้อมูล</td></tr>
+  <tr><td>รายการรายจ่าย งบประมาณ สมุด</td><td>ซิงก์ให้เห็นตรงกันทุกเครื่องของคุณ</td></tr>
+  <tr><td>ใบแจ้งหนี้ (ยอด · ชื่อรายการ · ข้อความตอบกลับ · รูปใบเสร็จที่แนบ)</td><td>ให้เพื่อนที่คุณส่งถึงเห็นยอดที่ต้องจ่ายและกดยืนยันได้</td></tr>
+  <tr><td>หมายเลขพร้อมเพย์</td><td>สร้าง QR ให้เพื่อนโอนคืน — <b>เก็บแบบเข้ารหัส</b> ในฐานข้อมูล</td></tr>
+  <tr><td>ข้อมูลการรับแจ้งเตือน (push endpoint ของเบราว์เซอร์)</td><td>ส่งแจ้งเตือนเมื่อเพื่อนส่งยอด แจ้งว่าจ่ายแล้ว หรือยืนยันรับเงิน</td></tr>
+</table>
+<ul>
+  <li>รับส่งผ่าน HTTPS ทั้งหมด</li>
+  <li>ฐานข้อมูลเปิด Row Level Security — แต่ละบัญชีเห็นเฉพาะข้อมูลของตัวเอง และใบแจ้งหนี้ที่ส่งถึงอีเมลของตัวเองเท่านั้น</li>
+  <li>อีเมลและพร้อมเพย์ถูกเข้ารหัสตอนเก็บ (pgcrypto) ไม่แสดงเป็นข้อความธรรมดาในฐานข้อมูล</li>
+  <li>ข้อมูลจะถูกส่งให้เฉพาะ “เพื่อนที่คุณเลือกส่งถึง” เท่านั้น ไม่มีการเปิดเผยให้บุคคลที่สาม</li>
+</ul>
+<p>ไม่อยากให้ข้อมูลออกจากเครื่อง — ไม่ต้องเปิดซิงก์ แอปใช้งานได้ครบทุกอย่างยกเว้นการหารบิลข้ามเครื่อง</p>
+
+<h2>4. สิทธิ์ที่แอปขอ</h2>
+<ul>
+  <li><b>กล้อง</b> — เฉพาะตอนคุณกดถ่ายใบเสร็จหรือสแกน QR เพิ่มเพื่อน ภาพจากกล้องประมวลผลในเครื่อง ไม่ถูกอัดหรือส่งออก</li>
+  <li><b>การแจ้งเตือน</b> — เฉพาะเมื่อคุณกดเปิดเอง ปิดได้ทุกเมื่อในแอปหรือในตั้งค่าเครื่อง</li>
+  <li><b>พื้นที่จัดเก็บ</b> — เก็บข้อมูลของแอปไว้ในเครื่องคุณ</li>
+</ul>
+
+<h2>5. เด็กและเยาวชน</h2>
+<p>แอปนี้เป็นเครื่องมือจดรายจ่ายทั่วไป ไม่ได้ออกแบบมาเพื่อเด็กอายุต่ำกว่า 13 ปีโดยเฉพาะ และไม่ได้เก็บข้อมูลจากเด็กโดยเจตนา</p>
+
+<h2>6. การลบข้อมูลของคุณ</h2>
+<ul>
+  <li><b>ข้อมูลในเครื่อง</b> — กด “ล้างข้อมูล” ในแอป หรือถอนการติดตั้ง/ลบข้อมูลเว็บไซต์</li>
+  <li><b>ข้อมูลบนเซิร์ฟเวอร์ (ถ้าเปิดซิงก์)</b> — ส่งอีเมลแจ้งมาที่ผู้ดูแลด้านล่าง ระบุอีเมลบัญชีที่ต้องการลบ ข้อมูลทั้งหมดของบัญชีนั้นจะถูกลบภายใน 30 วัน</li>
+</ul>
+
+<h2>7. การเปลี่ยนแปลงนโยบาย</h2>
+<p>ถ้ามีการแก้ไข จะอัปเดตหน้านี้พร้อมวันที่ด้านบน</p>
+
+<h2>8. ติดต่อ</h2>
+<p>ผู้ดูแลแอป: <b>[ใส่ชื่อผู้ดูแล]</b><br>
+อีเมลติดต่อ: <b>[ใส่อีเมลติดต่อ]</b></p>
+
+<p class="foot">AmPayPay · <a href="./">กลับไปที่แอป</a></p>
+
+</div>
+</body>
+</html>
