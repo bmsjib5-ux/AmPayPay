@@ -1092,3 +1092,16 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .ss-chev { font-size: 22px; color: var(--accent-ink); transition: transform .2s var(--ease); line-height: 1; }
 .split-box[open] > .split-summary .ss-chev { transform: rotate(90deg); }
 .split-body { padding-top: 12px; }
+
+/* ---------- สแกน QR ด้วยกล้องในแอป ---------- */
+.scan-card { max-width: 420px; }
+.scan-view { position: relative; width: 100%; aspect-ratio: 1 / 1; background: #000; border-radius: 16px; overflow: hidden; }
+.scan-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan-frame {
+  position: absolute; inset: 14%; border: 3px solid rgba(255, 255, 255, .85); border-radius: 18px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); pointer-events: none;
+}
+.scan-frame::after { content: ''; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: var(--accent); opacity: .9; animation: scanline 1.6s ease-in-out infinite alternate; }
+@keyframes scanline { from { transform: translateY(-120px); } to { transform: translateY(120px); } }
+.friend-notice { margin-bottom: 12px; }
+#scanModal { z-index: 70; }   /* อยู่เหนือหน้าต่างเพิ่มเพื่อน */

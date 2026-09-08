@@ -300,6 +300,104 @@
     if (tab) tab.click();
   });
 
+  /* ---------- สแกน QR ด้วยกล้องในแอป (BarcodeDetector ถ้ามี ไม่มีก็ใช้ jsQR ที่โหลดเฉพาะตอนสแกน) ---------- */
+  var scan = { stream: null, timer: null, facing: 'environment', detector: null, canvas: null };
+  function loadJsQR() {
+    if (window.jsQR) return Promise.resolve(window.jsQR);
+    return new Promise(function (resolve, reject) {
+      var el = document.createElement('script');
+      el.src = 'assets/vendor/jsQR.js?v=49';
+      el.onload = function () { window.jsQR ? resolve(window.jsQR) : reject(new Error('โหลดตัวอ่าน QR ไม่สำเร็จ')); };
+      el.onerror = function () { reject(new Error('โหลดตัวอ่าน QR ไม่สำเร็จ — ตรวจอินเทอร์เน็ต')); };
+      document.head.appendChild(el);
+    });
+  }
+  function stopScanner() {
+    clearInterval(scan.timer); scan.timer = null;
+    if (scan.stream) { scan.stream.getTracks().forEach(function (t) { t.stop(); }); scan.stream = null; }
+    var v = $('#scanVideo'); if (v) v.srcObject = null;
+  }
+  function closeScanner() { stopScanner(); $('#scanModal').hidden = true; }
+  function openScanner(onText) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast('เบราว์เซอร์นี้เปิดกล้องไม่ได้ — ใช้ “วางลิงก์” แทน'); return;
+    }
+    $('#scanModal').hidden = false;
+    $('#scanStatus').textContent = 'กำลังเปิดกล้อง…';
+    var video = $('#scanVideo');
+    var useDetector = 'BarcodeDetector' in window;
+    var ready = useDetector
+      ? Promise.resolve().then(function () { scan.detector = new window.BarcodeDetector({ formats: ['qr_code'] }); })
+      : loadJsQR();
+    ready.then(function () {
+      return navigator.mediaDevices.getUserMedia({ video: { facingMode: scan.facing, width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false });
+    }).then(function (stream) {
+      scan.stream = stream;
+      video.srcObject = stream;
+      /* ไม่รอ play() เพราะบางเบราว์เซอร์ค้างจนกว่าจะมีเฟรมแรก — เริ่มวนอ่านเลย แล้วอัปเดตสถานะเมื่อภาพมา */
+      video.play().catch(function () {});
+      video.addEventListener('playing', function () { $('#scanStatus').textContent = 'เล็งกล้องไปที่ QR ในบัตรของเพื่อน'; }, { once: true });
+      var busy = false;
+      scan.timer = setInterval(function () {
+        if (busy || !scan.stream || video.readyState < 2) return;
+        busy = true;
+        var done = function (text) {
+          busy = false;
+          if (!text) return;
+          closeScanner();
+          onText(String(text));
+        };
+        if (scan.detector) {
+          scan.detector.detect(video).then(function (codes) { done(codes && codes[0] && codes[0].rawValue); }, function () { busy = false; });
+        } else {
+          try {
+            var w = video.videoWidth, h = video.videoHeight;
+            if (!w || !h) { busy = false; return; }
+            var side = Math.min(w, h, 640), sx = (w - Math.min(w, h)) / 2, sy = (h - Math.min(w, h)) / 2;
+            var cv = scan.canvas || (scan.canvas = document.createElement('canvas'));
+            cv.width = side; cv.height = side;
+            var ctx = cv.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(video, sx, sy, Math.min(w, h), Math.min(w, h), 0, 0, side, side);
+            var img = ctx.getImageData(0, 0, side, side);
+            var res = window.jsQR(img.data, side, side, { inversionAttempts: 'dontInvert' });
+            done(res && res.data);
+          } catch (e) { busy = false; }
+        }
+      }, 180);
+    }).catch(function (e) {
+      closeScanner();
+      var msg = (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) ? 'ไม่ได้รับอนุญาตให้ใช้กล้อง — เปิดสิทธิ์กล้องให้เว็บนี้ในตั้งค่า'
+        : (e && e.name === 'NotFoundError') ? 'ไม่พบกล้องในเครื่องนี้' : 'เปิดกล้องไม่สำเร็จ: ' + (e && e.message || e);
+      toast(msg);
+    });
+  }
+  $('#scanModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-scan="close"]')) closeScanner();
+  });
+  $('#scanFlipBtn').addEventListener('click', function () {
+    scan.facing = scan.facing === 'environment' ? 'user' : 'environment';
+    stopScanner();
+    openScanner(handleScannedFriend);
+  });
+  function handleScannedFriend(text) {
+    var parsed = parseFriendLink(text);
+    if (!parsed || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(parsed.email)) { toast('QR นี้ไม่ใช่บัตรเพื่อนของ AmPayPay'); return; }
+    if (parsed.email === myEmail()) { toast('นี่คือบัตรของคุณเอง 🙂'); return; }
+    var already = ExpenseStore.friends.get(parsed.email);
+    ExpenseStore.friends.save(parsed.email, parsed.name || (already ? already.name : ''));
+    renderFriendList(); renderFriendBadge();
+    closeAddFriendModal();
+    toast(already ? (parsed.name || parsed.email) + ' อยู่ในรายชื่อเพื่อนอยู่แล้ว' : '✅ เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
+  }
+  $('#scanFriendBtn').addEventListener('click', function () { openScanner(handleScannedFriend); });
+
+  /* เปิดลิงก์บัตรเพื่อนใน Safari ทั้งที่ใช้แอปจากหน้าจอโฮม → บอกทางไปต่อ (คนละที่เก็บข้อมูลกัน) */
+  function showFriendNotice(html) {
+    var list = $('#friendList');
+    var old = $('#friendNotice'); if (old) old.remove();
+    list.insertAdjacentHTML('beforebegin', '<div id="friendNotice" class="banner is-warn friend-notice">' + html + '</div>');
+  }
+
   /* สแกน QR ของเพื่อนด้วยกล้องมือถือ → เปิดลิงก์ #addfriend= มาที่นี่ */
   function importFriendFromHash() {
     var hash = location.hash || '';
@@ -314,6 +412,16 @@
     var tab = document.querySelector('.tab[data-tab="friends"]');
     if (tab) tab.click();
     toast(already ? (parsed.name || parsed.email) + ' อยู่ในรายชื่อเพื่อนอยู่แล้ว' : 'เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
+    if (isIOS() && !isStandalone()) {
+      var link = location.origin + location.pathname + hash;
+      showFriendNotice('เพิ่ม <b>' + esc(parsed.name || parsed.email) + '</b> ไว้ใน Safari แล้ว — ถ้าคุณใช้ AmPayPay จากไอคอนบนหน้าจอโฮม ' +
+        'ข้อมูลจะแยกกัน ให้กด <button class="btn btn-sm" type="button" id="copyFriendLinkBtn">คัดลอกลิงก์</button> ' +
+        'แล้วเปิดแอปจากหน้าจอโฮม → เพื่อน → เพิ่มเพื่อน → <b>วางลิงก์</b> (หรือใช้ปุ่ม <b>สแกน QR ด้วยกล้อง</b> ในแอปครั้งหน้า)');
+      $('#copyFriendLinkBtn').addEventListener('click', function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function () { toast('คัดลอกลิงก์แล้ว'); });
+        else prompt('คัดลอกลิงก์นี้', link);
+      });
+    }
   }
 
   /* ---------- กระดิ่ง: เหตุการณ์จากเพื่อน (ส่งยอดมา / แจ้งจ่ายแล้ว / ยืนยันรับเงิน) ---------- */
@@ -3198,6 +3306,7 @@
     if (!$('#sendModal').hidden) closeSendModal();
     if (!$('#meModal').hidden) closeMeModal();
     if (!$('#addFriendModal').hidden) closeAddFriendModal();
+    if (!$('#scanModal').hidden) closeScanner();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
