@@ -168,10 +168,16 @@
    | `VAPID_SUBJECT` | `mailto:อีเมลของคุณ` |
    | `WEBHOOK_SECRET` | รหัสลับที่ตั้งเอง (ยาวๆ สุ่มๆ) |
 
-4. **สร้าง Database Webhook** — Database → Webhooks → *Create a new hook*
-   - Table `debt_claims` · Events **Insert** และ **Update**
-   - Type *Supabase Edge Functions* → เลือก `push-notify`
-   - HTTP Headers เพิ่ม `x-webhook-secret` = ค่าเดียวกับ `WEBHOOK_SECRET`
+4. **สร้าง Database Webhook** — ทำได้ 2 ทาง (เลือกทางเดียว)
+   - หน้าเว็บ: Database → Webhooks → *Create a new hook* · Table `debt_claims` · Events **Insert** และ **Update** ·
+     Type *Supabase Edge Functions* → `push-notify` · HTTP Headers เพิ่ม `x-webhook-secret` = ค่าเดียวกับ `WEBHOOK_SECRET`
+   - หรือ SQL: แก้ `<PROJECT_REF>` กับ `<WEBHOOK_SECRET>` ใน [`supabase/push-webhook.sql`](supabase/push-webhook.sql) แล้วรันใน SQL Editor
+     (สร้าง trigger ที่ยิงผ่าน `pg_net` — ผลเหมือนกัน)
+
+   > ทำผ่าน Management API ก็ได้ (ต้องมี Access Token): `POST /v1/projects/<ref>/functions/deploy?slug=push-notify`
+   > (multipart: `metadata` `{entrypoint_path:"index.ts",name:"push-notify",verify_jwt:false}` + ไฟล์ทั้งสอง),
+   > `POST /v1/projects/<ref>/secrets`, และรัน SQL ข้างบนผ่าน `POST /v1/projects/<ref>/database/query` ·
+   > ข้อควรระวัง: `GET /secrets` คืนค่าแบบแฮช ไม่ใช่ค่าจริง จึงต้องใช้ค่าเดียวกันกับตอนตั้งใน trigger
 5. ในแอป เปิดกระดิ่ง 🔔 → กด **“🩺 ตรวจการตั้งค่า”** จะบอกว่าตาราง / ฟังก์ชัน / secrets ข้อไหนยังไม่พร้อม
    แล้วกด “เปิดแจ้งเตือนตอนปิดแอป” บนเครื่องที่อยากให้เด้ง
 
