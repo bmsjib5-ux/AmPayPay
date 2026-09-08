@@ -45,7 +45,7 @@ TWA (Trusted Web Activity) คือแอป Android ที่เปิดเ�
 
 | ช่อง | ค่า |
 | --- | --- |
-| Package ID | `app.ampaypay.twa` (ต้องตรงกับใน `assetlinks.json` เป๊ะ ๆ) |
+| Package ID | `com.onrender.ampaypay.twa` (ค่าเริ่มต้นที่ PWABuilder ตั้งจากชื่อโดเมน — ต้องตรงกับใน `assetlinks.json` เป๊ะ ๆ) |
 | App name | `AmPayPay` |
 | Launcher name | `AmPayPay` |
 | App version / version code | `1.0.0` / `1` |
@@ -67,6 +67,29 @@ curl -s https://ampaypay.onrender.com/.well-known/assetlinks.json
 ```
 
 ถ้าอยากให้ Google ตรวจให้: <https://developers.google.com/digital-asset-links/tools/generator>
+หรือเช็คตรง ๆ ว่า Google อ่านไฟล์เราเห็นเป็นอะไร:
+
+```bash
+curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list\
+?source.web.site=https://ampaypay.onrender.com\
+&relation=delegate_permission/common.handle_all_urls"
+```
+
+**ยังขึ้นแถบ URL อยู่ ตรวจตามนี้ทีละข้อ** (สามข้อนี้คือสาเหตุเกือบทั้งหมด)
+
+1. **ชื่อแพ็กเกจไม่ตรง** — เปิดไฟล์ `assetlinks.json` ที่อยู่ในซิปของ PWABuilder ดูค่า `package_name`
+   ต้องมีชื่อนั้นอยู่ใน `.well-known/assetlinks.json` ของเว็บด้วย (ไฟล์นี้ใส่ได้หลายชื่อ ถ้าต้องรองรับหลายเวอร์ชัน)
+2. **ลายนิ้วมือคนละคีย์** — คีย์ที่เซ็น `.apk` ต้องเป็นคีย์เดียวกับที่ประกาศไว้ ดูของจริงจากไฟล์ที่ติดตั้ง:
+   ```bash
+   keytool -printcert -jarfile app-release-signed.apk | grep SHA256
+   ```
+3. **Android จำผลตรวจเก่าไว้** — ถ้าติดตั้ง `.apk` *ก่อน* ที่ไฟล์จะขึ้นเว็บ ต้อง **ถอนแล้วติดตั้งใหม่**
+   (ล้างข้อมูลแอป Chrome ด้วยยิ่งดี) เพราะผลตรวจถูกแคชไว้ตั้งแต่ตอนติดตั้ง
+
+> **สำคัญตอนขึ้น Play:** ถ้าเปิด Play App Signing (ค่าเริ่มต้น) Google จะ **เซ็นแอปใหม่ด้วยคีย์ของ Play**
+> ทำให้เวอร์ชันที่โหลดจากสโตร์มีลายนิ้วมือคนละอันกับ `.apk` ที่ทดสอบเอง
+> ต้องเข้า Play Console → *Setup → App signing* คัดลอก **SHA-256 ของ App signing key**
+> มาเพิ่มเป็นอีกค่าใน `sha256_cert_fingerprints` (ใส่ได้หลายค่าในอาร์เรย์เดียวกัน) ไม่งั้นแอปจากสโตร์จะโชว์แถบ URL
 
 **3. ทดสอบก่อนขึ้นสโตร์**
 
@@ -124,6 +147,7 @@ await p.screenshot({path:'assets/store/feature-graphic.png'});await b.close();})
 พิมพ์ในช่องกรอกแล้วปิดแป้นพิมพ์ แถบเมนูล่าง (`position: fixed`) ค้างลอยอยู่กลางจอทับเนื้อหา — เป็นอาการของ Safari บน iOS ที่ไม่ย้ายอิลิเมนต์แบบ fixed กลับที่เดิมหลังแป้นพิมพ์ยุบ
 
 - ฟังก์ชัน `visualViewport` จับตอนแป้นพิมพ์เด้งขึ้น → เก็บแถบลงไป (`.tabbar.is-away`) แล้วสะกิดให้ Safari วาดใหม่ตอนปิด (ตอนซูมนิ้วไม่ยุ่งด้วย)
+- v60: เก็บแถบเฉพาะตอน**กำลังพิมพ์อยู่จริง** (มีช่องกรอกที่โฟกัสอยู่) ไม่งั้นเบราว์เซอร์ที่มีแถบเครื่องมือของตัวเอง เช่น Chrome Custom Tab หรือ in-app browser จะโดนซ่อนเมนูทั้งที่ไม่มีแป้นพิมพ์
 - แถบเมนูเป็นเลเยอร์ของตัวเอง (`transform: translateZ(0)`) กัน Safari วาดภาพค้างทับ
 - ย้ายแสงพื้นหลังจาก `background-attachment: fixed` (ตัวที่ทำให้ Safari วาดพลาด) ไปไว้บนชั้น `position: fixed` ของตัวเอง
 - เติม `-webkit-backdrop-filter` ให้ครบทุกจุดที่เบลอพื้นหลัง — iOS ยังต้องใช้คำนำหน้านี้

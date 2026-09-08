@@ -1984,10 +1984,17 @@
     var nav = document.querySelector('.tabbar');
     if (!vv || !nav) return;
     var mobile = window.matchMedia('(max-width: 560px)');
+    function typing() {
+      var el = document.activeElement;
+      if (!el || el === document.body) return false;
+      return /^(input|textarea|select)$/i.test(el.tagName) || el.isContentEditable;
+    }
     function syncTabbar() {
       var away = false;
       if (mobile.matches && vv.scale <= 1.01) {
-        away = window.innerHeight - (vv.height + vv.offsetTop) > 80;   // ส่วนที่แป้นพิมพ์บังอยู่
+        /* ต้องกำลังพิมพ์อยู่จริงด้วย ไม่งั้นเบราว์เซอร์ที่มีแถบเครื่องมือของตัวเอง
+           (เช่น Custom Tab / in-app browser) จะโดนซ่อนเมนูทั้งที่ไม่มีแป้นพิมพ์ */
+        away = window.innerHeight - (vv.height + vv.offsetTop) > 80 && typing();
       }
       if (away === nav.classList.contains('is-away')) return;
       nav.classList.toggle('is-away', away);
