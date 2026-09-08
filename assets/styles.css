@@ -1120,3 +1120,25 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .action-card.mini .ac-label { font-size: 12.5px; }
 .action-card.mini .ac-sub { font-size: 10.5px; }
 @media (max-width: 560px) { .debt-item .claim-actions { width: 100%; } .action-card.mini { max-width: none; } }
+
+/* ---------- v52: ปุ่มลัดร้านประจำ + ปุ่มเลิกทำใน toast ---------- */
+.quick-add { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.quick-label { font-size: 12.5px; color: var(--text-muted); }
+.quick-chip {
+  appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 13px; min-height: 40px; border-radius: 999px; border: 1px solid var(--border-soft);
+  background: var(--surface-1); color: var(--text-primary); font-size: 13.5px; font-weight: 550;
+  box-shadow: var(--shadow); transition: transform .16s var(--ease), background-color .2s var(--ease);
+  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.quick-chip:hover { transform: translateY(-1px); background: var(--accent-soft); }
+.quick-chip:active { transform: scale(.96); }
+.quick-chip small { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.toast { display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(92vw, 460px); }
+.toast-text { flex: 1; min-width: 0; }
+.toast-action {
+  appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
+  background: var(--bg); color: var(--text-primary); border-radius: 999px; padding: 6px 12px; white-space: nowrap;
+}
+.toast-action:active { transform: scale(.95); }

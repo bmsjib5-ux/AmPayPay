@@ -29,5 +29,46 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "เพิ่มใบเสร็จ",
+      "short_name": "เพิ่ม",
+      "description": "ถ่าย/เลือกรูปใบเสร็จมาบันทึก",
+      "url": "./#go=add",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "ลูกหนี้",
+      "short_name": "ลูกหนี้",
+      "description": "ดูยอดค้างและหนี้ที่ต้องจ่าย",
+      "url": "./#go=debt",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "สแกน QR เพื่อน",
+      "short_name": "สแกน QR",
+      "description": "เพิ่มเพื่อนด้วยการสแกน QR",
+      "url": "./#go=scan",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

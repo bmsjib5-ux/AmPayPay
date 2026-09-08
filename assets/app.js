@@ -47,12 +47,28 @@
   }
 
   var toastTimer;
-  function toast(msg) {
+  /* toast(msg) แบบเดิม · toast(msg, { label, onClick }) จะมีปุ่มให้กด เช่น "เลิกทำ" */
+  function toast(msg, action) {
     var el = $('#toast');
-    el.textContent = msg;
+    el.innerHTML = '<span class="toast-text"></span>';
+    $('.toast-text', el).textContent = msg;
+    var hideAfter = 3200;
+    if (action && action.label) {
+      hideAfter = action.ms || 7000;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'toast-action';
+      btn.textContent = action.label;
+      btn.addEventListener('click', function () {
+        clearTimeout(toastTimer);
+        el.hidden = true;
+        action.onClick();
+      });
+      el.appendChild(btn);
+    }
     el.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.hidden = true; }, 3200);
+    toastTimer = setTimeout(function () { el.hidden = true; }, hideAfter);
   }
 
   /* ---------------- ธีม ---------------- */
@@ -396,6 +412,18 @@
     var list = $('#friendList');
     var old = $('#friendNotice'); if (old) old.remove();
     list.insertAdjacentHTML('beforebegin', '<div id="friendNotice" class="banner is-warn friend-notice">' + html + '</div>');
+  }
+
+  /* เมนูลัดจากการกดค้างที่ไอคอนแอป (manifest shortcuts) → #go=add / debt / scan */
+  function openFromShortcut() {
+    var m = (location.hash || '').match(/[#&]go=(\w+)/);
+    if (!m) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    var where = m[1];
+    var tabName = where === 'scan' ? 'friends' : where;
+    var tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
+    if (tab) tab.click();
+    if (where === 'scan') { openAddFriendModal(); setTimeout(function () { $('#scanFriendBtn').click(); }, 150); }
   }
 
   /* สแกน QR ของเพื่อนด้วยกล้องมือถือ → เปิดลิงก์ #addfriend= มาที่นี่ */
@@ -2281,6 +2309,30 @@
 
   $('#pickBtn').addEventListener('click', function (e) { e.stopPropagation(); $('#fileInput').click(); });
   $('#camBtn').addEventListener('click', function (e) { e.stopPropagation(); $('#camInput').click(); });
+  /* ---------------- ปุ่มลัดร้านประจำ: แตะแล้วได้การ์ดกรอกไว้ให้ เหลือแค่เช็กยอดแล้วบันทึก ---------------- */
+  function renderQuickAdd() {
+    var box = $('#quickAdd');
+    if (!box) return;
+    var list = ExpenseStore.frequentMerchants(6);
+    box.hidden = !list.length;
+    if (!list.length) return;
+    box.innerHTML = '<span class="quick-label">⚡ ร้านประจำ</span>' + list.map(function (m, i) {
+      return '<button type="button" class="quick-chip" data-quick="' + i + '">' +
+        '<span aria-hidden="true">' + ReceiptParser.categoryIcon(m.category) + '</span>' +
+        esc(m.merchant) + '<small>' + esc(fmtMoney(m.amount)) + '</small></button>';
+    }).join('');
+    $$('.quick-chip', box).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var m = list[+btn.dataset.quick];
+        addCard({
+          status: 'done', statusText: 'ร้านประจำ — ตรวจยอดแล้วบันทึกได้เลย',
+          parsed: { date: todayISO(), merchant: m.merchant, amount: m.amount, category: m.category, items: [], text: '', confident: true }
+        });
+        toast('ใส่ ' + m.merchant + ' ให้แล้ว — แก้ยอดได้ก่อนบันทึก');
+      });
+    });
+  }
+
   $('#manualBtn').addEventListener('click', function (e) {
     e.stopPropagation();
     addCard({
@@ -2798,11 +2850,23 @@
     if (!exp) return;
 
     if (act === 'del') {
-      if (!confirm('ลบรายจ่าย "' + exp.merchant + '" ' + fmtMoney(exp.amount) + ' ใช่ไหม?')) return;
+      var keptImage = exp.image || null;              // รูปถูกทิ้งตอนลบ เก็บไว้เผื่อกดเลิกทำ
       ExpenseStore.remove(id);
       renderList();
       renderBudgetAlert();
-      toast('ลบรายการแล้ว');
+      renderDebtBadge();
+      if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+      toast('ลบ "' + exp.merchant + '" ' + fmtMoney(exp.amount) + ' แล้ว', {
+        label: '↩️ เลิกทำ',
+        onClick: function () {
+          ExpenseStore.restore(id, keptImage);
+          renderList();
+          renderBudgetAlert();
+          renderDebtBadge();
+          if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+          toast('คืนรายการแล้ว');
+        }
+      });
     } else if (act === 'edit') {
       if ($('.ecard-edit', card)) return;
       card.insertAdjacentHTML('beforeend', editForm(exp));
@@ -3353,9 +3417,11 @@
   renderDebtBadge();
   renderFriendBadge();
   renderBell();
+  renderQuickAdd();
   importFromHash();
   importFriendFromHash();
-  window.addEventListener('hashchange', function () { importFromHash(); importFriendFromHash(); });
+  openFromShortcut();
+  window.addEventListener('hashchange', function () { importFromHash(); importFriendFromHash(); openFromShortcut(); });
 
   /* ปุ่มคัดลอกลิงก์สำหรับใส่ใน Shortcut — ใช้ที่อยู่จริงของหน้าเว็บที่กำลังเปิดอยู่ */
   (function () {
@@ -3395,13 +3461,25 @@
   })();
 
   renderSyncBadge();
-  ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); renderFriendBadge(); renderBell(); });
+  ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); renderFriendBadge(); renderBell(); renderQuickAdd(); });
   CloudSync.onState(function () {
     renderDebtBadge();
     renderBell();
     if ($('#panel-debt').classList.contains('is-active')) renderDebts();
     if ($('#panel-friends').classList.contains('is-active')) renderFriendsTab();
   });
+  /* ลงทะเบียน service worker ตั้งแต่เปิดแอป เพื่อให้เปิดใช้งานได้ตอนเน็ตหลุด (และพร้อมรับ push ถ้าเปิดไว้) */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+  /* บอกผู้ใช้ว่ากำลังออฟไลน์ แต่ยังบันทึกได้ตามปกติ (ข้อมูลอยู่ในเครื่อง) */
+  window.addEventListener('offline', function () { toast('📴 เน็ตหลุด — ยังบันทึกได้ตามปกติ เดี๋ยวซิงก์ให้เมื่อเน็ตกลับมา'); });
+  window.addEventListener('online', function () {
+    if (syncReady() && !ownerConflict()) { toast('🛜 เน็ตกลับมาแล้ว กำลังซิงก์…'); runSync(true); }
+  });
+
   /* เช็กแจ้งเตือนจากเพื่อนเป็นระยะขณะเปิดแอปอยู่ และทันทีที่กลับมาเปิดแอป */
   setInterval(function () {
     if (document.visibilityState === 'visible' && syncReady() && !ownerConflict()) runSync(true);

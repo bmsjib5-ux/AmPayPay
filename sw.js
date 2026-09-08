@@ -1,7 +1,52 @@
-/* Service worker ของ "สมุดเก็บรายจ่ายของฉัน" — ทำหน้าที่รับ push แจ้งเตือนอย่างเดียว
-   ไม่แคชไฟล์ใดๆ เพื่อให้เวอร์ชันใหม่ขึ้นทันทีเหมือนเดิม */
-self.addEventListener('install', function () { self.skipWaiting(); });
-self.addEventListener('activate', function (ev) { ev.waitUntil(self.clients.claim()); });
+/* Service worker ของ AmPayPay
+   1) รับ push แจ้งเตือนตอนปิดแอป
+   2) แคชไฟล์แอปไว้ให้เปิดใช้งานได้ตอนเน็ตหลุด (network-first: ออนไลน์ได้ของใหม่เสมอ ออฟไลน์ใช้ของที่แคชไว้)
+   ข้อมูลรายจ่ายอยู่ใน localStorage/IndexedDB ของเบราว์เซอร์อยู่แล้ว จึงใช้งานต่อได้เต็มรูปแบบตอนออฟไลน์ */
+var CACHE = 'ampaypay-v52';
+var SHELL = [
+  './', './index.html', './manifest.webmanifest',
+  './assets/styles.css', './assets/config.js', './assets/parser.js', './assets/store.js',
+  './assets/sync.js', './assets/promptpay.js', './assets/app.js',
+  './assets/vendor/qrcode.js',
+  './assets/icon-32.png', './assets/icon-180.png', './assets/icon-192.png', './assets/icon-512.png'
+];
+
+self.addEventListener('install', function (ev) {
+  self.skipWaiting();
+  ev.waitUntil(caches.open(CACHE).then(function (c) {
+    /* ใบไหนโหลดไม่ได้ก็ข้ามไป ไม่ให้ทั้งชุดล้ม */
+    return Promise.all(SHELL.map(function (u) { return c.add(u).catch(function () {}); }));
+  }));
+});
+
+self.addEventListener('activate', function (ev) {
+  ev.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.map(function (k) { return k === CACHE ? null : caches.delete(k); }));
+  }).then(function () { return self.clients.claim(); }));
+});
+
+self.addEventListener('fetch', function (ev) {
+  var req = ev.request;
+  if (req.method !== 'GET') return;
+  var url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;          // ข้ามไฟล์จาก CDN และการเรียก Supabase
+  ev.respondWith(
+    fetch(req).then(function (res) {
+      if (res && res.ok) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(req, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(req).then(function (hit) {
+        if (hit) return hit;
+        /* เปิดหน้าเว็บตอนออฟไลน์ → คืนหน้าแอปที่แคชไว้ */
+        if (req.mode === 'navigate') return caches.match('./index.html') || caches.match('./');
+        return new Response('', { status: 504, statusText: 'offline' });
+      });
+    })
+  );
+});
 
 self.addEventListener('push', function (ev) {
   var data = {};
