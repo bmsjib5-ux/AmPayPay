@@ -24,8 +24,15 @@ async function rest(path: string, init: RequestInit = {}): Promise<Response> {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }
   });
 }
+/* อีเมลในตารางเก็บแบบเข้ารหัส จึงค้นด้วย sha256(lower(email)) ผ่านคอลัมน์ email_hash (ตารางแบบเก่าไม่มีคอลัมน์นี้ → ค้นด้วยอีเมลตรงๆ) */
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text.trim().toLowerCase()));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 async function subsByEmail(email: string): Promise<SubRow[]> {
-  const r = await rest(`push_subscriptions?select=endpoint,p256dh,auth,user_id,email&email=eq.${encodeURIComponent(email.toLowerCase())}`);
+  const hash = await sha256Hex(email);
+  let r = await rest(`push_subscriptions?select=endpoint,p256dh,auth,user_id,email&email_hash=eq.${hash}`);
+  if (!r.ok) r = await rest(`push_subscriptions?select=endpoint,p256dh,auth,user_id,email&email=eq.${encodeURIComponent(email.toLowerCase())}`);
   return r.ok ? await r.json() : [];
 }
 async function subsByUser(userId: string): Promise<SubRow[]> {
@@ -33,7 +40,9 @@ async function subsByUser(userId: string): Promise<SubRow[]> {
   return r.ok ? await r.json() : [];
 }
 async function friendName(userId: string, email: string): Promise<string> {
-  const r = await rest(`friends?select=name&user_id=eq.${encodeURIComponent(userId)}&email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`);
+  const hash = await sha256Hex(email);
+  let r = await rest(`friends?select=name&user_id=eq.${encodeURIComponent(userId)}&email_hash=eq.${hash}&limit=1`);
+  if (!r.ok) r = await rest(`friends?select=name&user_id=eq.${encodeURIComponent(userId)}&email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`);
   const rows = r.ok ? await r.json() : [];
   return (rows[0] && rows[0].name) || email;
 }

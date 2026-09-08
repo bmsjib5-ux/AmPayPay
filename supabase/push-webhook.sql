@@ -4,20 +4,21 @@
 
 create extension if not exists pg_net with schema extensions;
 
+-- ตาราง debt_claims_data เก็บอีเมลแบบเข้ารหัส จึงใช้ claim_webhook_payload() (จาก schema.sql) สร้างข้อมูลที่ถอดรหัสแล้ว
+-- เฉพาะช่องที่ฟังก์ชันต้องใช้ (ไม่ส่งรูป/พร้อมเพย์)
 create or replace function public.push_notify_hook() returns trigger
 language plpgsql security definer set search_path = public, extensions, net as $fn$
 begin
   perform net.http_post(
     url := 'https://<PROJECT_REF>.supabase.co/functions/v1/push-notify',
-    body := jsonb_build_object('type', TG_OP, 'table', TG_TABLE_NAME, 'schema', TG_TABLE_SCHEMA,
-                               'record', to_jsonb(NEW), 'old_record', case when TG_OP = 'UPDATE' then to_jsonb(OLD) else null end),
+    body := public.claim_webhook_payload(TG_OP, NEW, case when TG_OP = 'UPDATE' then OLD else null end),
     headers := '{"Content-Type":"application/json","x-webhook-secret":"<WEBHOOK_SECRET>"}'::jsonb,
     timeout_milliseconds := 5000);
   return NEW;
 end $fn$;
 
-drop trigger if exists push_notify_hook on public.debt_claims;
-create trigger push_notify_hook after insert or update on public.debt_claims
+drop trigger if exists push_notify_hook on public.debt_claims_data;
+create trigger push_notify_hook after insert or update on public.debt_claims_data
   for each row execute function public.push_notify_hook();
 
 -- ตรวจผลการส่งล่าสุด (status_code 200 = ฟังก์ชันรับแล้ว, body บอกจำนวนเครื่องที่ส่งถึง)

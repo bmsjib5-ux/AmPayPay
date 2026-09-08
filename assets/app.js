@@ -720,10 +720,12 @@
           '<button class="btn btn-primary btn-sm" type="button" id="payShareBtn">💾 บันทึกรูป QR</button>' +
           '<button class="btn btn-ghost btn-sm" type="button" id="payCopyBtn">คัดลอกเลขพร้อมเพย์</button>' +
         '</div>' +
-        '<p class="pay-hint">บันทึกรูปแล้วเปิดแอปธนาคาร → สแกน → เลือกรูปจากอัลบั้ม ยอดเงินจะถูกใส่ให้อัตโนมัติ<br>' +
-          'โอนเสร็จแล้วกลับมากด “จ่ายแล้ว แจ้งเพื่อน”</p>' +
+        '<p class="pay-hint">บันทึกรูปแล้วเปิดแอปธนาคาร → สแกน → เลือกรูปจากอัลบั้ม ยอดเงินจะถูกใส่ให้อัตโนมัติ</p>' +
+        (c.status === 'pending' ? '<button class="btn btn-primary" type="button" id="payDoneBtn">✅ โอนแล้ว — บันทึกรายจ่าย + แจ้งเพื่อน</button>' : '') +
       '</div>';
     $('#payModal').hidden = false;
+    var doneBtn = $('#payDoneBtn');
+    if (doneBtn) doneBtn.addEventListener('click', function () { closePayModal(); payAndSave(c.id, null); });
     $('#payCopyBtn').addEventListener('click', function () {
       var digits = idInfo.type === '01' ? '0' + idInfo.value.slice(4) : idInfo.value;
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(digits).then(function () { toast('คัดลอก ' + digits + ' แล้ว'); });
@@ -779,17 +781,21 @@
             (c.reply ? ' · “' + esc(c.reply) + '”' : '') + '</span>' +
         '</div>' +
         '<span class="debt-item-amount">' + fmtMoney(c.amount) + '</span>' +
-        '<span class="debt-item-actions">' +
+        '<span class="debt-item-actions claim-actions">' +
           (c.promptpay && c.status !== 'confirmed' && PromptPay.payload(c.promptpay, c.amount)
-            ? '<button class="btn btn-sm btn-primary" data-claim="qr" title="QR พร้อมเพย์ของเพื่อน พร้อมยอดที่ต้องโอน">💳 QR โอนคืน</button>' : '') +
-          (expenseOfClaim(c)
-            ? '<span class="chip is-ok" title="อยู่ในรายการรายจ่ายของคุณแล้ว">✓ บันทึกแล้ว</span>'
-            : '<button class="btn btn-sm" data-claim="save" title="บันทึกส่วนของคุณเป็นรายจ่ายในสมุดนี้">📥 บันทึกเป็นรายจ่าย</button>') +
+            ? '<button class="action-card mini" data-claim="qr" title="QR พร้อมเพย์ของเพื่อน พร้อมยอดที่ต้องโอน"><span class="ac-ic" aria-hidden="true">💳</span><span class="ac-label">QR โอนคืน</span><span class="ac-sub">สแกนจ่ายพร้อมเพย์</span></button>' : '') +
           (c.status === 'pending'
-            ? '<button class="btn btn-sm' + (c.promptpay ? '' : ' btn-primary') + '" data-claim="pay">จ่ายแล้ว แจ้งเพื่อน</button>'
-            : c.status === 'paid'
-              ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
-              : '<span class="chip is-ok">เรียบร้อย</span>') +
+            ? '<button class="action-card mini is-primary" data-claim="payall" title="บันทึกลงสมุด (พร้อมรูปใบเสร็จ) และแจ้งเพื่อนว่าจ่ายแล้ว ในคลิกเดียว"><span class="ac-ic" aria-hidden="true">✅</span>' +
+                (expenseOfClaim(c) ? '<span class="ac-label">จ่ายแล้ว แจ้งเพื่อน</span><span class="ac-sub">บันทึกในสมุดแล้ว</span>'
+                                   : '<span class="ac-label">จ่ายแล้ว + บันทึก</span><span class="ac-sub">ลงสมุด + แจ้งเพื่อน</span>') + '</button>'
+            : '') +
+          (expenseOfClaim(c)
+            ? (c.status === 'pending' ? '' : '<span class="chip is-ok" title="อยู่ในรายการรายจ่ายของคุณแล้ว">✓ บันทึกแล้ว</span>')
+            : c.status === 'pending' ? ''
+            : '<button class="action-card mini" data-claim="save" title="บันทึกส่วนของคุณเป็นรายจ่ายในสมุดนี้"><span class="ac-ic" aria-hidden="true">📥</span><span class="ac-label">บันทึกรายจ่าย</span><span class="ac-sub">ลงสมุดพร้อมรูป</span></button>') +
+          (c.status === 'paid'
+            ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
+            : c.status === 'confirmed' ? '<span class="chip is-ok">เรียบร้อย</span>' : '') +
         '</span>' +
       '</div>';
     }).join('');
@@ -820,10 +826,10 @@
     var dup = findDuplicate({ date: info.date, amount: c.amount, merchant: info.merchant });
     return dup ? dup.record : null;
   }
-  function saveClaimAsExpense(id) {
+  function saveClaimAsExpense(id, quiet) {
     var c = ExpenseStore.claims.all().filter(function (x) { return x.id === id; })[0];
-    if (!c) return;
-    if (expenseOfClaim(c)) { toast('รายการนี้อยู่ในสมุดแล้ว'); renderIncoming(); return; }
+    if (!c) return false;
+    if (expenseOfClaim(c)) { if (!quiet) { toast('รายการนี้อยู่ในสมุดแล้ว'); renderIncoming(); } return true; }
     var info = parseClaimNote(c);
     var who = c.fromName || c.fromEmail;
     var res = ExpenseStore.add({
@@ -839,8 +845,27 @@
     renderList();
     renderBudgetAlert();
     if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+    if (quiet) return true;
     toast('บันทึก ' + fmtMoney(c.amount) + ' ลงสมุด “' + ExpenseStore.currentBookName() + '” แล้ว' +
       (res && res.result && !res.result.ok ? ' (พื้นที่ใกล้เต็ม)' : ''));
+    return true;
+  }
+
+  /* ปุ่มเดียวจบ: บันทึกส่วนที่ต้องจ่ายลงสมุด (พร้อมรูปใบเสร็จ) + แจ้งเพื่อนว่าจ่ายแล้ว */
+  function payAndSave(id, btn) {
+    var c = ExpenseStore.claims.all().filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    var reply = prompt('ข้อความถึงเพื่อน (ไม่ใส่ก็ได้)', 'โอนคืนแล้วนะ');
+    if (reply === null) return;
+    if (btn) btn.disabled = true;
+    var saved = saveClaimAsExpense(id, true);
+    var notify = c.status === 'pending'
+      ? CloudSync.updateClaim(id, { status: 'paid', reply: reply }).then(function () { return CloudSync.syncNow(); })
+      : Promise.resolve();
+    notify.then(function () {
+      renderDebts(); renderList(); renderBudgetAlert();
+      toast((saved ? '📥 บันทึก ' + fmtMoney(c.amount) + ' ลงสมุดแล้ว · ' : '') + '✅ แจ้งเพื่อนแล้วว่าจ่ายคืนแล้ว');
+    }).catch(function (e) { if (btn) btn.disabled = false; renderIncoming(); toast('บันทึกแล้ว แต่แจ้งเพื่อนไม่สำเร็จ: ' + e.message); });
   }
 
   $('#incomingList').addEventListener('click', function (ev) {
@@ -850,6 +875,7 @@
     var act = btn.dataset.claim;
     if (act === 'save') { saveClaimAsExpense(id); return; }
     if (act === 'qr') { openPayModal(id); return; }
+    if (act === 'payall') { payAndSave(id, btn); return; }
     if (act === 'pay') {
       var reply = prompt('ข้อความถึงเพื่อน (ไม่ใส่ก็ได้)', 'โอนคืนแล้วนะ');
       if (reply === null) return;
