@@ -1105,3 +1105,10 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 @keyframes scanline { from { transform: translateY(-120px); } to { transform: translateY(120px); } }
 .friend-notice { margin-bottom: 12px; }
 #scanModal { z-index: 70; }   /* อยู่เหนือหน้าต่างเพิ่มเพื่อน */
+
+/* หน้าต่างเพิ่มเพื่อน: ปุ่ม 3 ทางเป็นการ์ดไอคอน */
+.add-friend-grid { margin-top: 14px; gap: 8px; }
+.add-friend-grid .action-card { min-height: 92px; padding: 10px 6px; gap: 4px; }
+.add-friend-grid .ac-ic { font-size: 26px; }
+.add-friend-grid .ac-label { font-size: 13.5px; }
+.add-friend-grid .ac-sub { font-size: 11px; }

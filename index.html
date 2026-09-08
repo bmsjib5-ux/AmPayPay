@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AmPayPay</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=49">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=49">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=50">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=50">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=49">
-<link rel="manifest" href="manifest.webmanifest?v=49">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=50">
+<link rel="manifest" href="manifest.webmanifest?v=50">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=49">
+<link rel="stylesheet" href="assets/styles.css?v=50">
 </head>
 <body>
 <header class="topbar">
@@ -265,7 +265,7 @@
 
 <footer class="wrap foot">
   ข้อมูลเก็บในเครื่องของคุณ · เปิดซิงก์ ☁️ เมื่ออยากใช้หลายเครื่อง
-  <span class="ver">เวอร์ชัน 49</span>
+  <span class="ver">เวอร์ชัน 50</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -335,10 +335,10 @@
       <label class="field"><span class="field-label">อีเมลของเพื่อน</span>
         <input type="email" id="newFriendEmail" placeholder="friend@example.com" autocomplete="off"></label>
     </div>
-    <div class="row-actions" style="margin-top:12px">
-      <button class="btn btn-primary btn-sm" id="addFriendBtn" type="button">เพิ่มเพื่อน</button>
-      <button class="btn btn-sm" id="scanFriendBtn" type="button">📷 สแกน QR ด้วยกล้อง</button>
-      <button class="btn btn-ghost btn-sm" id="pasteFriendBtn" type="button">📋 วางลิงก์</button>
+    <div class="action-grid add-friend-grid">
+      <button class="action-card is-primary" id="addFriendBtn" type="button"><span class="ac-ic" aria-hidden="true">✅</span><span class="ac-label">เพิ่มเพื่อน</span><span class="ac-sub">จากอีเมลด้านบน</span></button>
+      <button class="action-card" id="scanFriendBtn" type="button"><span class="ac-ic" aria-hidden="true">📷</span><span class="ac-label">สแกน QR</span><span class="ac-sub">ด้วยกล้องในแอป</span></button>
+      <button class="action-card" id="pasteFriendBtn" type="button"><span class="ac-ic" aria-hidden="true">📋</span><span class="ac-label">วางลิงก์</span><span class="ac-sub">ที่ได้จาก QR / แชต</span></button>
     </div>
     <p class="muted" style="font-size:12.5px;margin:10px 0 0">สแกนจากในแอปนี้ได้เลย ไม่ต้องใช้กล้องของเครื่อง (กล้องเครื่องจะเปิดลิงก์ใน Safari ซึ่งเป็นคนละที่เก็บข้อมูลกับแอปบนหน้าจอโฮม)</p>
   </div>
@@ -395,12 +395,12 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=49"></script>
-<script src="assets/promptpay.js?v=49"></script>
-<script src="assets/config.js?v=49"></script>
-<script src="assets/parser.js?v=49"></script>
-<script src="assets/store.js?v=49"></script>
-<script src="assets/sync.js?v=49"></script>
-<script src="assets/app.js?v=49"></script>
+<script src="assets/vendor/qrcode.js?v=50"></script>
+<script src="assets/promptpay.js?v=50"></script>
+<script src="assets/config.js?v=50"></script>
+<script src="assets/parser.js?v=50"></script>
+<script src="assets/store.js?v=50"></script>
+<script src="assets/sync.js?v=50"></script>
+<script src="assets/app.js?v=50"></script>
 </body>
 </html>
