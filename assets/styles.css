@@ -1144,7 +1144,7 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .toast-action:active { transform: scale(.95); }
 
 /* ---------- แท็บ ฉัน ---------- */
-.me-grid { grid-template-columns: repeat(3, 1fr); margin: 0 0 14px; }
+.me-grid { grid-template-columns: repeat(2, 1fr); margin: 0 0 14px; }
 .me-grid .action-card { min-height: 116px; }
 .me-grid .ac-ic { font-size: 30px; }
 .me-grid .ac-label { font-size: 14px; }

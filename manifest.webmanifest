@@ -45,19 +45,6 @@
       ]
     },
     {
-      "name": "สแกนจ่ายเงิน",
-      "short_name": "สแกนจ่าย",
-      "description": "อ่าน QR ร้านค้าแล้วบันทึกรายจ่าย",
-      "url": "./#go=pay",
-      "icons": [
-        {
-          "src": "assets/icon-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
       "name": "ลูกหนี้",
       "short_name": "ลูกหนี้",
       "description": "ดูยอดค้างและหนี้ที่ต้องจ่าย",
