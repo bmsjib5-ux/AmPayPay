@@ -741,40 +741,110 @@
   });
 
   /* ---------- ฝั่งเจ้าหนี้: ส่งยอดให้เพื่อน / ยืนยันรับเงิน ---------- */
+  /* ส่งยอดให้เพื่อน: เลือกได้ว่าจะส่งในแอป (เพื่อนเห็นในกระดิ่ง) ส่งทางอีเมล หรือแชร์ไปแอปอื่น (LINE ฯลฯ) */
+  var sendCtx = null;
   function sendClaimFor(expenseId, personId) {
     var exp = ExpenseStore.get(expenseId);
     if (!exp) return;
     var person = splitOf(exp).filter(function (p) { return p.id === personId; })[0];
     if (!person) return;
-    if (!syncReady()) { toast('ต้องเปิดซิงก์ ☁️ และล็อกอินก่อน จึงจะส่งยอดให้เพื่อนได้'); return; }
-
     var friends = ExpenseStore.friends.all();
     var guess = friends.filter(function (f) {
       return (f.name || '').trim() && (f.name || '').trim() === person.name.trim();
     })[0];
-    var email = prompt('ส่งยอด ' + fmtMoney(person.amount) + ' ของ "' + person.name + '" ไปที่อีเมลไหน?' +
-      (friends.length ? '\n\nเพื่อนในรายชื่อ: ' + friends.map(function (f) { return f.name || f.email; }).join(', ') : ''),
-      person.email || (guess ? guess.email : ''));
-    if (email === null) return;
-    email = String(email).trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('อีเมลไม่ถูกต้อง'); return; }
-    ExpenseStore.friends.save(email, person.name);
-
     var existing = claimOfPerson(expenseId, personId);
-    CloudSync.sendClaim({
+    sendCtx = { expenseId: expenseId, personId: personId, exp: exp, person: person, existing: existing };
+    var email = person.email || (guess ? guess.email : '') || (existing ? existing.toEmail : '');
+    var pp = myPromptPay();
+    $('#sendBody').innerHTML = '<div class="send-body">' +
+        '<div class="send-sum"><span>' + esc(person.name) + '</span><b>' + fmtMoney(person.amount) + '</b></div>' +
+        '<div class="muted" style="font-size:12.5px">' + esc(exp.merchant) + ' · ' + esc(dateLabel(exp.date)) + '</div>' +
+        '<label class="field"><span class="field-label">อีเมลของเพื่อน</span>' +
+          '<input type="email" id="sendEmail" value="' + esc(email) + '" placeholder="friend@example.com" autocomplete="off" list="sendFriendList"></label>' +
+        '<datalist id="sendFriendList">' + friends.map(function (f) { return '<option value="' + esc(f.email) + '">' + esc(f.name || f.email) + '</option>'; }).join('') + '</datalist>' +
+        '<div class="send-options">' +
+          '<button type="button" class="action-card" id="sendAppBtn"' + (syncReady() ? '' : ' disabled') + '><span class="ac-ic" aria-hidden="true">📲</span><span class="ac-label">ในแอป AmPayPay</span>' +
+            '<span class="ac-sub">' + (syncReady() ? 'เพื่อนเห็นในกระดิ่ง กดจ่ายแล้ว/สแกน QR ได้' : 'ต้องล็อกอิน ☁️ ก่อน') + '</span></button>' +
+          '<button type="button" class="action-card" id="sendMailBtn"><span class="ac-ic" aria-hidden="true">✉️</span><span class="ac-label">ทางอีเมล</span>' +
+            '<span class="ac-sub">เปิดแอปอีเมลพร้อมข้อความ' + (pp ? ' + เลขพร้อมเพย์' : '') + '</span></button>' +
+          (navigator.share ? '<button type="button" class="action-card" id="sendShareBtn"><span class="ac-ic" aria-hidden="true">📤</span><span class="ac-label">แชร์ไปแอปอื่น</span>' +
+            '<span class="ac-sub">LINE · ข้อความ · อื่นๆ</span></button>' : '') +
+        '</div>' +
+        (existing ? '<p class="muted" style="font-size:12.5px;margin:0">เคยส่งในแอปไปแล้ว (' + esc((CLAIM_LABEL[existing.status] || {}).text || existing.status) + ') — ส่งซ้ำจะอัปเดตยอด/พร้อมเพย์ให้</p>' : '') +
+      '</div>';
+    $('#sendModal').hidden = false;
+    setTimeout(function () { var el = $('#sendEmail'); if (el && !el.value) el.focus(); }, 50);
+  }
+  function closeSendModal() { $('#sendModal').hidden = true; sendCtx = null; }
+  function sendEmailValue() {
+    var email = String($('#sendEmail').value || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('ใส่อีเมลของเพื่อนก่อน'); $('#sendEmail').focus(); return ''; }
+    return email;
+  }
+  function claimMessage(ctx, email) {
+    var pp = myPromptPay();
+    var ppInfo = pp ? PromptPay.normalizeId(pp) : null;
+    var me = myName() || myEmail() || 'เพื่อนของคุณ';
+    var lines = [
+      'สวัสดี ' + ctx.person.name,
+      me + ' ออกค่า ' + ctx.exp.merchant + ' ให้ก่อน (' + dateLabel(ctx.exp.date) + ')',
+      'ยอดของคุณ: ' + fmtMoney(ctx.person.amount) + (ctx.exp.amount ? ' (บิลรวม ' + fmtMoney(ctx.exp.amount) + ')' : ''),
+      ppInfo ? 'โอนคืนทางพร้อมเพย์: ' + ppInfo.label.replace(/^เบอร์ |^บัตรประชาชน |^e-Wallet /, '') : '',
+      '',
+      'ดูรายละเอียด / กดจ่ายแล้ว / สแกน QR โอนคืน ได้ในแอป AmPayPay: ' + location.origin + location.pathname +
+        (email ? '#addfriend=' + encodeURIComponent(myEmail()) + (myName() ? '&name=' + encodeURIComponent(myName()) : '') : '')
+    ].filter(function (l, i) { return l !== '' || i === 4; });
+    return { subject: 'ยอดค้าง ' + fmtMoney(ctx.person.amount) + ' — ' + ctx.exp.merchant, body: lines.join('\n') };
+  }
+  function sendClaimInApp(ctx, email) {
+    if (!syncReady()) { toast('ต้องเปิดซิงก์ ☁️ และล็อกอินก่อน จึงจะส่งในแอปได้'); return Promise.resolve(false); }
+    ExpenseStore.friends.save(email, ctx.person.name);
+    var existing = ctx.existing;
+    return CloudSync.sendClaim({
       id: existing ? existing.id : ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
       toEmail: email,
-      amount: person.amount,
-      note: exp.merchant + ' · ' + dateLabel(exp.date),
-      expenseId: expenseId,
-      personId: personId,
+      amount: ctx.person.amount,
+      note: ctx.exp.merchant + ' · ' + dateLabel(ctx.exp.date),
+      expenseId: ctx.expenseId,
+      personId: ctx.personId,
       fromName: myName(),
       promptpay: myPromptPay(),
       status: existing ? existing.status : 'pending'
     }).then(function () { return CloudSync.syncNow(); })
-      .then(function () { renderDebts(); toast('ส่งยอดให้ ' + email + ' แล้ว'); })
-      .catch(function (e) { toast('ส่งไม่สำเร็จ: ' + e.message); });
+      .then(function () { renderDebts(); return true; })
+      .catch(function (e) { toast('ส่งไม่สำเร็จ: ' + e.message); return false; });
   }
+  $('#sendModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-send="close"]')) { closeSendModal(); return; }
+    var ctx = sendCtx;
+    if (!ctx) return;
+    if (ev.target.closest('#sendAppBtn')) {
+      var email = sendEmailValue(); if (!email) return;
+      var btn = $('#sendAppBtn'); btn.disabled = true;
+      sendClaimInApp(ctx, email).then(function (okk) {
+        if (okk) { closeSendModal(); toast('ส่งยอดให้ ' + email + ' ในแอปแล้ว'); } else btn.disabled = false;
+      });
+    } else if (ev.target.closest('#sendMailBtn')) {
+      var email2 = sendEmailValue(); if (!email2) return;
+      ExpenseStore.friends.save(email2, ctx.person.name);
+      var m = claimMessage(ctx, email2);
+      var href = 'mailto:' + encodeURIComponent(email2) + '?subject=' + encodeURIComponent(m.subject) + '&body=' + encodeURIComponent(m.body);
+      document.body.dataset.lastMailto = href;        // ให้เทสต์อ่านได้ (เบราว์เซอร์ทดสอบเปิด mailto ไม่ได้)
+      window.location.href = href;
+      /* ส่งในแอปควบคู่ไปด้วยถ้าล็อกอินอยู่ จะได้ติดตามสถานะได้ */
+      (syncReady() ? sendClaimInApp(ctx, email2) : Promise.resolve(false)).then(function (okk) {
+        closeSendModal();
+        toast(okk ? 'เปิดอีเมลแล้ว และส่งในแอปให้ด้วย' : 'เปิดแอปอีเมลพร้อมข้อความแล้ว');
+      });
+    } else if (ev.target.closest('#sendShareBtn')) {
+      var email3 = String($('#sendEmail').value || '').trim().toLowerCase();
+      var m2 = claimMessage(ctx, email3);
+      navigator.share({ title: m2.subject, text: m2.body }).then(function () {
+        if (email3 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email3)) ExpenseStore.friends.save(email3, ctx.person.name);
+        closeSendModal(); toast('แชร์ข้อความแล้ว');
+      }).catch(function () {});
+    }
+  });
 
   /* บันทึกรายจ่ายที่หารกับเพื่อนที่เลือกจากรายชื่อ → ส่งใบแจ้งหนี้ให้เขาเลยโดยไม่ต้องกดส่งเอง
      เครื่องเพื่อนจะได้กระดิ่งแจ้งเตือนตอนซิงก์ครั้งถัดไป */
@@ -3095,6 +3165,7 @@
     if (!$('#bookModal').hidden) closeBookModal();
     if (!$('#bellModal').hidden) closeBell();
     if (!$('#payModal').hidden) closePayModal();
+    if (!$('#sendModal').hidden) closeSendModal();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
