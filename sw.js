@@ -5,8 +5,8 @@ self.addEventListener('activate', function (ev) { ev.waitUntil(self.clients.clai
 
 self.addEventListener('push', function (ev) {
   var data = {};
-  try { data = ev.data ? ev.data.json() : {}; } catch (e) { data = { title: 'สมุดรายจ่าย', body: ev.data ? ev.data.text() : '' }; }
-  var title = data.title || '🔔 สมุดรายจ่าย';
+  try { data = ev.data ? ev.data.json() : {}; } catch (e) { data = { title: 'AmPayPay', body: ev.data ? ev.data.text() : '' }; }
+  var title = data.title || '🔔 AmPayPay';
   var opts = {
     body: data.body || '',
     icon: 'assets/icon-192.png',

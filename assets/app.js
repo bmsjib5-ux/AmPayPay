@@ -360,7 +360,7 @@
     try {
       var top = fresh[0];
       var body = fresh.length > 1 ? top.title + ' และอีก ' + (fresh.length - 1) + ' รายการ' : top.title + (top.sub ? '\n' + top.sub : '');
-      var note = new Notification('🔔 สมุดรายจ่าย', { body: body, icon: 'assets/icon-192.png', tag: 'expense-book-bell' });
+      var note = new Notification('🔔 AmPayPay', { body: body, icon: 'assets/icon-192.png', tag: 'expense-book-bell' });
       note.onclick = function () { window.focus(); openBell(); note.close(); };
     } catch (e) {}
   }

@@ -1,6 +1,6 @@
 {
-  "name": "สมุดเก็บรายจ่ายของฉัน",
-  "short_name": "สมุดรายจ่าย",
+  "name": "AmPayPay",
+  "short_name": "AmPayPay",
   "description": "อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย",
   "lang": "th",
   "dir": "ltr",
