@@ -117,6 +117,7 @@
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(cur)); } catch (e) {}
   }
   function myName() { return String(profile().name || '').trim(); }
+  function myPromptPay() { return String(profile().promptpay || '').trim(); }
 
   /* ลิงก์ในบัตร: เพื่อนสแกนแล้วเปิดแอป จะเพิ่มเราเป็นเพื่อนให้ทันที */
   function friendLink(email, name) {
@@ -151,6 +152,11 @@
             '<input type="text" id="myNameInput" value="' + esc(name) + '" placeholder="เช่น แอน" maxlength="40"></label>' +
           '<div><span class="field-label">รหัสประจำตัว (อีเมลที่ล็อกอิน)</span>' +
             '<div class="me-id">' + esc(email) + '</div></div>' +
+          '<label class="field"><span class="field-label">พร้อมเพย์ของฉัน (เบอร์โทร / เลขบัตร) — แนบ QR โอนคืนไปกับยอดหนี้</span>' +
+            '<input type="text" id="myPromptPayInput" inputmode="tel" value="' + esc(myPromptPay()) + '" placeholder="เช่น 0812345678" maxlength="20"></label>' +
+          (myPromptPay() ? '<div class="muted" id="myPromptPayNote" style="font-size:12.5px">' +
+            (PromptPay.normalizeId(myPromptPay()) ? '✅ ' + esc(PromptPay.normalizeId(myPromptPay()).label) + ' — เพื่อนจะได้ QR โอนคืนพร้อมยอด'
+                                                   : '⚠️ รูปแบบไม่ถูกต้อง ใส่เบอร์ 10 หลัก หรือเลขบัตร 13 หลัก') + '</div>' : '') +
           '<div class="row-actions">' +
             '<button class="btn btn-sm" id="shareMeBtn" type="button">📤 แชร์ลิงก์เพิ่มเพื่อน</button>' +
             '<button class="btn btn-ghost btn-sm" id="copyMeBtn" type="button">คัดลอกอีเมล</button>' +
@@ -164,6 +170,13 @@
       ExpenseStore.friends.all().forEach(function (f) { ExpenseStore.friends.save(f.email, f.name); });
       renderMeCard();
       toast('บันทึกชื่อเล่นแล้ว');
+    });
+    $('#myPromptPayInput').addEventListener('change', function () {
+      var v = this.value.trim();
+      if (v && !PromptPay.normalizeId(v)) { toast('พร้อมเพย์ไม่ถูกต้อง — ใส่เบอร์ 10 หลัก หรือเลขบัตร 13 หลัก'); }
+      saveProfile({ promptpay: v });
+      renderMeCard();
+      if (v && PromptPay.normalizeId(v)) toast('บันทึกพร้อมเพย์แล้ว ยอดที่ส่งให้เพื่อนครั้งต่อไปจะมี QR โอนคืน');
     });
     $('#shareMeBtn').addEventListener('click', function () {
       var text = 'เพิ่มฉันเป็นเพื่อนในสมุดรายจ่าย: ' + link;
@@ -554,6 +567,67 @@
       .then(function () { btn.disabled = false; });
   });
 
+  /* ---------- QR พร้อมเพย์: ลูกหนี้เปิดดู/บันทึกรูป แล้วสแกนจากรูปในแอปธนาคาร ---------- */
+  function qrCanvas(text, size) {
+    var qr = qrcode(0, 'M'); qr.addData(text, 'Byte'); qr.make();
+    var n = qr.getModuleCount(), margin = 4, cell = Math.floor(size / (n + margin * 2));
+    var px = cell * (n + margin * 2);
+    var cv = document.createElement('canvas'); cv.width = px; cv.height = px;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, px, px);
+    ctx.fillStyle = '#000';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect((c + margin) * cell, (r + margin) * cell, cell, cell);
+    return cv;
+  }
+  function openPayModal(claimId) {
+    var c = ExpenseStore.claims.all().filter(function (x) { return x.id === claimId; })[0];
+    if (!c || !c.promptpay) return;
+    var text = PromptPay.payload(c.promptpay, c.amount);
+    var idInfo = PromptPay.normalizeId(c.promptpay);
+    if (!text || !idInfo) { toast('พร้อมเพย์ของเพื่อนไม่ถูกต้อง'); return; }
+    var who = c.fromName || c.fromEmail;
+    $('#payBody').innerHTML = '<div class="pay-body">' +
+        '<div class="pay-amount">' + fmtMoney(c.amount) + '</div>' +
+        '<div class="pay-to">โอนให้ <b>' + esc(who) + '</b>' + (c.note ? ' · ' + esc(c.note) : '') + '</div>' +
+        '<div class="pay-qr" aria-label="QR พร้อมเพย์">' + qrSvg(text) + '</div>' +
+        '<div class="pay-id">' + esc(idInfo.label) + '</div>' +
+        '<div class="row-actions">' +
+          '<button class="btn btn-primary btn-sm" type="button" id="payShareBtn">💾 บันทึกรูป QR</button>' +
+          '<button class="btn btn-ghost btn-sm" type="button" id="payCopyBtn">คัดลอกเลขพร้อมเพย์</button>' +
+        '</div>' +
+        '<p class="pay-hint">บันทึกรูปแล้วเปิดแอปธนาคาร → สแกน → เลือกรูปจากอัลบั้ม ยอดเงินจะถูกใส่ให้อัตโนมัติ<br>' +
+          'โอนเสร็จแล้วกลับมากด “จ่ายแล้ว แจ้งเพื่อน”</p>' +
+      '</div>';
+    $('#payModal').hidden = false;
+    $('#payCopyBtn').addEventListener('click', function () {
+      var digits = idInfo.type === '01' ? '0' + idInfo.value.slice(4) : idInfo.value;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(digits).then(function () { toast('คัดลอก ' + digits + ' แล้ว'); });
+      else prompt('เลขพร้อมเพย์', digits);
+    });
+    $('#payShareBtn').addEventListener('click', function () {
+      var cv = qrCanvas(text, 640);
+      var name = 'promptpay-' + Math.round(c.amount) + '.png';
+      cv.toBlob(function (blob) {
+        if (!blob) { toast('สร้างรูปไม่ได้'); return; }
+        var file;
+        try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { file = null; }
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: 'QR พร้อมเพย์ ' + fmtMoney(c.amount) }).catch(function () {});
+          return;
+        }
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+        toast('บันทึกรูป QR แล้ว เปิดในแอปธนาคารได้เลย');
+      }, 'image/png');
+    });
+  }
+  function closePayModal() { $('#payModal').hidden = true; }
+  $('#payModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-pay="close"]')) closePayModal();
+  });
+
   /* ---------- ฝั่งลูกหนี้: หนี้ที่เพื่อนส่งมา ---------- */
   function renderIncoming() {
     var card = $('#incomingCard');
@@ -580,11 +654,13 @@
         '</div>' +
         '<span class="debt-item-amount">' + fmtMoney(c.amount) + '</span>' +
         '<span class="debt-item-actions">' +
+          (c.promptpay && c.status !== 'confirmed' && PromptPay.payload(c.promptpay, c.amount)
+            ? '<button class="btn btn-sm btn-primary" data-claim="qr" title="QR พร้อมเพย์ของเพื่อน พร้อมยอดที่ต้องโอน">💳 QR โอนคืน</button>' : '') +
           (expenseOfClaim(c)
             ? '<span class="chip is-ok" title="อยู่ในรายการรายจ่ายของคุณแล้ว">✓ บันทึกแล้ว</span>'
             : '<button class="btn btn-sm" data-claim="save" title="บันทึกส่วนของคุณเป็นรายจ่ายในสมุดนี้">📥 บันทึกเป็นรายจ่าย</button>') +
           (c.status === 'pending'
-            ? '<button class="btn btn-primary btn-sm" data-claim="pay">จ่ายแล้ว แจ้งเพื่อน</button>'
+            ? '<button class="btn btn-sm' + (c.promptpay ? '' : ' btn-primary') + '" data-claim="pay">จ่ายแล้ว แจ้งเพื่อน</button>'
             : c.status === 'paid'
               ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
               : '<span class="chip is-ok">เรียบร้อย</span>') +
@@ -646,6 +722,7 @@
     var id = btn.closest('.debt-item').dataset.cid;
     var act = btn.dataset.claim;
     if (act === 'save') { saveClaimAsExpense(id); return; }
+    if (act === 'qr') { openPayModal(id); return; }
     if (act === 'pay') {
       var reply = prompt('ข้อความถึงเพื่อน (ไม่ใส่ก็ได้)', 'โอนคืนแล้วนะ');
       if (reply === null) return;
@@ -692,6 +769,7 @@
       expenseId: expenseId,
       personId: personId,
       fromName: myName(),
+      promptpay: myPromptPay(),
       status: existing ? existing.status : 'pending'
     }).then(function () { return CloudSync.syncNow(); })
       .then(function () { renderDebts(); toast('ส่งยอดให้ ' + email + ' แล้ว'); })
@@ -719,6 +797,8 @@
         expenseId: expenseId,
         personId: p.id,
         fromName: myName(),
+        promptpay: myPromptPay(),
+      promptpay: myPromptPay(),
         status: existing ? existing.status : 'pending'
       });
     });
@@ -3014,6 +3094,7 @@
     if (!$('#syncModal').hidden) closeSync();
     if (!$('#bookModal').hidden) closeBookModal();
     if (!$('#bellModal').hidden) closeBell();
+    if (!$('#payModal').hidden) closePayModal();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
