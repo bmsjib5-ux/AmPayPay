@@ -2796,10 +2796,12 @@
           ? '<span class="bar-sub is-over">เกินงบ ' + esc(moneyShort.format(r.value - cap)) + ' (งบ ' + esc(moneyShort.format(cap)) + ')</span>'
           : '<span class="bar-sub">งบ ' + esc(moneyShort.format(cap)) + ' · ใช้ไป ' + Math.round(r.value / cap * 100) + '%</span>';
       }
+      var share = max ? r.value / max * 100 : 0;
       return '<div class="bar-row">' +
         '<span class="bar-name"><span class="bar-label" title="' + esc(r.label) + '">' +
           '<span class="bar-icon" aria-hidden="true">' + ReceiptParser.categoryIcon(r.key) + '</span>' + esc(r.label) + '</span>' + sub + '</span>' +
-        '<span class="bar-track"><span class="bar-fill' + (over ? ' is-over' : '') + '" style="width:' + (max ? Math.max(2, r.value / max * 100) : 0) + '%"></span></span>' +
+        '<span class="bar-track"><span class="bar-fill' + heatClass(share) + (over ? ' is-over' : '') +
+          '" style="width:' + (max ? Math.max(2, share) : 0) + '%"></span></span>' +
         '<span class="bar-value">' + moneyShort.format(r.value) + '<span class="bar-pct">' + pct + '%</span></span>' +
       '</div>';
     }).join('') : '<p class="empty"><span class="empty-icon" aria-hidden="true">🌱</span>เดือนนี้ยังไม่มีรายจ่ายเลย</p>';
@@ -2816,10 +2818,11 @@
     var totals = keys.map(function (k) { return sumOf(all.filter(function (e) { return monthKey(e.date) === k; })); });
     var maxT = Math.max.apply(null, totals.concat([1]));
     $('#trendChart').innerHTML = keys.map(function (k, idx) {
-      var h = Math.max(2, totals[idx] / maxT * 130);
+      var share = totals[idx] / maxT * 100;
+      var h = Math.max(2, share * 1.3);
       return '<div class="trend-col">' +
         '<span class="trend-val">' + (totals[idx] ? moneyShort.format(totals[idx]) : '–') + '</span>' +
-        '<span class="trend-bar' + (k === key ? ' is-current' : '') + '" style="height:' + h + 'px" title="' +
+        '<span class="trend-bar' + heatClass(share) + (k === key ? ' is-current' : '') + '" style="height:' + h + 'px" title="' +
           esc(monthLabel(k)) + ': ' + fmtMoney(totals[idx]) + '"></span>' +
       '</div>';
     }).join('');
@@ -2847,6 +2850,11 @@
         ' <span class="muted">· ' + m.count + ' ครั้ง</span></span>' +
         '<span class="r-amount">' + fmtMoney(m.total) + '</span></li>';
     }).join('') : '<li class="muted">ยังไม่มีข้อมูล</li>';
+  }
+
+  /* สีแท่งกราฟตามสัดส่วนเทียบกับแท่งที่สูงสุด — ยิ่งสูงยิ่งร้อน เขียว → ส้ม → แดง */
+  function heatClass(pct) {
+    return pct >= 80 ? ' is-hot' : pct >= 50 ? ' is-warm' : ' is-cool';
   }
 
   /* ---------------- สรุปรายจ่ายรายวัน ---------------- */
@@ -2913,10 +2921,11 @@
       var day = i + 1;
       var future = todayDay && day > todayDay;
       var wd = WEEKDAYS_TH[new Date(+parts[0], +parts[1] - 1, day).getDay()];
-      var h = v > 0 ? Math.max(3, Math.round(v / max * 92)) : 0;
+      var share = v > 0 ? v / max * 100 : 0;
+      var h = v > 0 ? Math.max(3, Math.round(share * 0.92)) : 0;
       return '<div class="day-col' + (day === todayDay ? ' is-today' : '') + (future ? ' is-future' : '') + '"' +
           ' title="' + esc(dayLabelShort(key, day) + ' (' + wd + ') · ' + (v ? fmtMoney(v) : 'ไม่มีรายจ่าย')) + '">' +
-        '<span class="day-bar" style="height:' + h + 'px"></span>' +
+        '<span class="day-bar' + heatClass(share) + '" style="height:' + h + 'px"></span>' +
         '<span class="day-num">' + day + '</span>' +
       '</div>';
     }).join('');
