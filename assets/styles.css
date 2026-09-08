@@ -1046,3 +1046,13 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .pay-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; background: var(--surface-2); border-radius: 10px; padding: 8px 12px; }
 .pay-hint { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
 .pay-body .row-actions { justify-content: center; }
+
+/* ---------- หน้าต่างส่งยอดให้เพื่อน: เลือกช่องทาง ---------- */
+.send-body { display: grid; gap: 10px; }
+.send-sum { display: flex; justify-content: space-between; align-items: baseline; font-size: 16px; }
+.send-sum b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.send-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 4px; }
+.send-options .action-card { min-height: 92px; padding: 12px 8px; }
+.send-options .action-card:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.ac-sub { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; text-align: center; }
+.action-card.is-primary .ac-sub { color: rgba(255, 255, 255, .85); }
