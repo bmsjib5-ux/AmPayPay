@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AmPayPay</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=44">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=44">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=45">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=45">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=44">
-<link rel="manifest" href="manifest.webmanifest?v=44">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=45">
+<link rel="manifest" href="manifest.webmanifest?v=45">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,25 +17,28 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=44">
+<link rel="stylesheet" href="assets/styles.css?v=45">
 </head>
 <body>
 <header class="topbar">
   <div class="wrap topbar-inner">
-    <h1 class="brand"><span aria-hidden="true">🧾</span> สมุดเก็บรายจ่ายของฉัน</h1>
+    <h1 class="brand"><span aria-hidden="true">🧾</span> AmPayPay</h1>
     <button id="bellBtn" class="icon-btn bell-btn" type="button" title="แจ้งเตือนจากเพื่อน" aria-label="แจ้งเตือน">🔔<span id="bellCount" class="bell-count" hidden></span></button>
     <button id="bgBtn" class="icon-btn" type="button" title="เปลี่ยนพื้นหลัง" aria-label="เปลี่ยนพื้นหลัง">🎨</button>
     <button id="syncBtn" class="icon-btn" type="button" title="ซิงก์ข้อมูลข้ามเครื่อง" aria-label="ซิงก์ข้อมูล">☁️</button>
     <button id="themeBtn" class="icon-btn" type="button" title="สลับธีมสว่าง/มืด" aria-label="สลับธีม">🌗</button>
   </div>
-  <nav class="wrap tabs" role="tablist" aria-label="เมนูหลัก">
+</header>
+<!-- เมนูหลักอยู่นอก header เพราะ backdrop-filter ของ header จะทำให้ position:fixed ของเมนูล่างบนมือถือไม่ทำงาน -->
+<nav class="tabbar" aria-label="เมนูหลัก">
+  <div class="wrap tabs" role="tablist">
     <button class="tab is-active" role="tab" aria-selected="true" data-tab="add"><span class="tab-ic" aria-hidden="true">📸</span><span class="tab-full">เพิ่มรายจ่าย</span><span class="tab-short">เพิ่ม</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="summary"><span class="tab-ic" aria-hidden="true">📊</span><span class="tab-full">สรุปรายจ่าย</span><span class="tab-short">สรุป</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="list"><span class="tab-ic" aria-hidden="true">🗂️</span><span class="tab-full">รายการทั้งหมด</span><span class="tab-short">รายการ</span></button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="debt"><span class="tab-ic" aria-hidden="true">🧑‍🤝‍🧑</span>ลูกหนี้<span id="debtBadge" class="pill tab-count" hidden></span></button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="friends"><span class="tab-ic" aria-hidden="true">👥</span>เพื่อน<span id="friendBadge" class="pill tab-count" hidden></span></button>
-  </nav>
-</header>
+    <button class="tab" role="tab" aria-selected="false" data-tab="debt"><span class="tab-ic" aria-hidden="true">🧑‍🤝‍🧑</span><span class="tab-label">ลูกหนี้</span><span id="debtBadge" class="pill tab-count" hidden></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="friends"><span class="tab-ic" aria-hidden="true">👥</span><span class="tab-label">เพื่อน</span><span id="friendBadge" class="pill tab-count" hidden></span></button>
+  </div>
+</nav>
 
 <div class="bookbar">
   <div class="wrap bookbar-inner">
@@ -52,13 +55,13 @@
   <section id="panel-add" class="panel is-active" role="tabpanel" aria-label="เพิ่มรายจ่าย">
     <div id="dropzone" class="dropzone" tabindex="0" role="button"
          aria-label="เลือกหรือลากรูปใบเสร็จมาวางที่นี่">
-      <div class="dz-icon" aria-hidden="true">📷</div>
-      <p class="dz-title">ลากรูปใบเสร็จมาวางตรงนี้ หรือกดเลือกไฟล์ได้เลย</p>
-      <p class="dz-sub">รองรับ JPG / PNG / HEIC หลายไฟล์พร้อมกัน · เรียงใบล่าสุดขึ้นก่อนให้อัตโนมัติ · อ่านข้อความไทย–อังกฤษในเครื่องคุณเอง</p>
-      <div class="dz-actions">
-        <button id="pickBtn" class="btn btn-primary" type="button">🖼️ เลือกรูปใบเสร็จ</button>
-        <button id="camBtn" class="btn" type="button">📷 ถ่ายรูป</button>
-        <button id="manualBtn" class="btn btn-ghost" type="button">✏️ กรอกเอง</button>
+      <div class="dz-icon" aria-hidden="true">🧾</div>
+      <p class="dz-title">เพิ่มใบเสร็จ</p>
+      <p class="dz-sub">ลากรูปมาวาง หรือเลือกด้านล่าง · อ่านในเครื่องคุณ ไม่ส่งรูปออกไปไหน</p>
+      <div class="action-grid">
+        <button id="pickBtn" class="action-card is-primary" type="button"><span class="ac-ic" aria-hidden="true">🖼️</span><span class="ac-label">เลือกรูป</span></button>
+        <button id="camBtn" class="action-card" type="button"><span class="ac-ic" aria-hidden="true">📷</span><span class="ac-label">ถ่ายรูป</span></button>
+        <button id="manualBtn" class="action-card" type="button"><span class="ac-ic" aria-hidden="true">✏️</span><span class="ac-label">กรอกเอง</span></button>
       </div>
       <input id="fileInput" class="sr-only" type="file" accept="image/*" multiple>
       <input id="camInput" class="sr-only" type="file" accept="image/*" capture="environment">
@@ -78,10 +81,9 @@
     <div id="queue" class="queue"></div>
 
     <details class="raw shortcut-help">
-      <summary>📲 ให้ iPhone ดึงใบเสร็จจากอัลบั้มมาให้เอง (ไม่ต้องเลือกรูปทีละใบ)</summary>
+      <summary>📲 ดึงใบเสร็จจากอัลบั้ม iPhone อัตโนมัติ</summary>
       <div class="shortcut-body">
-        <p>เว็บเปิดอัลบั้มรูปเองไม่ได้ (เบราว์เซอร์ห้ามไว้เพื่อความปลอดภัย) แต่แอป <b>คำสั่งลัด</b> (Shortcuts) ของ iPhone เปิดได้
-          จึงให้คำสั่งลัดเป็นคนหยิบรูปแล้วส่งข้อความมาให้แอปนี้แทน — สร้างครั้งเดียว ใช้ได้ตลอด</p>
+        <p>สร้าง <b>คำสั่งลัด</b> (Shortcuts) ครั้งเดียว ให้ iPhone หยิบรูปจากอัลบั้มแล้วส่งเข้าแอปนี้เอง</p>
         <ol>
           <li>เปิดแอป <b>คำสั่งลัด</b> (Shortcuts) → กด <b>+</b> สร้างคำสั่งลัดใหม่</li>
           <li>เพิ่ม <b>ค้นหารูปภาพ</b> (Find Photos) → ตั้งเงื่อนไข เช่น <i>อัลบั้ม คือ ใบเสร็จ</i>
@@ -106,17 +108,10 @@
           ถ้าคุณเพิ่มแอปนี้ไว้ที่หน้าจอโฮม iOS จะถือว่าเป็นคนละที่เก็บข้อมูลกับ Safari
           รายการที่เข้ามาทางคำสั่งลัดจะไปอยู่ใน Safari เท่านั้น —
           ให้เลือกใช้ทางใดทางหนึ่งไปเลย หรือเปิดซิงก์ ☁️ ทั้งสองฝั่งเพื่อให้ข้อมูลตรงกัน</p>
-        <p class="muted">ข้อความอยู่หลังเครื่องหมาย <code>#</code> จึง <b>ไม่ถูกส่งไปที่เซิร์ฟเวอร์</b> —
-          อ่านและแยกข้อมูลในเครื่องคุณเหมือนเดิม · ใบที่เคยบันทึกแล้วระบบยังกันซ้ำให้อัตโนมัติ ·
-          อยากให้ทำเองทุกวันก็ตั้งเป็น <b>ระบบอัตโนมัติ</b> (Automation) แบบ <i>เวลาของวัน</i> (Time of Day) ได้<br>
-          ชื่อเมนูในวงเล็บคือชื่อภาษาอังกฤษ เผื่อเครื่องคุณตั้งภาษาอังกฤษไว้ หรือ iOS รุ่นนั้นแปลไม่เหมือนกันเป๊ะ</p>
+        <p class="muted">อยากให้ทำเองทุกวัน ตั้งเป็น <b>ระบบอัตโนมัติ</b> (Automation) แบบ <i>เวลาของวัน</i> ได้ · ชื่อในวงเล็บคือชื่อเมนูภาษาอังกฤษ</p>
       </div>
     </details>
 
-    <p class="hint">
-      เคล็ดลับให้อ่านแม่น: ถ่ายใบเสร็จให้เต็มกรอบ แสงสม่ำเสมอ ไม่เอียง และไม่มีเงาทับตัวเลข ·
-      ถ้าอ่านผิดสามารถแก้ตัวเลขในช่องก่อนกดบันทึกได้เสมอ
-    </p>
   </section>
 
   <!-- ---------- แท็บ: สรุป ---------- -->
@@ -139,7 +134,7 @@
       <div class="tile">
         <span class="tile-label">จำนวนรายการ</span>
         <strong id="sumCount" class="tile-value">0</strong>
-        <span class="tile-foot">รายการที่บันทึกไว้</span>
+        <span class="tile-foot"></span>
       </div>
       <div class="tile">
         <span class="tile-label">เฉลี่ยต่อรายการ</span>
@@ -203,15 +198,14 @@
         <select id="fMonth"></select>
       </label>
     </div>
-    <div class="row-actions list-actions">
-      <span id="listSummary" class="muted"></span>
-      <span class="spacer"></span>
-      <button id="csvBtn" class="btn" type="button">📥 ดาวน์โหลด CSV</button>
-      <button id="backupBtn" class="btn" type="button">💾 สำรองข้อมูล</button>
-      <button id="restoreBtn" class="btn" type="button">♻️ กู้คืนข้อมูล</button>
-      <button id="wipeLocalBtn" class="btn btn-ghost btn-danger" type="button">🧹 ล้างข้อมูลในเครื่อง</button>
+    <div class="tool-grid">
+      <button id="csvBtn" class="action-card" type="button" title="ดาวน์โหลดเป็น CSV เปิดใน Excel ได้"><span class="ac-ic" aria-hidden="true">📥</span><span class="ac-label">CSV</span></button>
+      <button id="backupBtn" class="action-card" type="button" title="สำรองข้อมูลเป็นไฟล์"><span class="ac-ic" aria-hidden="true">💾</span><span class="ac-label">สำรอง</span></button>
+      <button id="restoreBtn" class="action-card" type="button" title="กู้คืนจากไฟล์สำรอง"><span class="ac-ic" aria-hidden="true">♻️</span><span class="ac-label">กู้คืน</span></button>
+      <button id="wipeLocalBtn" class="action-card is-danger" type="button" title="ล้างข้อมูลในเครื่องนี้"><span class="ac-ic" aria-hidden="true">🧹</span><span class="ac-label">ล้าง</span></button>
       <input id="restoreInput" class="sr-only" type="file" accept="application/json">
     </div>
+    <p id="listSummary" class="muted list-summary"></p>
     <div id="expenseList" class="cards"></div>
   </section>
 
@@ -220,14 +214,14 @@
     <section class="chart-card me-card">
       <div class="me-head">
         <h2 class="section-title">🪪 บัตรของฉัน</h2>
-        <p class="chart-sub">ให้เพื่อนสแกน QR นี้ด้วยกล้องมือถือ จะเพิ่มคุณเป็นเพื่อนในแอปของเขาทันที</p>
+        <p class="chart-sub">ให้เพื่อนสแกน QR เพื่อเพิ่มคุณเป็นเพื่อน</p>
       </div>
       <div id="meBody"></div>
     </section>
 
     <section class="chart-card">
       <h2 class="section-title">➕ เพิ่มเพื่อน</h2>
-      <p class="chart-sub">สแกน QR ของเพื่อนด้วยกล้องมือถือ หรือใส่อีเมลที่เขาใช้ล็อกอินแอปนี้</p>
+      <p class="chart-sub">สแกน QR ของเพื่อน หรือใส่อีเมลที่เขาใช้ล็อกอิน</p>
       <div class="grid2" style="margin-top:12px">
         <label class="field"><span class="field-label">ชื่อเล่น</span>
           <input type="text" id="newFriendName" placeholder="เช่น เอ"></label>
@@ -250,19 +244,19 @@
   <section id="panel-debt" class="panel" role="tabpanel" aria-label="ลูกหนี้" hidden>
     <div class="tiles">
       <div class="tile">
-        <span class="tile-label">เพื่อนค้างจ่ายรวม</span>
+        <span class="tile-label">เพื่อนค้างเรา</span>
         <strong id="debtTotal" class="tile-value">฿0</strong>
         <span id="debtFoot" class="tile-foot"></span>
       </div>
       <div class="tile">
-        <span class="tile-label">จำนวนคนที่ค้าง</span>
+        <span class="tile-label">คนที่ค้าง</span>
         <strong id="debtPeople" class="tile-value">0</strong>
-        <span class="tile-foot">นับเฉพาะที่ยังไม่จ่ายคืน</span>
+        <span class="tile-foot"></span>
       </div>
       <div class="tile">
-        <span class="tile-label">ได้คืนแล้วทั้งหมด</span>
+        <span class="tile-label">ได้คืนแล้ว</span>
         <strong id="debtPaid" class="tile-value">฿0</strong>
-        <span class="tile-foot">ยอดที่เพื่อนจ่ายคืนแล้ว</span>
+        <span class="tile-foot"></span>
       </div>
     </div>
 
@@ -270,7 +264,7 @@
       <div class="debt-head">
         <div>
           <h2 class="section-title">📨 หนี้ที่ฉันต้องจ่าย</h2>
-          <p class="chart-sub" id="incomingSub">เพื่อนส่งยอดมาให้คุณ</p>
+          <p class="chart-sub" id="incomingSub"></p>
         </div>
         <span id="incomingTotal" class="debt-total is-owed">฿0</span>
       </div>
@@ -284,16 +278,12 @@
 
     <div id="debtList" class="cards"></div>
 
-    <p class="hint">
-      วิธีใช้: ตอนบันทึกรายจ่าย เปิดหัวข้อ “➗ หารกับเพื่อน / ออกให้ก่อน” ใส่ชื่อเพื่อนกับยอดที่เขาต้องคืน ·
-      ยอดรายจ่ายยังนับเต็มจำนวนที่คุณจ่ายจริง ส่วนที่เพื่อนค้างจะมาโผล่ในหน้านี้
-    </p>
   </section>
 </main>
 
 <footer class="wrap foot">
-  ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
-  <span class="ver">เวอร์ชัน 44</span>
+  ข้อมูลเก็บในเครื่องของคุณ · เปิดซิงก์ ☁️ เมื่ออยากใช้หลายเครื่อง
+  <span class="ver">เวอร์ชัน 45</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -318,8 +308,7 @@
       <button class="btn btn-ghost btn-sm" type="button" id="bellReadAllBtn">อ่านทั้งหมดแล้ว</button>
     </div>
     <div id="pushBox" class="push-box"></div>
-    <p class="muted" style="font-size:12.5px;margin:10px 0 0">แอปเช็กอัปเดตจากเพื่อนให้เองทุก 2 นาทีขณะเปิดอยู่ · จำนวนที่ยังไม่ได้อ่านจะโชว์บนชื่อแท็บของเบราว์เซอร์
-      และบนไอคอนแอปที่ติดตั้งไว้ (ถ้าอุปกรณ์รองรับ)</p>
+    <p class="muted" style="font-size:12.5px;margin:10px 0 0">เช็กอัปเดตให้เองทุก 2 นาที · ยอดที่ยังไม่อ่านโชว์บนแท็บเบราว์เซอร์และไอคอนแอป</p>
   </div>
 </div>
 
@@ -354,11 +343,11 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=44"></script>
-<script src="assets/config.js?v=44"></script>
-<script src="assets/parser.js?v=44"></script>
-<script src="assets/store.js?v=44"></script>
-<script src="assets/sync.js?v=44"></script>
-<script src="assets/app.js?v=44"></script>
+<script src="assets/vendor/qrcode.js?v=45"></script>
+<script src="assets/config.js?v=45"></script>
+<script src="assets/parser.js?v=45"></script>
+<script src="assets/store.js?v=45"></script>
+<script src="assets/sync.js?v=45"></script>
+<script src="assets/app.js?v=45"></script>
 </body>
 </html>

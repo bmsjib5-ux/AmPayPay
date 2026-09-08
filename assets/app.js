@@ -565,9 +565,8 @@
     var owed = list.filter(function (c) { return c.status !== 'confirmed'; })
       .reduce(function (a, c) { return a + c.amount; }, 0);
     $('#incomingTotal').textContent = fmtMoney(owed);
-    $('#incomingSub').textContent = owed > 0.005
-      ? 'คุณต้องจ่ายคืนเพื่อนรวม ' + fmtMoney(owed)
-      : 'เคลียร์ครบแล้ว 🎉';
+    var pendingN = list.filter(function (c) { return c.status !== 'confirmed'; }).length;
+    $('#incomingSub').textContent = owed > 0.005 ? 'รอจ่าย ' + pendingN + ' รายการ' : 'เคลียร์ครบแล้ว 🎉';
 
     $('#incomingList').innerHTML = list.map(function (c) {
       var who = c.fromName || c.fromEmail;
