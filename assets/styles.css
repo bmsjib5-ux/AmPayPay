@@ -124,6 +124,7 @@ img { max-width: 100%; display: block; }
 .topbar-inner { display: flex; align-items: center; gap: 12px; padding-block: 12px; }
 .brand { font-size: 18px; letter-spacing: -.01em; }
 .icon-btn {
+  flex: none;
   margin-left: auto; border: 1px solid var(--border); background: var(--surface-1);
   color: var(--text-secondary); border-radius: 999px; width: 36px; height: 36px;
   font-size: 16px; cursor: pointer;
@@ -218,6 +219,8 @@ details.raw pre {
 }
 @media (max-width: 560px) {
   .rcard { grid-template-columns: 84px 1fr; gap: 12px; }
+  /* กล่องหารบิลอยู่ใต้รูปย่ออยู่แล้ว จึงยืดออกมาเต็มความกว้างการ์ดให้พิมพ์ชื่อ/เลือกเพื่อนได้สะดวก */
+  .rcard .split-box { margin-left: -96px; }
 }
 
 /* ---------- summary tiles ---------- */
@@ -797,14 +800,18 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .split-tools .field { max-width: 150px; }
 .split-rows { display: grid; gap: 8px; }
 .split-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) 110px auto auto; gap: 8px; align-items: center;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 110px auto auto; gap: 8px; align-items: center;
 }
+/* เลือกชื่อจากรายชื่อเพื่อน หรือพิมพ์เองในช่องข้างๆ ก็ได้ */
+.split-row .sp-pick { width: auto; max-width: 132px; padding-inline: 8px 26px; }
 .split-row .sp-amt { text-align: right; font-variant-numeric: tabular-nums; }
 .sp-paid { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
 .sp-paid input { min-height: 0; width: 18px; height: 18px; accent-color: var(--good); }
 .split-foot { font-size: 12.5px; line-height: 1.6; }
 @media (max-width: 560px) {
-  .split-row { grid-template-columns: minmax(0, 1fr) 96px auto; grid-template-areas: "name amt del" "paid paid paid"; row-gap: 6px; }
+  /* จอแคบ: ช่องเลือกเพื่อนลงมาอยู่แถวเดียวกับ "คืนแล้ว" เพื่อให้ช่องชื่อกว้างพอพิมพ์ */
+  .split-row { grid-template-columns: minmax(0, 1fr) 96px auto; grid-template-areas: "name amt del" "pick paid paid"; row-gap: 6px; }
+  .split-row .sp-pick { grid-area: pick; max-width: none; }
   .split-row .sp-name { grid-area: name; }
   .split-row .sp-amt { grid-area: amt; }
   .split-row [data-split="del"] { grid-area: del; }
@@ -943,3 +950,26 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .friend-row .book-count { display: flex; gap: 8px; flex-wrap: wrap; }
 .friend-owe { color: var(--warn-ink); font-weight: 600; }
 .friend-owed { color: var(--ok-ink); font-weight: 600; }
+
+/* ---------- กระดิ่งแจ้งเตือนจากเพื่อน ---------- */
+.bell-btn { position: relative; }
+.bell-count {
+  position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px;
+  border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
+  line-height: 19px; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--surface-1);
+  animation: pop-in .3s var(--ease) both;
+}
+.bell-btn.has-new { animation: ring 1.2s var(--ease) 1; }
+@keyframes ring { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-16deg); } 40% { transform: rotate(14deg); } 60% { transform: rotate(-8deg); } 80% { transform: rotate(6deg); } }
+.bell-list { display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.bell-item {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px;
+  background: var(--surface-2); cursor: pointer; text-align: left; border: 0; width: 100%; color: inherit; font: inherit;
+}
+.bell-item.is-new { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.bell-ic { font-size: 20px; line-height: 1.2; }
+.bell-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.bell-title { font-weight: 600; }
+.bell-sub { font-size: 12.5px; color: var(--text-secondary); }
+.bell-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+@media (max-width: 420px) { .topbar-inner { gap: 8px; } .brand { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .brand > span[aria-hidden] { flex: none; } }

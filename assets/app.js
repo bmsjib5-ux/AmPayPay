@@ -286,6 +286,152 @@
     toast(already ? (parsed.name || parsed.email) + ' อยู่ในรายชื่อเพื่อนอยู่แล้ว' : 'เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
   }
 
+  /* ---------- กระดิ่ง: เหตุการณ์จากเพื่อน (ส่งยอดมา / แจ้งจ่ายแล้ว / ยืนยันรับเงิน) ---------- */
+  function friendLabel(email) {
+    var f = ExpenseStore.friends.get(email);
+    return (f && f.name) || email;
+  }
+  function timeAgo(ts) {
+    var d = Date.now() - (Number(ts) || 0);
+    if (d < 60e3) return 'เมื่อกี้';
+    if (d < 3600e3) return Math.floor(d / 60e3) + ' นาทีที่แล้ว';
+    if (d < 86400e3) return Math.floor(d / 3600e3) + ' ชม.ที่แล้ว';
+    return dateLabel(new Date(Number(ts) || 0).toISOString().slice(0, 10));
+  }
+  function bellEvents() {
+    var me = myEmail();
+    if (!me) return [];
+    var seen = ExpenseStore.claims.seen.get();
+    var out = [];
+    ExpenseStore.claims.all().forEach(function (c) {
+      var ev = null;
+      var who = c.fromName || friendLabel(c.fromEmail);
+      if (c.toEmail === me && c.fromEmail !== me) {
+        if (c.status === 'pending') ev = { icon: '🧾', title: who + ' ส่งยอด ' + fmtMoney(c.amount) + ' มาให้คุณ', sub: c.note };
+        else if (c.status === 'confirmed') ev = { icon: '✅', title: who + ' ยืนยันรับเงิน ' + fmtMoney(c.amount) + ' แล้ว', sub: c.note };
+        else if (c.status === 'cancelled') ev = { icon: '🚫', title: who + ' ยกเลิกยอด ' + fmtMoney(c.amount), sub: c.note };
+      } else if (c.fromEmail === me && c.status === 'paid') {
+        ev = { icon: '💸', title: friendLabel(c.toEmail) + ' แจ้งว่าจ่าย ' + fmtMoney(c.amount) + ' แล้ว', sub: (c.reply ? '“' + c.reply + '” · ' : '') + c.note };
+      }
+      if (!ev) return;
+      ev.key = c.id + ':' + c.status;
+      ev.at = c.updatedAt || 0;
+      ev.unseen = !seen[ev.key];
+      out.push(ev);
+    });
+    return out.sort(function (a, b) { return b.at - a.at; }).slice(0, 50);
+  }
+  var bellShownCount = -1;
+  function renderBell() {
+    var btn = $('#bellBtn'), badge = $('#bellCount');
+    var list = bellEvents();
+    var n = list.filter(function (e) { return e.unseen; }).length;
+    badge.hidden = n === 0;
+    badge.textContent = n ? (n > 99 ? '99+' : String(n)) : '';
+    btn.title = n ? 'มีแจ้งเตือนใหม่ ' + n + ' รายการ' : 'แจ้งเตือนจากเพื่อน';
+    btn.setAttribute('aria-label', btn.title);
+    if (n > bellShownCount && bellShownCount >= 0) {
+      btn.classList.remove('has-new'); void btn.offsetWidth; btn.classList.add('has-new');
+      toast('🔔 ' + list.filter(function (e) { return e.unseen; })[0].title);
+    }
+    bellShownCount = n;
+    reflectBellOutside(n, list);
+    if (!$('#bellModal').hidden) renderBellList();
+  }
+
+  /* ให้เห็นจำนวนแจ้งเตือนจากนอกหน้าแอปด้วย: ชื่อแท็บเบราว์เซอร์ (เดสก์ท็อป), ตัวเลขบนไอคอนแอปที่ติดตั้งไว้,
+     และแจ้งเตือนของระบบเมื่อผู้ใช้อนุญาต (เด้งเฉพาะรายการที่ยังไม่เคยเด้ง) */
+  var baseTitle = document.title;
+  var systemNotified = {};
+  try { systemNotified = JSON.parse(localStorage.getItem('expense-book:notified:v1') || '{}') || {}; } catch (e) {}
+  function reflectBellOutside(n, list) {
+    document.title = (n ? '(' + n + ') ' : '') + baseTitle;
+    try {
+      if (navigator.setAppBadge) { if (n) navigator.setAppBadge(n); else navigator.clearAppBadge(); }
+    } catch (e) {}
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    var fresh = list.filter(function (e) { return e.unseen && !systemNotified[e.key]; });
+    if (!fresh.length) return;
+    fresh.forEach(function (e) { systemNotified[e.key] = Date.now(); });
+    try { localStorage.setItem('expense-book:notified:v1', JSON.stringify(systemNotified)); } catch (e) {}
+    try {
+      var top = fresh[0];
+      var body = fresh.length > 1 ? top.title + ' และอีก ' + (fresh.length - 1) + ' รายการ' : top.title + (top.sub ? '\n' + top.sub : '');
+      var note = new Notification('🔔 สมุดรายจ่าย', { body: body, icon: 'assets/icon-192.png', tag: 'expense-book-bell' });
+      note.onclick = function () { window.focus(); openBell(); note.close(); };
+    } catch (e) {}
+  }
+  function renderNotifyPerm() {
+    var btn = $('#bellPermBtn');
+    if (!btn) return;
+    var supported = 'Notification' in window;
+    btn.hidden = !supported || Notification.permission === 'granted';
+    btn.disabled = supported && Notification.permission === 'denied';
+    btn.textContent = supported && Notification.permission === 'denied'
+      ? 'การแจ้งเตือนของระบบถูกปิดไว้ (เปิดได้ในตั้งค่าเบราว์เซอร์)'
+      : '🔔 เปิดแจ้งเตือนของระบบ';
+  }
+  $('#bellPermBtn').addEventListener('click', function () {
+    if (!('Notification' in window)) return;
+    Notification.requestPermission().then(function (perm) {
+      renderNotifyPerm();
+      toast(perm === 'granted' ? 'เปิดแจ้งเตือนของระบบแล้ว จะเด้งเมื่อมีอัปเดตจากเพื่อน' : 'ยังไม่ได้อนุญาตการแจ้งเตือน');
+    }).catch(function () {});
+  });
+  function renderBellList() {
+    var body = $('#bellBody');
+    if (!syncReady()) {
+      body.innerHTML = '<p class="banner is-warn" style="margin:0">ต้องล็อกอิน ☁️ ก่อน — แจ้งเตือนจะมาเมื่อเพื่อนส่งยอดหนี้ แจ้งว่าจ่ายแล้ว หรือยืนยันรับเงิน</p>';
+      return;
+    }
+    var list = bellEvents();
+    body.innerHTML = list.length ? '<div class="bell-list">' + list.map(function (e) {
+      return '<button type="button" class="bell-item' + (e.unseen ? ' is-new' : '') + '" data-bell="open" data-key="' + esc(e.key) + '">' +
+        '<span class="bell-ic" aria-hidden="true">' + e.icon + '</span>' +
+        '<span class="bell-text"><span class="bell-title">' + esc(e.title) + '</span>' +
+          (e.sub ? '<span class="bell-sub">' + esc(e.sub) + '</span>' : '') + '</span>' +
+        '<span class="bell-time">' + esc(timeAgo(e.at)) + '</span>' +
+      '</button>';
+    }).join('') + '</div>'
+    : '<p class="empty"><span class="empty-icon" aria-hidden="true">🔕</span>ยังไม่มีแจ้งเตือน<br>' +
+      '<span class="muted">เมื่อเพื่อนส่งยอดหนี้มา แจ้งว่าจ่ายแล้ว หรือยืนยันรับเงิน จะมาขึ้นที่นี่</span></p>';
+  }
+  function openBell() {
+    $('#bellModal').hidden = false;
+    renderBellList();
+    renderNotifyPerm();
+    if (syncReady() && !ownerConflict() && Date.now() - lastSyncFinished > 30e3) runSync(true);
+  }
+  function closeBell() {
+    $('#bellModal').hidden = true;
+    ExpenseStore.claims.seen.mark(bellEvents().map(function (e) { return e.key; }));   // เปิดดูแล้วถือว่าอ่านแล้ว
+    renderBell();
+    renderDebtBadge();
+  }
+  $('#bellBtn').addEventListener('click', openBell);
+  $('#bellModal').addEventListener('click', function (ev) {
+    if (ev.target === this) { closeBell(); return; }
+    var btn = ev.target.closest('[data-bell]');
+    if (!btn) return;
+    if (btn.dataset.bell === 'close') closeBell();
+    else if (btn.dataset.bell === 'open') {
+      closeBell();
+      var tab = document.querySelector('.tab[data-tab="debt"]');
+      if (tab) tab.click();
+    }
+  });
+  $('#bellReadAllBtn').addEventListener('click', function () {
+    ExpenseStore.claims.seen.mark(bellEvents().map(function (e) { return e.key; }));
+    renderBell(); renderBellList(); renderDebtBadge();
+  });
+  $('#bellRefreshBtn').addEventListener('click', function () {
+    if (!syncReady()) { toast('ต้องล็อกอิน ☁️ ก่อน'); return; }
+    var btn = this; btn.disabled = true;
+    CloudSync.syncNow().then(function () { renderBellList(); toast('เช็กแล้ว'); })
+      .catch(function (e) { toast('เช็กไม่สำเร็จ: ' + e.message); })
+      .then(function () { btn.disabled = false; });
+  });
+
   /* ---------- ฝั่งลูกหนี้: หนี้ที่เพื่อนส่งมา ---------- */
   function renderIncoming() {
     var card = $('#incomingCard');
@@ -357,7 +503,7 @@
     })[0];
     var email = prompt('ส่งยอด ' + fmtMoney(person.amount) + ' ของ "' + person.name + '" ไปที่อีเมลไหน?' +
       (friends.length ? '\n\nเพื่อนในรายชื่อ: ' + friends.map(function (f) { return f.name || f.email; }).join(', ') : ''),
-      guess ? guess.email : '');
+      person.email || (guess ? guess.email : ''));
     if (email === null) return;
     email = String(email).trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast('อีเมลไม่ถูกต้อง'); return; }
@@ -376,6 +522,42 @@
     }).then(function () { return CloudSync.syncNow(); })
       .then(function () { renderDebts(); toast('ส่งยอดให้ ' + email + ' แล้ว'); })
       .catch(function (e) { toast('ส่งไม่สำเร็จ: ' + e.message); });
+  }
+
+  /* บันทึกรายจ่ายที่หารกับเพื่อนที่เลือกจากรายชื่อ → ส่งใบแจ้งหนี้ให้เขาเลยโดยไม่ต้องกดส่งเอง
+     เครื่องเพื่อนจะได้กระดิ่งแจ้งเตือนตอนซิงก์ครั้งถัดไป */
+  function autoSendClaims(expenseId) {
+    if (!syncReady() || ownerConflict()) return Promise.resolve(0);
+    var exp = ExpenseStore.get(expenseId);
+    if (!exp) return Promise.resolve(0);
+    var me = myEmail();
+    var jobs = [];
+    splitOf(exp).forEach(function (p) {
+      if (!p.email || p.email === me) return;
+      var existing = claimOfPerson(expenseId, p.id);
+      if (existing && (existing.status !== 'pending' || Math.abs(existing.amount - p.amount) < 0.005)) return;
+      if (!existing && p.paid) return;
+      jobs.push({
+        id: existing ? existing.id : ('c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+        toEmail: p.email,
+        amount: p.amount,
+        note: exp.merchant + ' · ' + dateLabel(exp.date),
+        expenseId: expenseId,
+        personId: p.id,
+        fromName: myName(),
+        status: existing ? existing.status : 'pending'
+      });
+    });
+    if (!jobs.length) return Promise.resolve(0);
+    return Promise.all(jobs.map(function (c) { return CloudSync.sendClaim(c); }))
+      .then(function () { return CloudSync.syncNow(); })
+      .then(function () {
+        renderDebtBadge();
+        if ($('#panel-debt').classList.contains('is-active')) renderDebts();
+        toast('📨 ส่งแจ้งยอดให้เพื่อน ' + jobs.length + ' คนแล้ว');
+        return jobs.length;
+      })
+      .catch(function (e) { toast('ส่งแจ้งยอดให้เพื่อนไม่สำเร็จ: ' + e.message); return 0; });
   }
 
   function confirmClaim(id) {
@@ -517,10 +699,22 @@
       '</div>' +
     '</details>';
   }
+  function friendPicker(selected) {
+    var friends = ExpenseStore.friends.all();
+    if (!friends.length) return '';
+    return '<select class="sp-pick" aria-label="เลือกจากรายชื่อเพื่อน" title="เลือกจากรายชื่อเพื่อน">' +
+      '<option value="">👥 เลือกเพื่อน</option>' +
+      friends.map(function (f) {
+        return '<option value="' + esc(f.email) + '"' + (f.email === selected ? ' selected' : '') + '>' +
+          esc(f.name || f.email) + '</option>';
+      }).join('') +
+    '</select>';
+  }
   function splitRow(p) {
     p = p || {};
-    return '<div class="split-row" data-pid="' + esc(p.id || '') + '">' +
-      '<input type="text" class="sp-name" placeholder="ชื่อเพื่อน" value="' + esc(p.name || '') + '">' +
+    return '<div class="split-row" data-pid="' + esc(p.id || '') + '" data-email="' + esc(p.email || '') + '">' +
+      friendPicker(p.email || '') +
+      '<input type="text" class="sp-name" placeholder="ชื่อเพื่อน (พิมพ์เองได้)" value="' + esc(p.name || '') + '">' +
       '<input type="number" class="sp-amt" min="0" step="0.01" placeholder="0.00" value="' +
         (p.amount != null ? p.amount : '') + '">' +
       '<label class="sp-paid"><input type="checkbox" class="sp-cb"' + (p.paid ? ' checked' : '') + '> คืนแล้ว</label>' +
@@ -535,6 +729,7 @@
       people.push({
         id: row.dataset.pid || '',
         name: $('.sp-name', row).value,
+        email: row.dataset.email || '',
         amount: amount,
         paid: $('.sp-cb', row).checked
       });
@@ -582,6 +777,24 @@
     if (act === 'even') splitEven(box);
     else if (act === 'add') { $('.split-rows', box).insertAdjacentHTML('beforeend', splitRow({})); refreshSplitFoot(box); }
     else if (act === 'del') { btn.closest('.split-row').remove(); refreshSplitFoot(box); }
+  });
+  /* เลือกเพื่อนจากรายชื่อ → ใส่ชื่อให้และจำอีเมลไว้ (ส่งยอดให้เพื่อนอัตโนมัติตอนบันทึก)
+     พิมพ์ชื่อเองก็ได้ ถ้าชื่อตรงกับเพื่อนในรายชื่อพอดีจะจับคู่อีเมลให้เอง */
+  document.addEventListener('change', function (ev) {
+    if (!ev.target.matches || !ev.target.matches('.sp-pick')) return;
+    var row = ev.target.closest('.split-row');
+    var f = ev.target.value ? ExpenseStore.friends.get(ev.target.value) : null;
+    row.dataset.email = f ? f.email : '';
+    if (f) $('.sp-name', row).value = f.name || f.email;
+  });
+  document.addEventListener('input', function (ev) {
+    if (!ev.target.matches || !ev.target.matches('.sp-name')) return;
+    var row = ev.target.closest('.split-row');
+    var typed = ev.target.value.trim().toLowerCase();
+    var match = ExpenseStore.friends.all().filter(function (f) { return (f.name || '').trim().toLowerCase() === typed; })[0];
+    var pick = $('.sp-pick', row);
+    if (match) { row.dataset.email = match.email; if (pick) pick.value = match.email; }
+    /* แก้ชื่อของคนที่เลือกไว้เล็กน้อย ยังถือว่าเป็นคนเดิม จึงไม่ล้างอีเมล */
   });
   ['input', 'change'].forEach(function (evt) {
     document.addEventListener(evt, function (ev) {
@@ -746,8 +959,7 @@
     incomingClaims().forEach(function (c) {
       if (c.status === 'pending' || c.status === 'paid') { mine += c.amount; mineCount++; }
     });
-    var news = incomingClaims().filter(function (c) { return c.status === 'pending'; }).length +
-      outgoingClaims().filter(function (c) { return c.status === 'paid'; }).length;
+    var news = bellEvents().filter(function (e) { return e.unseen; }).length;
     var count = owedCount + mineCount;
     badge.hidden = count === 0;
     badge.textContent = count ? (count > 99 ? '99+' : String(count)) : '';
@@ -1440,6 +1652,7 @@
     if (!res.result.ok) toast('พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — บันทึกข้อมูลแล้วแต่ต้องลบรูปย่อบางส่วนออก');
     removeCard(card);
     renderBudgetAlert();
+    autoSendClaims(res.record.id);
     return res.record.date;
   }
 
@@ -2119,6 +2332,7 @@
       renderList();
       renderBudgetAlert();
       renderDebtBadge();
+      autoSendClaims(id);
       toast(saveToast(patch.date, 'แก้ไขเรียบร้อย'));
     }
   });
@@ -2625,6 +2839,7 @@
     if (!$('#bgModal').hidden) closeBgModal();
     if (!$('#syncModal').hidden) closeSync();
     if (!$('#bookModal').hidden) closeBookModal();
+    if (!$('#bellModal').hidden) closeBell();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
@@ -2644,6 +2859,7 @@
   renderBudgetAlert();
   renderDebtBadge();
   renderFriendBadge();
+  renderBell();
   importFromHash();
   importFriendFromHash();
   window.addEventListener('hashchange', function () { importFromHash(); importFriendFromHash(); });
@@ -2686,12 +2902,21 @@
   })();
 
   renderSyncBadge();
-  ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); renderFriendBadge(); });
+  ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); renderFriendBadge(); renderBell(); });
   CloudSync.onState(function () {
     renderDebtBadge();
+    renderBell();
     if ($('#panel-debt').classList.contains('is-active')) renderDebts();
     if ($('#panel-friends').classList.contains('is-active')) renderFriendsTab();
   });
+  /* เช็กแจ้งเตือนจากเพื่อนเป็นระยะขณะเปิดแอปอยู่ และทันทีที่กลับมาเปิดแอป */
+  setInterval(function () {
+    if (document.visibilityState === 'visible' && syncReady() && !ownerConflict()) runSync(true);
+  }, 120e3);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && syncReady() && !ownerConflict() && Date.now() - lastSyncFinished > 60e3) runSync(true);
+  });
+
   if (CloudSync.isConfigured()) {
     var cameFromEmailLink = /access_token=|error_description=/.test(location.hash);
     CloudSync.init().then(function (session) {
