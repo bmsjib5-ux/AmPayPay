@@ -109,6 +109,9 @@ create table if not exists public.debt_claims (
   updated_at  timestamptz not null default now()
 );
 
+-- รูปย่อใบเสร็จ (data URL ขนาดเล็ก) ให้ลูกหนี้เปิดดูได้ว่าเป็นบิลอะไร
+alter table public.debt_claims add column if not exists image text not null default '';
+
 -- พร้อมเพย์ของเจ้าหนี้ (เบอร์/เลขบัตร) ให้ลูกหนี้สแกน QR โอนคืนได้ทันที
 alter table public.debt_claims add column if not exists promptpay text not null default '';
 
@@ -197,6 +200,7 @@ begin
   new.expense_id := old.expense_id;
   new.person_id  := old.person_id;
   new.promptpay  := old.promptpay;
+  new.image      := old.image;
   new.deleted    := old.deleted;
   new.created_at := old.created_at;
   if new.status not in ('pending', 'paid') then  -- ยืนยันรับเงินได้เฉพาะเจ้าหนี้

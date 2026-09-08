@@ -128,6 +128,7 @@ window.CloudSync = (function () {
       status: row.status || 'pending',
       reply: row.reply || '',
       promptpay: row.promptpay || '',
+      image: (row.image && /^data:image\//.test(row.image)) ? row.image : '',
       deleted: !!row.deleted,
       createdAt: Date.parse(row.created_at) || Date.now(),
       updatedAt: Date.parse(row.updated_at) || Date.now()
@@ -348,14 +349,15 @@ window.CloudSync = (function () {
           status: claim.status || 'pending',
           reply: claim.reply || '',
           promptpay: String(claim.promptpay || '').slice(0, 40),
+          image: (claim.image && /^data:image\//.test(claim.image) && claim.image.length <= 150000) ? claim.image : '',
           deleted: false,
           updated_at: new Date().toISOString()
         };
         return c.from('debt_claims').upsert(row, { onConflict: 'id' }).then(function (up) {
           /* ตารางเวอร์ชันเก่ายังไม่มีคอลัมน์ promptpay → ส่งแบบไม่มีคอลัมน์นั้นแทน */
-          if (up.error && /promptpay/.test(up.error.message || '')) {
-            featureNote = 'QR พร้อมเพย์ในใบแจ้งหนี้ยังใช้ไม่ได้ — รันไฟล์ supabase/schema.sql ซ้ำอีกครั้งก่อน';
-            var row2 = Object.assign({}, row); delete row2.promptpay;
+          if (up.error && /promptpay|image/.test(up.error.message || '')) {
+            featureNote = 'QR พร้อมเพย์/รูปใบเสร็จในใบแจ้งหนี้ยังใช้ไม่ได้ — รันไฟล์ supabase/schema.sql ซ้ำอีกครั้งก่อน';
+            var row2 = Object.assign({}, row); delete row2.promptpay; delete row2.image;
             return c.from('debt_claims').upsert(row2, { onConflict: 'id' });
           }
           return up;
