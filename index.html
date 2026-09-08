@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AmPayPay</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=45">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=45">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=46">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=46">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=45">
-<link rel="manifest" href="manifest.webmanifest?v=45">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=46">
+<link rel="manifest" href="manifest.webmanifest?v=46">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=45">
+<link rel="stylesheet" href="assets/styles.css?v=46">
 </head>
 <body>
 <header class="topbar">
@@ -283,7 +283,7 @@
 
 <footer class="wrap foot">
   ข้อมูลเก็บในเครื่องของคุณ · เปิดซิงก์ ☁️ เมื่ออยากใช้หลายเครื่อง
-  <span class="ver">เวอร์ชัน 45</span>
+  <span class="ver">เวอร์ชัน 46</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -309,6 +309,16 @@
     </div>
     <div id="pushBox" class="push-box"></div>
     <p class="muted" style="font-size:12.5px;margin:10px 0 0">เช็กอัปเดตให้เองทุก 2 นาที · ยอดที่ยังไม่อ่านโชว์บนแท็บเบราว์เซอร์และไอคอนแอป</p>
+  </div>
+</div>
+
+<div id="payModal" class="modal" hidden>
+  <div class="modal-card pay-card" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+    <div class="modal-head">
+      <h2 id="payTitle" class="section-title">💳 โอนคืนด้วยพร้อมเพย์</h2>
+      <button class="btn btn-ghost btn-sm" type="button" data-pay="close" aria-label="ปิด">✕</button>
+    </div>
+    <div id="payBody"></div>
   </div>
 </div>
 
@@ -343,11 +353,12 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=45"></script>
-<script src="assets/config.js?v=45"></script>
-<script src="assets/parser.js?v=45"></script>
-<script src="assets/store.js?v=45"></script>
-<script src="assets/sync.js?v=45"></script>
-<script src="assets/app.js?v=45"></script>
+<script src="assets/vendor/qrcode.js?v=46"></script>
+<script src="assets/promptpay.js?v=46"></script>
+<script src="assets/config.js?v=46"></script>
+<script src="assets/parser.js?v=46"></script>
+<script src="assets/store.js?v=46"></script>
+<script src="assets/sync.js?v=46"></script>
+<script src="assets/app.js?v=46"></script>
 </body>
 </html>

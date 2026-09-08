@@ -1035,3 +1035,14 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 /* ปุ่มไอคอนบนหัวเกาะกลุ่มชิดขวา แทนที่จะกระจายเต็มแถบ */
 .topbar-inner .icon-btn { margin-left: 8px; }
 .topbar-inner .icon-btn:first-of-type { margin-left: auto; }
+
+/* ---------- QR พร้อมเพย์สำหรับโอนคืน ---------- */
+.pay-card { max-width: 400px; }
+.pay-body { display: grid; gap: 10px; justify-items: center; text-align: center; }
+.pay-qr { width: 232px; height: 232px; padding: 12px; background: #fff; border-radius: 16px; border: 1px solid var(--border-soft); box-shadow: var(--shadow); }
+.pay-qr svg { width: 100%; height: 100%; display: block; }
+.pay-amount { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pay-to { font-size: 14px; color: var(--text-secondary); }
+.pay-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; background: var(--surface-2); border-radius: 10px; padding: 8px 12px; }
+.pay-hint { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+.pay-body .row-actions { justify-content: center; }

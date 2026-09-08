@@ -109,6 +109,9 @@ create table if not exists public.debt_claims (
   updated_at  timestamptz not null default now()
 );
 
+-- พร้อมเพย์ของเจ้าหนี้ (เบอร์/เลขบัตร) ให้ลูกหนี้สแกน QR โอนคืนได้ทันที
+alter table public.debt_claims add column if not exists promptpay text not null default '';
+
 create index if not exists debt_claims_to_email_idx
   on public.debt_claims (lower(to_email), updated_at desc);
 create index if not exists debt_claims_from_user_idx
@@ -193,6 +196,7 @@ begin
   new.note       := old.note;
   new.expense_id := old.expense_id;
   new.person_id  := old.person_id;
+  new.promptpay  := old.promptpay;
   new.deleted    := old.deleted;
   new.created_at := old.created_at;
   if new.status not in ('pending', 'paid') then  -- ยืนยันรับเงินได้เฉพาะเจ้าหนี้
