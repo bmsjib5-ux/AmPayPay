@@ -370,6 +370,35 @@ window.CloudSync = (function () {
       });
     },
 
+    /* ---------- push แจ้งเตือน: จดเครื่องนี้ไว้ให้ Edge Function ส่งหาได้ ---------- */
+    savePushSubscription: function (sub) {
+      return getClient().then(function (c) {
+        if (!session || !session.user) throw new Error('ยังไม่ได้ล็อกอิน');
+        var j = typeof sub.toJSON === 'function' ? sub.toJSON() : sub;
+        var row = {
+          endpoint: j.endpoint,
+          user_id: session.user.id,
+          email: String(session.user.email || '').toLowerCase(),
+          p256dh: (j.keys && j.keys.p256dh) || '',
+          auth: (j.keys && j.keys.auth) || '',
+          user_agent: String(navigator.userAgent || '').slice(0, 200),
+          updated_at: new Date().toISOString()
+        };
+        return c.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' }).then(function (up) {
+          if (up.error) throw new Error(friendly(up.error));
+          return true;
+        });
+      });
+    },
+    removePushSubscription: function (endpoint) {
+      return getClient().then(function (c) {
+        return c.from('push_subscriptions').delete().eq('endpoint', endpoint).then(function (res) {
+          if (res.error) throw new Error(friendly(res.error));
+          return true;
+        });
+      });
+    },
+
     /* ให้แอปห้ามซิงก์ได้ เช่น ตอนข้อมูลในเครื่องเป็นของอีกบัญชีและยังไม่ได้ตัดสินใจ */
     setGuard: function (fn) { guard = fn; },
     /* ชื่อเล่นจากบัตรของฉัน ใส่ไปกับแถวเพื่อน เพื่อให้ฝั่งที่ถูกเพิ่มเห็นชื่อเรา */

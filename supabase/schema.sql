@@ -114,12 +114,28 @@ create index if not exists debt_claims_to_email_idx
 create index if not exists debt_claims_from_user_idx
   on public.debt_claims (from_user, updated_at desc);
 
+-- ---------- เครื่องที่เปิดรับ push แจ้งเตือน (หนึ่งแถวต่อเบราว์เซอร์/เครื่อง) ----------
+-- Edge Function push-notify อ่านตารางนี้ด้วย service role เพื่อส่งแจ้งเตือนหาอีกฝ่าย
+create table if not exists public.push_subscriptions (
+  endpoint    text        not null primary key,
+  user_id     uuid        not null references auth.users (id) on delete cascade,
+  email       text        not null default '',
+  p256dh      text        not null,
+  auth        text        not null,
+  user_agent  text        not null default '',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists push_subscriptions_email_idx on public.push_subscriptions (lower(email));
+create index if not exists push_subscriptions_user_idx  on public.push_subscriptions (user_id);
+
 -- ---------- Row Level Security: แต่ละคนเห็นและแก้ได้เฉพาะข้อมูลตัวเอง ----------
 alter table public.books       enable row level security;
 alter table public.expenses    enable row level security;
 alter table public.budgets     enable row level security;
 alter table public.friends     enable row level security;
 alter table public.debt_claims enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 drop policy if exists "books_own_rows" on public.books;
 create policy "books_own_rows" on public.books
@@ -141,6 +157,10 @@ create policy "friends_own_rows" on public.friends
 drop policy if exists "friends_added_me_read" on public.friends;
 create policy "friends_added_me_read" on public.friends
   for select using (lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+
+drop policy if exists "push_subscriptions_own_rows" on public.push_subscriptions;
+create policy "push_subscriptions_own_rows" on public.push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ใบแจ้งหนี้มีสองฝ่าย: เจ้าหนี้ (from_user) และลูกหนี้ (to_email)
 drop policy if exists "debt_claims_owner" on public.debt_claims;

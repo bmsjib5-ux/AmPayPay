@@ -350,6 +350,9 @@
       if (navigator.setAppBadge) { if (n) navigator.setAppBadge(n); else navigator.clearAppBadge(); }
     } catch (e) {}
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    /* เด้งแจ้งเตือนของระบบเฉพาะตอนแอปไม่ได้อยู่หน้าจอ และเครื่องนี้ไม่ได้เปิด push (push จะเด้งเองผ่าน sw.js ไม่ให้ซ้ำ) */
+    if (document.visibilityState === 'visible') return;
+    try { if (localStorage.getItem(PUSH_LOCAL_KEY)) return; } catch (e) {}
     var fresh = list.filter(function (e) { return e.unseen && !systemNotified[e.key]; });
     if (!fresh.length) return;
     fresh.forEach(function (e) { systemNotified[e.key] = Date.now(); });
@@ -361,23 +364,124 @@
       note.onclick = function () { window.focus(); openBell(); note.close(); };
     } catch (e) {}
   }
-  function renderNotifyPerm() {
-    var btn = $('#bellPermBtn');
-    if (!btn) return;
-    var supported = 'Notification' in window;
-    btn.hidden = !supported || Notification.permission === 'granted';
-    btn.disabled = supported && Notification.permission === 'denied';
-    btn.textContent = supported && Notification.permission === 'denied'
-      ? 'การแจ้งเตือนของระบบถูกปิดไว้ (เปิดได้ในตั้งค่าเบราว์เซอร์)'
-      : '🔔 เปิดแจ้งเตือนของระบบ';
+  /* ---------- push แจ้งเตือนตอนปิดแอป ----------
+     เบราว์เซอร์สมัครรับ push กับผู้ให้บริการของมันเอง (Google/Apple/Mozilla) แล้วเราจด endpoint ไว้ใน Supabase
+     เมื่อเพื่อนส่งยอด/ตอบกลับ Edge Function push-notify จะยิงแจ้งเตือนมาที่ service worker (sw.js) แม้ปิดแอปอยู่ */
+  var PUSH_KEY = (window.PUSH_CONFIG && window.PUSH_CONFIG.vapidPublicKey) || '';
+  var PUSH_LOCAL_KEY = 'expense-book:push:v1';
+  function pushSupported() {
+    return !!(PUSH_KEY && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
   }
-  $('#bellPermBtn').addEventListener('click', function () {
-    if (!('Notification' in window)) return;
-    Notification.requestPermission().then(function (perm) {
-      renderNotifyPerm();
-      toast(perm === 'granted' ? 'เปิดแจ้งเตือนของระบบแล้ว จะเด้งเมื่อมีอัปเดตจากเพื่อน' : 'ยังไม่ได้อนุญาตการแจ้งเตือน');
+  function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
+  function isStandalone() {
+    return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  }
+  function urlBase64ToUint8Array(b64) {
+    var pad = '='.repeat((4 - b64.length % 4) % 4);
+    var raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function swReady() {
+    if (!('serviceWorker' in navigator)) return Promise.reject(new Error('เบราว์เซอร์นี้ไม่รองรับ'));
+    return navigator.serviceWorker.register('sw.js').then(function () { return navigator.serviceWorker.ready; });
+  }
+  function currentPushSub() {
+    if (!pushSupported()) return Promise.resolve(null);
+    return swReady().then(function (reg) { return reg.pushManager.getSubscription(); }).catch(function () { return null; });
+  }
+  function enablePush() {
+    if (!pushSupported()) { toast('เบราว์เซอร์นี้ยังไม่รองรับ push'); return Promise.resolve(false); }
+    if (!syncReady()) { toast('ต้องล็อกอิน ☁️ ก่อน'); return Promise.resolve(false); }
+    if (isIOS() && !isStandalone()) { toast('บน iPhone ต้องเพิ่มแอปไว้ที่หน้าจอโฮมก่อน แล้วเปิดจากไอคอนนั้น'); return Promise.resolve(false); }
+    return Notification.requestPermission().then(function (perm) {
+      if (perm !== 'granted') { toast('ยังไม่ได้อนุญาตการแจ้งเตือน'); return false; }
+      return swReady().then(function (reg) {
+        return reg.pushManager.getSubscription().then(function (sub) {
+          return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(PUSH_KEY) });
+        });
+      }).then(function (sub) {
+        return CloudSync.savePushSubscription(sub).then(function () {
+          try { localStorage.setItem(PUSH_LOCAL_KEY, JSON.stringify({ endpoint: sub.endpoint, at: Date.now() })); } catch (e) {}
+          toast('เปิด push แจ้งเตือนบนเครื่องนี้แล้ว 🎉');
+          return true;
+        });
+      });
+    }).catch(function (e) { toast('เปิด push ไม่สำเร็จ: ' + (e && e.message || e)); return false; })
+      .then(function (r) { renderPushBox(); return r; });
+  }
+  function disablePush() {
+    return currentPushSub().then(function (sub) {
+      if (!sub) return false;
+      var endpoint = sub.endpoint;
+      return sub.unsubscribe().then(function () {
+        return syncReady() ? CloudSync.removePushSubscription(endpoint).catch(function () {}) : null;
+      }).then(function () {
+        try { localStorage.removeItem(PUSH_LOCAL_KEY); } catch (e) {}
+        toast('ปิด push บนเครื่องนี้แล้ว');
+        return true;
+      });
+    }).catch(function (e) { toast('ปิดไม่สำเร็จ: ' + (e && e.message || e)); return false; })
+      .then(function (r) { renderPushBox(); return r; });
+  }
+  /* เปิดแอปมาแล้วเคยเปิด push ไว้ → ต่ออายุแถวในตารางเงียบๆ (endpoint อาจเปลี่ยนได้) */
+  function refreshPushSub() {
+    if (!pushSupported() || !syncReady() || Notification.permission !== 'granted') return;
+    var had = null;
+    try { had = JSON.parse(localStorage.getItem(PUSH_LOCAL_KEY) || 'null'); } catch (e) {}
+    if (!had) return;
+    currentPushSub().then(function (sub) {
+      if (!sub) return;
+      if (had.endpoint === sub.endpoint && Date.now() - (had.at || 0) < 7 * 86400e3) return;
+      return CloudSync.savePushSubscription(sub).then(function () {
+        try { localStorage.setItem(PUSH_LOCAL_KEY, JSON.stringify({ endpoint: sub.endpoint, at: Date.now() })); } catch (e) {}
+      });
     }).catch(function () {});
-  });
+  }
+  function renderPushBox() {
+    var box = $('#pushBox');
+    if (!box) return;
+    if (!PUSH_KEY) { box.hidden = true; return; }
+    box.hidden = false;
+    if (!pushSupported()) {
+      box.innerHTML = '<div class="push-state">📴 แจ้งเตือนตอนปิดแอป: เบราว์เซอร์นี้ไม่รองรับ</div>' +
+        '<div class="push-hint">' + (isIOS() ? 'บน iPhone/iPad ต้องใช้ iOS 16.4 ขึ้นไป และเพิ่มแอปไว้ที่หน้าจอโฮม (แชร์ → เพิ่มไปยังหน้าจอโฮม) แล้วเปิดจากไอคอนนั้น'
+                                             : 'ลองใช้ Chrome, Edge, Firefox หรือ Safari รุ่นใหม่') + '</div>';
+      return;
+    }
+    if (!syncReady()) {
+      box.innerHTML = '<div class="push-state">📴 แจ้งเตือนตอนปิดแอป</div><div class="push-hint">ต้องล็อกอิน ☁️ ก่อน จึงจะเปิดได้</div>';
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      box.innerHTML = '<div class="push-state">🔕 แจ้งเตือนถูกปิดไว้ในเบราว์เซอร์</div>' +
+        '<div class="push-hint">ไปที่ตั้งค่าเบราว์เซอร์ → การแจ้งเตือน แล้วอนุญาตให้เว็บนี้ก่อน</div>';
+      return;
+    }
+    box.innerHTML = '<div class="push-state">⏳ กำลังตรวจสอบ…</div>';
+    currentPushSub().then(function (sub) {
+      var on = !!sub && Notification.permission === 'granted';
+      box.innerHTML = '<div class="push-state">' + (on ? '✅ แจ้งเตือนตอนปิดแอป: เปิดอยู่บนเครื่องนี้' : '📴 แจ้งเตือนตอนปิดแอป: ยังไม่ได้เปิด') + '</div>' +
+        '<div class="push-hint">' + (on ? 'เมื่อเพื่อนส่งยอดหนี้ แจ้งว่าจ่ายแล้ว หรือยืนยันรับเงิน จะเด้งแจ้งเตือนที่เครื่องนี้แม้ไม่ได้เปิดแอป'
+          : 'เปิดแล้วจะได้รับแจ้งเตือนที่เครื่องนี้แม้ไม่ได้เปิดแอป' + (isIOS() && !isStandalone() ? ' — บน iPhone ต้องเพิ่มไว้ที่หน้าจอโฮมก่อน' : '')) + '</div>' +
+        '<div class="row-actions">' + (on
+          ? '<button class="btn btn-ghost btn-sm" type="button" id="pushOffBtn">ปิดบนเครื่องนี้</button>'
+          : '<button class="btn btn-sm btn-primary" type="button" id="pushOnBtn">🔔 เปิดแจ้งเตือนตอนปิดแอป</button>') + '</div>';
+      var onBtn = $('#pushOnBtn'), offBtn = $('#pushOffBtn');
+      if (onBtn) onBtn.addEventListener('click', function () { onBtn.disabled = true; enablePush(); });
+      if (offBtn) offBtn.addEventListener('click', function () { offBtn.disabled = true; disablePush(); });
+    });
+  }
+  /* ข้อความจาก service worker: push มาตอนแอปเปิดอยู่ → ซิงก์ทันที · แตะแจ้งเตือน → เปิดกระดิ่ง */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function (ev) {
+      var d = ev.data || {};
+      if (d.type === 'push' && syncReady() && !ownerConflict()) runSync(true);
+      if (d.type === 'open-bell') openBell();
+    });
+  }
+
   function renderBellList() {
     var body = $('#bellBody');
     if (!syncReady()) {
@@ -399,7 +503,7 @@
   function openBell() {
     $('#bellModal').hidden = false;
     renderBellList();
-    renderNotifyPerm();
+    renderPushBox();
     if (syncReady() && !ownerConflict() && Date.now() - lastSyncFinished > 30e3) runSync(true);
   }
   function closeBell() {
@@ -2925,7 +3029,8 @@
         history.replaceState(null, '', location.pathname + location.search);   // ล้าง token ออกจาก URL
         if (session) toast('ล็อกอินสำเร็จ กำลังซิงก์ข้อมูล…');
       }
-      if (session) runSync(true);
+      if (session) { runSync(true); refreshPushSub(); }
+      if (/#bell$/.test(location.hash)) { history.replaceState(null, '', location.pathname + location.search); openBell(); }
     }).catch(function () { /* ต่อเซิร์ฟเวอร์ไม่ได้ก็ใช้งานออฟไลน์ได้ตามปกติ */ });
   }
 })();

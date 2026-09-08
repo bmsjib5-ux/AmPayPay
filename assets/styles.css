@@ -973,3 +973,8 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .bell-sub { font-size: 12.5px; color: var(--text-secondary); }
 .bell-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 @media (max-width: 420px) { .topbar-inner { gap: 8px; } .brand { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .brand > span[aria-hidden] { flex: none; } }
+
+/* ---------- กล่องเปิด push แจ้งเตือน (ในกระดิ่ง) ---------- */
+.push-box { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--surface-2); display: grid; gap: 8px; }
+.push-box .push-state { font-weight: 600; }
+.push-box .push-hint { font-size: 12.5px; color: var(--text-secondary); line-height: 1.55; }
