@@ -11,6 +11,28 @@ window.CloudSync = (function () {
   var syncing = false;
   var featureNote = '';
   var profileName = null;
+  /* โครงตารางแบบเข้ารหัส (v51+): อีเมลเก็บเป็นรหัส ค้นหาด้วย sha256(lower(email)) ผ่านคอลัมน์ …_hash
+     และเขียนผ่าน view ด้วย insert (view จัดการ upsert ให้เอง) · ถ้าตารางยังเป็นแบบเก่า ใช้วิธีเดิม */
+  var piiMode = null;
+  function sha256Hex(str) {
+    var text = String(str || '').trim().toLowerCase();
+    if (!text) return Promise.resolve('');
+    if (!(window.crypto && window.crypto.subtle && window.TextEncoder)) return Promise.reject(new Error('เบราว์เซอร์นี้คำนวณแฮชไม่ได้'));
+    return window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+      var out = '', u8 = new Uint8Array(buf);
+      for (var i = 0; i < u8.length; i++) out += ('0' + u8[i].toString(16)).slice(-2);
+      return out;
+    });
+  }
+  function detectPiiMode(c) {
+    if (piiMode !== null) return Promise.resolve(piiMode);
+    var probe;
+    try { probe = c.from('friends').select('email_hash').limit(1); } catch (e) { piiMode = false; return Promise.resolve(false); }
+    return Promise.resolve(probe).then(function (res) {
+      piiMode = !(res && res.error);
+      return piiMode;
+    }, function () { piiMode = false; return false; });
+  }
   var guard = null;          // ฟังก์ชันที่แอปตั้งไว้ ถ้าคืนข้อความ = ห้ามซิงก์
 
   function config() {
@@ -252,6 +274,7 @@ window.CloudSync = (function () {
     signOut: function () {
       return getClient().then(function (c) { return c.auth.signOut(); }).then(function () {
         session = null;
+        piiMode = null;
         ExpenseStore.lastSync.set(0);
         emit();
       });
@@ -275,7 +298,10 @@ window.CloudSync = (function () {
         }));
         /* เพื่อนสองทาง: ใครเพิ่มเรา เราก็ได้เขาในรายชื่อด้วย (ถ้าตารางยังไม่มีคอลัมน์/สิทธิ์นี้ ก็ข้ามไปเฉยๆ) */
         if (!me) return null;
-        return c.from('friends').select('*').eq('email', me).then(function (r2) {
+        return detectPiiMode(c).then(function (pii) {
+          return pii ? sha256Hex(me).then(function (h) { return c.from('friends').select('*').eq('email_hash', h); })
+                     : c.from('friends').select('*').eq('email', me);
+        }).then(function (r2) {
           if (r2.error) return null;
           ExpenseStore.friends.adoptAddedBy((r2.data || []).filter(function (row) {
             return row.owner_email && !row.deleted && row.user_id !== userId;
@@ -299,7 +325,9 @@ window.CloudSync = (function () {
             updated_at: new Date(f.updatedAt || Date.now()).toISOString()
           };
         });
-        var push = function (list) { return c.from('friends').upsert(list, { onConflict: 'user_id,email' }); };
+        var push = function (list) {
+          return piiMode ? c.from('friends').insert(list) : c.from('friends').upsert(list, { onConflict: 'user_id,email' });
+        };
         return push(rows).then(function (up) {
           /* ตารางเวอร์ชันเก่ายังไม่มี owner_email → ส่งแบบไม่มีคอลัมน์นั้นแทน จะได้ไม่พังทั้งการซิงก์ */
           if (up.error && /owner_email|owner_name/.test(up.error.message || '')) {
@@ -318,9 +346,12 @@ window.CloudSync = (function () {
     /* ---------- ใบแจ้งหนี้: มีสองฝ่าย จึงดึงใหม่ทั้งชุดทุกครั้ง ---------- */
     syncClaims: function (c) {
       var email = (session && session.user && session.user.email) || '';
-      return c.from('debt_claims').select('*')
-        .or('from_user.eq.' + session.user.id + ',to_email.eq.' + email)
-        .then(function (res) {
+      return detectPiiMode(c).then(function (pii) {
+        if (!pii) return c.from('debt_claims').select('*').or('from_user.eq.' + session.user.id + ',to_email.eq.' + email);
+        return sha256Hex(email).then(function (h) {
+          return c.from('debt_claims').select('*').or('from_user.eq.' + session.user.id + ',to_email_hash.eq.' + h);
+        });
+      }).then(function (res) {
           if (res.error) throw new Error(friendly(res.error));
           var rows = (res.data || []).map(claimToLocal)
             .filter(function (r) { return !r.deleted; })
@@ -353,12 +384,14 @@ window.CloudSync = (function () {
           deleted: false,
           updated_at: new Date().toISOString()
         };
-        return c.from('debt_claims').upsert(row, { onConflict: 'id' }).then(function (up) {
+        return detectPiiMode(c).then(function (pii) {
+          return pii ? c.from('debt_claims').insert(row) : c.from('debt_claims').upsert(row, { onConflict: 'id' });
+        }).then(function (up) {
           /* ตารางเวอร์ชันเก่ายังไม่มีคอลัมน์ promptpay → ส่งแบบไม่มีคอลัมน์นั้นแทน */
           if (up.error && /promptpay|image/.test(up.error.message || '')) {
             featureNote = 'QR พร้อมเพย์/รูปใบเสร็จในใบแจ้งหนี้ยังใช้ไม่ได้ — รันไฟล์ supabase/schema.sql ซ้ำอีกครั้งก่อน';
             var row2 = Object.assign({}, row); delete row2.promptpay; delete row2.image;
-            return c.from('debt_claims').upsert(row2, { onConflict: 'id' });
+            return piiMode ? c.from('debt_claims').insert(row2) : c.from('debt_claims').upsert(row2, { onConflict: 'id' });
           }
           return up;
         }).then(function (up) {
@@ -396,7 +429,9 @@ window.CloudSync = (function () {
           user_agent: String(navigator.userAgent || '').slice(0, 200),
           updated_at: new Date().toISOString()
         };
-        return c.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' }).then(function (up) {
+        return detectPiiMode(c).then(function (pii) {
+          return pii ? c.from('push_subscriptions').insert(row) : c.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' });
+        }).then(function (up) {
           if (up.error) throw new Error(friendly(up.error));
           return true;
         });

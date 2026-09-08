@@ -10,11 +10,12 @@
 --  แบบที่ 1 (แนะนำ) — ลบเฉพาะข้อมูล เก็บโครงตารางไว้เหมือนเดิม
 --  บัญชีผู้ใช้ยังอยู่ ล็อกอินเดิมได้เลย แค่ข้อมูลว่างเปล่า
 -- ---------------------------------------------------------------------
-truncate table public.debt_claims;
+truncate table public.debt_claims_data;
 truncate table public.expenses;
 truncate table public.budgets;
 truncate table public.books;
-truncate table public.friends;
+truncate table public.friends_data;
+truncate table public.push_subscriptions_data;
 
 
 -- ---------------------------------------------------------------------
@@ -26,11 +27,12 @@ truncate table public.friends;
 -- begin
 --   select id into uid from auth.users where email = 'ใส่อีเมลตรงนี้@example.com';
 --   if uid is null then raise notice 'ไม่พบบัญชีนี้'; return; end if;
---   delete from public.debt_claims where from_user = uid;
+--   delete from public.debt_claims_data where from_user = uid;
 --   delete from public.expenses    where user_id  = uid;
 --   delete from public.budgets     where user_id  = uid;
 --   delete from public.books       where user_id  = uid;
---   delete from public.friends     where user_id  = uid;
+--   delete from public.friends_data     where user_id  = uid;
+--   delete from public.push_subscriptions_data where user_id = uid;
 --   raise notice 'ล้างข้อมูลของ % แล้ว', uid;
 -- end $$;
 
@@ -41,8 +43,10 @@ truncate table public.friends;
 -- ---------------------------------------------------------------------
 -- drop trigger if exists debt_claims_guard_trg on public.debt_claims;
 -- drop function if exists public.debt_claims_guard();
--- drop table if exists public.debt_claims;
--- drop table if exists public.friends;
+-- drop view if exists public.debt_claims; drop view if exists public.friends; drop view if exists public.push_subscriptions;
+-- drop table if exists public.debt_claims_data;
+-- drop table if exists public.friends_data;
+-- drop table if exists public.push_subscriptions_data;
 -- drop table if exists public.expenses;
 -- drop table if exists public.budgets;
 -- drop table if exists public.books;
@@ -64,5 +68,6 @@ truncate table public.friends;
 select 'books' as ตาราง, count(*) as จำนวนแถว from public.books
 union all select 'expenses',    count(*) from public.expenses
 union all select 'budgets',     count(*) from public.budgets
-union all select 'friends',     count(*) from public.friends
-union all select 'debt_claims', count(*) from public.debt_claims;
+union all select 'friends',     count(*) from public.friends_data
+union all select 'debt_claims', count(*) from public.debt_claims_data
+union all select 'push_subs',   count(*) from public.push_subscriptions_data;
