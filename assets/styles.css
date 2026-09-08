@@ -26,6 +26,10 @@
   --crit:        #c0392f;
   --crit-ink:    #a12e26;
   --crit-soft:   #fbe9e7;
+  --heat-1:      #1baf7a;   /* เขียว  — ต่ำกว่า 80% */
+  --heat-2:      #e0ba00;   /* เหลือง — 80-89% */
+  --heat-3:      #ef7d1a;   /* ส้ม    — 90-99% */
+  --heat-4:      #c0392f;   /* แดง    — 100% */
   --radius: 16px;
   --radius-lg: 22px;
   --shadow: 0 1px 2px rgba(22,20,28,.05), 0 8px 22px rgba(22,20,28,.06);
@@ -60,6 +64,10 @@
     --crit:        #e66767;
     --crit-ink:    #f08d8d;
     --crit-soft:   #2e1a19;
+    --heat-1:      #199e70;
+    --heat-2:      #ccab10;
+    --heat-3:      #e07b26;
+    --heat-4:      #e66767;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.3);
   }
 }
@@ -598,22 +606,25 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
 /* ---------- สีแท่งตามสัดส่วนเทียบกับแท่งที่สูงสุด: เขียว (น้อย) → ส้ม → แดง (สูงสุด) ---------- */
-.bar-fill.is-cool { background: linear-gradient(90deg, color-mix(in srgb, var(--good) 74%, #fff 26%), var(--good)); }
-.bar-fill.is-warm { background: linear-gradient(90deg, color-mix(in srgb, var(--warn) 74%, #fff 26%), var(--warn)); }
-.bar-fill.is-hot  { background: linear-gradient(90deg, color-mix(in srgb, var(--crit) 74%, #fff 26%), var(--crit)); }
-.day-bar.is-cool,  .trend-bar.is-cool { background: linear-gradient(180deg, color-mix(in srgb, var(--good) 76%, #fff 24%), var(--good)); }
-.day-bar.is-warm,  .trend-bar.is-warm { background: linear-gradient(180deg, color-mix(in srgb, var(--warn) 76%, #fff 24%), var(--warn)); }
-.day-bar.is-hot,   .trend-bar.is-hot  { background: linear-gradient(180deg, color-mix(in srgb, var(--crit) 76%, #fff 24%), var(--crit)); }
+.bar-fill.is-cool { background: linear-gradient(90deg, color-mix(in srgb, var(--heat-1) 74%, #fff 26%), var(--heat-1)); }
+.bar-fill.is-mid  { background: linear-gradient(90deg, color-mix(in srgb, var(--heat-2) 74%, #fff 26%), var(--heat-2)); }
+.bar-fill.is-warm { background: linear-gradient(90deg, color-mix(in srgb, var(--heat-3) 74%, #fff 26%), var(--heat-3)); }
+.bar-fill.is-hot  { background: linear-gradient(90deg, color-mix(in srgb, var(--heat-4) 74%, #fff 26%), var(--heat-4)); }
+.day-bar.is-cool,  .trend-bar.is-cool { background: linear-gradient(180deg, color-mix(in srgb, var(--heat-1) 76%, #fff 24%), var(--heat-1)); }
+.day-bar.is-mid,   .trend-bar.is-mid  { background: linear-gradient(180deg, color-mix(in srgb, var(--heat-2) 76%, #fff 24%), var(--heat-2)); }
+.day-bar.is-warm,  .trend-bar.is-warm { background: linear-gradient(180deg, color-mix(in srgb, var(--heat-3) 76%, #fff 24%), var(--heat-3)); }
+.day-bar.is-hot,   .trend-bar.is-hot  { background: linear-gradient(180deg, color-mix(in srgb, var(--heat-4) 76%, #fff 24%), var(--heat-4)); }
 /* เกินงบยังเป็นแดงเสมอ ไม่ว่าแท่งจะสั้นแค่ไหน */
-.bar-fill.is-over { background: linear-gradient(90deg, color-mix(in srgb, var(--crit) 74%, #fff 26%), var(--crit)); }
+.bar-fill.is-over { background: linear-gradient(90deg, color-mix(in srgb, var(--heat-4) 74%, #fff 26%), var(--heat-4)); }
 
 /* คำอธิบายสีใต้กราฟ */
 .heat-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
 .heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .heat-legend i { width: 10px; height: 10px; border-radius: 3px; display: block; }
-.heat-legend .lg-cool { background: var(--good); }
-.heat-legend .lg-warm { background: var(--warn); }
-.heat-legend .lg-hot  { background: var(--crit); }
+.heat-legend .lg-cool { background: var(--heat-1); }
+.heat-legend .lg-mid  { background: var(--heat-2); }
+.heat-legend .lg-warm { background: var(--heat-3); }
+.heat-legend .lg-hot  { background: var(--heat-4); }
 .meter { height: 14px; }
 .meter-fill { animation: grow-x .6s var(--ease) both; }
 

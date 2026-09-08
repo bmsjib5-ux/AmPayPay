@@ -9,11 +9,11 @@
      ใส่ไว้ในหน้าเว็บโดยตรงเพื่อให้มีผลแม้โฮสต์จะตั้ง header ให้ไม่ได้
      (Tesseract.js ต้องใช้ Web Worker ผ่าน blob: และ wasm จึงต้องอนุญาตไว้) -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; manifest-src 'self'; connect-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=62">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=62">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=63">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=63">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=62">
-<link rel="manifest" href="manifest.webmanifest?v=62">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=63">
+<link rel="manifest" href="manifest.webmanifest?v=63">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,7 +21,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=62">
+<link rel="stylesheet" href="assets/styles.css?v=63">
 </head>
 <body>
 <header class="topbar">
@@ -164,7 +164,7 @@
         <p class="chart-sub" id="daySub">ยอดรวมของแต่ละวันในเดือนนี้</p>
       </figcaption>
       <div id="dayChart" class="days"></div>
-      <p class="heat-legend"><span><i class="lg-cool"></i>น้อย</span><span><i class="lg-warm"></i>ปานกลาง</span><span><i class="lg-hot"></i>สูงสุด</span></p>
+      <p class="heat-legend"><span><i class="lg-cool"></i>ต่ำกว่า 80%</span><span><i class="lg-mid"></i>80–89%</span><span><i class="lg-warm"></i>90–99%</span><span><i class="lg-hot"></i>100%</span></p>
       <ol id="dayTop" class="rank day-top"></ol>
     </figure>
 
@@ -174,7 +174,7 @@
         <p class="chart-sub" id="catSub">หน่วย: บาท</p>
       </figcaption>
       <div id="catChart" class="bars"></div>
-      <p class="heat-legend"><span><i class="lg-cool"></i>น้อย</span><span><i class="lg-warm"></i>ปานกลาง</span><span><i class="lg-hot"></i>สูงสุด</span></p>
+      <p class="heat-legend"><span><i class="lg-cool"></i>ต่ำกว่า 80%</span><span><i class="lg-mid"></i>80–89%</span><span><i class="lg-warm"></i>90–99%</span><span><i class="lg-hot"></i>100%</span></p>
     </figure>
 
     <figure class="chart-card">
@@ -287,7 +287,7 @@
 <footer class="wrap foot">
   ข้อมูลเก็บในเครื่องของคุณ · เปิดซิงก์ ☁️ เมื่ออยากใช้หลายเครื่อง
   · <a href="privacy.html">ความเป็นส่วนตัว</a>
-  <span class="ver">เวอร์ชัน 62</span>
+  <span class="ver">เวอร์ชัน 63</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -427,12 +427,12 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=62"></script>
-<script src="assets/promptpay.js?v=62"></script>
-<script src="assets/config.js?v=62"></script>
-<script src="assets/parser.js?v=62"></script>
-<script src="assets/store.js?v=62"></script>
-<script src="assets/sync.js?v=62"></script>
-<script src="assets/app.js?v=62"></script>
+<script src="assets/vendor/qrcode.js?v=63"></script>
+<script src="assets/promptpay.js?v=63"></script>
+<script src="assets/config.js?v=63"></script>
+<script src="assets/parser.js?v=63"></script>
+<script src="assets/store.js?v=63"></script>
+<script src="assets/sync.js?v=63"></script>
+<script src="assets/app.js?v=63"></script>
 </body>
 </html>
