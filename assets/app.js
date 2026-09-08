@@ -1186,6 +1186,7 @@
     var btn = this;
     btn.disabled = true;
     CloudSync.syncNow().then(function (res) {
+      healConfirmedClaims();
       renderDebts();
       var n = res && res.claims ? res.claims.changed : 0;
       toast(n ? 'มีอัปเดตจากเพื่อน ' + n + ' รายการ' : 'อัปเดตแล้ว ยังไม่มีอะไรเปลี่ยน');
@@ -1457,10 +1458,14 @@
         (claim.reply ? ' “' + esc(claim.reply) + '”' : '');
     }
     var extra = '';
-    if (!it.paid && syncReady()) {
-      extra = claim && claim.status === 'paid'
-        ? '<button class="btn btn-sm btn-primary" data-debt="confirm" data-cid="' + esc(claim.id) + '">ยืนยันได้รับ</button>'
-        : '<button class="btn btn-sm" data-debt="send">' + (claim ? 'ส่งซ้ำ' : '📨 ส่งให้เพื่อน') + '</button>';
+    if (syncReady()) {
+      /* ยังไม่ได้บอกเพื่อนว่ารับเงินแล้ว → ให้กดยืนยันได้ ถึงจะทำเครื่องหมายในเครื่องเราไปแล้วก็ตาม
+         (ไม่งั้นฝั่งเพื่อนจะค้างเป็น "แจ้งว่าจ่ายแล้ว" ตลอดไป) */
+      if (claim && claim.status !== 'confirmed' && (claim.status === 'paid' || it.paid)) {
+        extra = '<button class="btn btn-sm btn-primary" data-debt="confirm" data-cid="' + esc(claim.id) + '">ยืนยันได้รับ</button>';
+      } else if (!it.paid) {
+        extra = '<button class="btn btn-sm" data-debt="send">' + (claim ? 'ส่งซ้ำ' : '📨 ส่งให้เพื่อน') + '</button>';
+      }
     }
     return '<div class="debt-item' + (it.paid ? ' is-paid' : '') + '" data-eid="' + esc(it.expenseId) +
         '" data-pid="' + esc(it.personId) + '">' +
@@ -1536,6 +1541,45 @@
     return true;
   }
 
+  var healed = {};                                   // ใบที่ยิงยืนยันไปแล้วในรอบนี้ กันส่งซ้ำทุกครั้งที่ซิงก์
+
+  /* กด "รับเงินแล้ว" ในเครื่องเรา = ยืนยันรับเงินให้เพื่อนเห็นด้วย
+     ไม่งั้นเครื่องเพื่อนจะค้างอยู่ที่ "แจ้งว่าจ่ายแล้ว" ทั้งที่เราได้เงินแล้ว */
+  function pushClaimPaid(expenseId, personId, paid) {
+    if (!syncReady()) return Promise.resolve(false);
+    var claim = claimOfPerson(expenseId, personId);
+    if (!claim) return Promise.resolve(false);
+    var next = paid ? 'confirmed' : (claim.reply ? 'paid' : 'pending');
+    if (claim.status === next) return Promise.resolve(false);
+    healed[claim.id] = true;
+    return CloudSync.updateClaim(claim.id, { status: next })
+      .then(function () { return CloudSync.syncNow(); })
+      .then(function () { renderDebts(); return true; })
+      .catch(function (e) { toast('บันทึกในเครื่องแล้ว แต่แจ้งเพื่อนไม่สำเร็จ: ' + e.message); return false; });
+  }
+
+  /* ซ่อมรายการเก่า: เคยกด "รับเงินแล้ว" ตอนที่แอปยังไม่ได้ส่งสถานะให้เพื่อน
+     ใบไหนที่เราทำเครื่องหมายว่าได้เงินคืนแล้ว แต่ใบแจ้งหนี้ยังไม่ confirmed ให้ยืนยันให้อัตโนมัติตอนซิงก์ */
+  function healConfirmedClaims() {
+    if (!syncReady()) return Promise.resolve(0);
+    var ids = [];
+    ExpenseStore.allWithDeleted().forEach(function (e) {
+      if (e.deleted) return;
+      splitOf(e).forEach(function (p) {
+        if (!p.paid) return;
+        var claim = claimOfPerson(e.id, p.id);
+        if (!claim || claim.status === 'confirmed' || healed[claim.id]) return;
+        healed[claim.id] = true;
+        ids.push(claim.id);
+      });
+    });
+    if (!ids.length) return Promise.resolve(0);
+    return Promise.all(ids.map(function (id) { return CloudSync.updateClaim(id, { status: 'confirmed' }); }))
+      .then(function () { return CloudSync.syncNow(); })
+      .then(function () { renderDebts(); return ids.length; })
+      .catch(function () { return 0; });
+  }
+
   $('#debtList').addEventListener('click', function (ev) {
     var btn = ev.target.closest('[data-debt]');
     if (!btn) return;
@@ -1545,7 +1589,10 @@
       var rows = $$('.debt-item:not(.is-paid)', cardEl);
       if (!rows.length) return;
       if (!confirm('บันทึกว่า "' + cardEl.dataset.name + '" จ่ายคืนครบทุกรายการแล้วใช่ไหม?')) return;
-      rows.forEach(function (row) { setPaid(row.dataset.eid, row.dataset.pid, true); });
+      rows.forEach(function (row) {
+        setPaid(row.dataset.eid, row.dataset.pid, true);
+        pushClaimPaid(row.dataset.eid, row.dataset.pid, true);
+      });
       toast('เคลียร์ยอดของ ' + cardEl.dataset.name + ' แล้ว 🎉');
     } else if (act === 'send') {
       var sendRow = btn.closest('.debt-item');
@@ -1558,7 +1605,11 @@
       var row = btn.closest('.debt-item');
       if (!row) return;
       setPaid(row.dataset.eid, row.dataset.pid, act === 'pay');
-      toast(act === 'pay' ? 'บันทึกว่าได้รับเงินคืนแล้ว' : 'ย้อนกลับเป็นยังค้างจ่าย');
+      var told = claimOfPerson(row.dataset.eid, row.dataset.pid);
+      pushClaimPaid(row.dataset.eid, row.dataset.pid, act === 'pay');
+      toast(act === 'pay'
+        ? (told ? 'บันทึกว่าได้รับเงินคืนแล้ว · แจ้งเพื่อนให้ด้วย' : 'บันทึกว่าได้รับเงินคืนแล้ว')
+        : 'ย้อนกลับเป็นยังค้างจ่าย');
     }
     renderDebts();
     renderList();
@@ -3316,6 +3367,7 @@
   function closeSync() { $('#syncModal').hidden = true; }
 
   function refreshAfterSync() {
+    healConfirmedClaims();
     renderList();
     renderBudgetAlert();
     if ($('#panel-summary').classList.contains('is-active')) renderSummary();
