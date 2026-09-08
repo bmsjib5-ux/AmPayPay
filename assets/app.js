@@ -160,6 +160,8 @@
 
     $('#myNameInput').addEventListener('change', function () {
       saveProfile({ name: this.value.trim() });
+      /* ชื่อเล่นติดไปกับแถวเพื่อนบนเซิร์ฟเวอร์ จึงต้องส่งแถวเพื่อนขึ้นไปใหม่ทั้งหมด */
+      ExpenseStore.friends.all().forEach(function (f) { ExpenseStore.friends.save(f.email, f.name); });
       renderMeCard();
       toast('บันทึกชื่อเล่นแล้ว');
     });
@@ -731,24 +733,41 @@
   });
 
   /* ป้ายตัวเลขบนแท็บ ให้เห็นยอดค้างโดยไม่ต้องเข้าไปดู */
+  /* ป้ายบนแท็บลูกหนี้ = จำนวนรายการที่ยังค้างชำระ (เพื่อนค้างเรา + เราค้างเพื่อน) รายละเอียดยอดเงินอยู่ใน tooltip */
   function renderDebtBadge() {
     var badge = $('#debtBadge');
     if (!badge) return;
-    var owed = ExpenseStore.all().reduce(function (a, e) { return a + owedOf(e); }, 0);
-    var mine = incomingClaims().reduce(function (a, c) {
-      return a + (c.status === 'pending' || c.status === 'paid' ? c.amount : 0);
-    }, 0);
+    var owed = 0, owedCount = 0;
+    ExpenseStore.allWithDeleted().forEach(function (e) {
+      if (e.deleted) return;
+      splitOf(e).forEach(function (p) { if (!p.paid) { owed += p.amount; owedCount++; } });
+    });
+    var mine = 0, mineCount = 0;
+    incomingClaims().forEach(function (c) {
+      if (c.status === 'pending' || c.status === 'paid') { mine += c.amount; mineCount++; }
+    });
     var news = incomingClaims().filter(function (c) { return c.status === 'pending'; }).length +
       outgoingClaims().filter(function (c) { return c.status === 'paid'; }).length;
-    badge.hidden = owed <= 0.005 && mine <= 0.005;
-    var parts = [];
-    if (owed > 0.005) parts.push('+' + moneyShort.format(owed));   // เพื่อนค้างเรา
-    if (mine > 0.005) parts.push('−' + moneyShort.format(mine));   // เราค้างเพื่อน
-    badge.textContent = badge.hidden ? '' : parts.join(' ') + (news ? ' •' : '');
-    badge.title = (owed > 0.005 ? 'เพื่อนค้างคุณ ' + fmtMoney(owed) : '') +
-      (owed > 0.005 && mine > 0.005 ? ' · ' : '') +
-      (mine > 0.005 ? 'คุณค้างเพื่อน ' + fmtMoney(mine) : '') +
+    var count = owedCount + mineCount;
+    badge.hidden = count === 0;
+    badge.textContent = count ? (count > 99 ? '99+' : String(count)) : '';
+    badge.classList.toggle('has-new', news > 0);
+    badge.title = (owedCount ? 'เพื่อนค้างคุณ ' + owedCount + ' รายการ รวม ' + fmtMoney(owed) : '') +
+      (owedCount && mineCount ? ' · ' : '') +
+      (mineCount ? 'คุณค้างเพื่อน ' + mineCount + ' รายการ รวม ' + fmtMoney(mine) : '') +
       (news ? ' · มีอัปเดตจากเพื่อน ' + news + ' รายการ' : '');
+    badge.setAttribute('aria-label', 'ค้างชำระ ' + count + ' รายการ');
+  }
+
+  /* ป้ายบนแท็บเพื่อน = จำนวนเพื่อนในรายชื่อ */
+  function renderFriendBadge() {
+    var badge = $('#friendBadge');
+    if (!badge) return;
+    var n = ExpenseStore.friends.all().length;
+    badge.hidden = n === 0;
+    badge.textContent = n ? (n > 99 ? '99+' : String(n)) : '';
+    badge.title = n ? 'เพื่อน ' + n + ' คน' : '';
+    badge.setAttribute('aria-label', 'เพื่อน ' + n + ' คน');
   }
 
   /* ---------------- ดูรูปใบเสร็จแบบขยาย ---------------- */
@@ -2448,6 +2467,7 @@
   }
 
   /* กันทุกทางที่เรียกซิงก์ ไม่ใช่แค่ปุ่มเดียว */
+  CloudSync.setProfile(myName);
   CloudSync.setGuard(function () {
     var c = ownerConflict();
     return c ? 'ข้อมูลในเครื่องนี้เป็นของบัญชี ' + (c.email || c.userId) + ' — เปิด ☁️ แล้วเลือกก่อนว่าจะเก็บหรือล้าง' : null;
@@ -2623,6 +2643,7 @@
   renderList();
   renderBudgetAlert();
   renderDebtBadge();
+  renderFriendBadge();
   importFromHash();
   importFriendFromHash();
   window.addEventListener('hashchange', function () { importFromHash(); importFriendFromHash(); });
@@ -2665,7 +2686,7 @@
   })();
 
   renderSyncBadge();
-  ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); });
+  ExpenseStore.onChange(function () { renderBookBar(); renderDebtBadge(); renderFriendBadge(); });
   CloudSync.onState(function () {
     renderDebtBadge();
     if ($('#panel-debt').classList.contains('is-active')) renderDebts();

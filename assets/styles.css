@@ -843,7 +843,14 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   .debt-item-name { white-space: normal; }
   .debt-head .debt-total { margin-left: auto; }
 }
-.tab #debtBadge { margin-left: 4px; background: var(--warn-soft); color: var(--warn-ink); }
+/* ตัวเลขบนแท็บ: ลูกหนี้ = จำนวนรายการค้างชำระ · เพื่อน = จำนวนเพื่อน */
+.tab .tab-count {
+  margin-left: 5px; min-width: 20px; height: 20px; padding: 0 6px; line-height: 20px; text-align: center;
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; vertical-align: 1px;
+}
+.tab #debtBadge { background: var(--warn-soft); color: var(--warn-ink); }
+.tab #debtBadge.has-new { box-shadow: 0 0 0 2px var(--warn-ink); }
+.tab #friendBadge { background: var(--accent-soft, var(--surface-2)); color: var(--accent, var(--text-secondary)); }
 /* สี่แท็บบนจอมือถือ — ใช้ชื่อสั้นเพื่อให้พอดีจอ ไม่ต้องเลื่อนหา */
 .tab-short { display: none; }
 @media (max-width: 560px) {

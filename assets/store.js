@@ -508,6 +508,33 @@ window.ExpenseStore = (function () {
         });
         writeJSON(FRIENDS_KEY, list);
         notify();
+      },
+      /* เพื่อนสองทาง: คนที่เพิ่มเราไว้ จะถูกเพิ่มเข้ารายชื่อเราให้เอง (แล้วส่งขึ้นเซิร์ฟเวอร์ต่อ)
+         ถ้าเราเคยลบเขาออกไปหลังจากนั้น จะไม่เพิ่มกลับซ้ำ */
+      adoptAddedBy: function (rows, myEmail) {
+        var me = String(myEmail || '').toLowerCase();
+        var list = readJSON(FRIENDS_KEY, []).slice();
+        var by = {};
+        list.forEach(function (f, i) { by[f.email] = i; });
+        var added = 0, now = Date.now();
+        (rows || []).forEach(function (row) {
+          var email = String(row.email || '').toLowerCase();
+          if (!email || email === me || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
+          var i = by[email];
+          var cur = i === undefined ? null : list[i];
+          if (cur && !cur.deleted) {
+            if (!cur.name && row.name) { list[i] = Object.assign({}, cur, { name: String(row.name).slice(0, 60), updatedAt: now }); markFriendDirty(email); added++; }
+            return;
+          }
+          if (cur && cur.deleted && (cur.updatedAt || 0) >= (row.updatedAt || 0)) return;
+          var f = { email: email, name: String(row.name || '').trim().slice(0, 60), deleted: false,
+                    createdAt: cur ? cur.createdAt || now : now, updatedAt: now };
+          if (cur) list[i] = f; else { list.push(f); by[email] = list.length - 1; }
+          markFriendDirty(email);
+          added++;
+        });
+        if (added) { writeJSON(FRIENDS_KEY, list); notify(); }
+        return added;
       }
     },
 

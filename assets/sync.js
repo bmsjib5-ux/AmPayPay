@@ -10,6 +10,7 @@ window.CloudSync = (function () {
   var listeners = [];
   var syncing = false;
   var featureNote = '';
+  var profileName = null;
   var guard = null;          // ฟังก์ชันที่แอปตั้งไว้ ถ้าคืนข้อความ = ห้ามซิงก์
 
   function config() {
@@ -258,6 +259,7 @@ window.CloudSync = (function () {
        ครอบคลุมทั้งสมุด รายจ่าย และงบประมาณของทุกสมุด */
     /* ---------- เพื่อน: ข้อมูลส่วนตัว ซิงก์แบบเดียวกับสมุด ---------- */
     syncFriends: function (c, userId) {
+      var me = String((session && session.user && session.user.email) || '').toLowerCase();
       return c.from('friends').select('*').eq('user_id', userId).then(function (res) {
         if (res.error) throw new Error(friendly(res.error));
         ExpenseStore.friends.mergeRemote((res.data || []).map(function (row) {
@@ -269,15 +271,41 @@ window.CloudSync = (function () {
             updatedAt: Date.parse(row.updated_at) || Date.now()
           };
         }));
+        /* เพื่อนสองทาง: ใครเพิ่มเรา เราก็ได้เขาในรายชื่อด้วย (ถ้าตารางยังไม่มีคอลัมน์/สิทธิ์นี้ ก็ข้ามไปเฉยๆ) */
+        if (!me) return null;
+        return c.from('friends').select('*').eq('email', me).then(function (r2) {
+          if (r2.error) return null;
+          ExpenseStore.friends.adoptAddedBy((r2.data || []).filter(function (row) {
+            return row.owner_email && !row.deleted && row.user_id !== userId;
+          }).map(function (row) {
+            return {
+              email: String(row.owner_email).toLowerCase(),
+              name: row.owner_name || '',
+              updatedAt: Date.parse(row.updated_at) || Date.now()
+            };
+          }), me);
+        }, function () { return null; });
+      }).then(function () {
         var pending = ExpenseStore.friends.pending();
         if (!pending.length) return 0;
-        return c.from('friends').upsert(pending.map(function (f) {
+        var myName = profileName ? String(profileName() || '') : '';
+        var rows = pending.map(function (f) {
           return {
             user_id: userId, email: f.email, name: f.name || '', deleted: !!f.deleted,
+            owner_email: me, owner_name: myName,
             created_at: new Date(f.createdAt || Date.now()).toISOString(),
             updated_at: new Date(f.updatedAt || Date.now()).toISOString()
           };
-        }), { onConflict: 'user_id,email' }).then(function (up) {
+        });
+        var push = function (list) { return c.from('friends').upsert(list, { onConflict: 'user_id,email' }); };
+        return push(rows).then(function (up) {
+          /* ตารางเวอร์ชันเก่ายังไม่มี owner_email → ส่งแบบไม่มีคอลัมน์นั้นแทน จะได้ไม่พังทั้งการซิงก์ */
+          if (up.error && /owner_email|owner_name/.test(up.error.message || '')) {
+            featureNote = 'เพื่อนแบบสองทางยังใช้ไม่ได้ — รันไฟล์ supabase/schema.sql ซ้ำอีกครั้งก่อน';
+            return push(rows.map(function (r) { delete r.owner_email; delete r.owner_name; return r; }));
+          }
+          return up;
+        }).then(function (up) {
           if (up.error) throw new Error(friendly(up.error));
           ExpenseStore.friends.clearPending(pending.map(function (f) { return f.email; }));
           return pending.length;
@@ -344,6 +372,8 @@ window.CloudSync = (function () {
 
     /* ให้แอปห้ามซิงก์ได้ เช่น ตอนข้อมูลในเครื่องเป็นของอีกบัญชีและยังไม่ได้ตัดสินใจ */
     setGuard: function (fn) { guard = fn; },
+    /* ชื่อเล่นจากบัตรของฉัน ใส่ไปกับแถวเพื่อน เพื่อให้ฝั่งที่ถูกเพิ่มเห็นชื่อเรา */
+    setProfile: function (fn) { profileName = fn; },
 
     syncNow: function () {
       if (!isConfigured()) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า Supabase'));
