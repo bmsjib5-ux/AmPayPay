@@ -108,6 +108,10 @@ create or replace function public.pii_hash(v text) returns text
 language sql immutable set search_path = '' as $$
   select case when v is null or btrim(v) = '' then '' else encode(extensions.digest(lower(btrim(v)), 'sha256'), 'hex') end
 $$;
+create or replace function public.jwt_email() returns text
+language sql stable set search_path = '' as $$
+  select lower(btrim(coalesce(auth.jwt() ->> 'email', '')))
+$$;
 create or replace function public.my_email_hash() returns text
 language sql stable set search_path = '' as $$
   select public.pii_hash(coalesce(auth.jwt() ->> 'email', ''))
@@ -198,7 +202,8 @@ begin
     return old;
   end if;
   new.email := lower(btrim(coalesce(new.email, '')));
-  new.owner_email := lower(btrim(coalesce(new.owner_email, '')));
+  -- อีเมลเจ้าของรายชื่อยึดจากบัญชีที่ล็อกอินเสมอ (ฝั่งที่ถูกเพิ่มจะได้ไม่ถูกหลอกว่าใครเป็นคนเพิ่ม)
+  new.owner_email := lower(btrim(coalesce(auth.jwt() ->> 'email', '')));
   if tg_op = 'INSERT' then
     insert into public.friends_data (user_id, email_enc, email_hash, name, deleted, owner_email_enc, owner_email_hash, owner_name, created_at, updated_at)
     values (new.user_id, public.pii_encrypt(new.email), public.pii_hash(new.email), coalesce(new.name, ''), coalesce(new.deleted, false),
@@ -211,7 +216,7 @@ begin
   end if;
   update public.friends_data set
     name = coalesce(new.name, ''), deleted = coalesce(new.deleted, false),
-    owner_email_enc = public.pii_encrypt(new.owner_email), owner_email_hash = public.pii_hash(new.owner_email),
+    owner_email_enc = public.pii_encrypt(new.owner_email), owner_email_hash = public.pii_hash(new.owner_email),   -- จาก JWT เท่านั้น
     owner_name = coalesce(new.owner_name, ''), updated_at = coalesce(new.updated_at, now())
   where user_id = old.user_id and email_hash = old.email_hash;
   return new;
@@ -262,13 +267,13 @@ begin
   if tg_op = 'INSERT' then
     insert into public.debt_claims_data (id, from_user, from_email_enc, from_email_hash, from_name, to_email_enc, to_email_hash,
       amount, note, expense_id, person_id, status, reply, promptpay_enc, image, deleted, created_at, updated_at)
-    values (new.id, new.from_user, public.pii_encrypt(lower(btrim(coalesce(new.from_email, '')))), public.pii_hash(new.from_email),
+    values (new.id, new.from_user, public.pii_encrypt(public.jwt_email()), public.pii_hash(public.jwt_email()),
       coalesce(new.from_name, ''), public.pii_encrypt(lower(btrim(coalesce(new.to_email, '')))), public.pii_hash(new.to_email),
       coalesce(new.amount, 0), coalesce(new.note, ''), coalesce(new.expense_id, ''), coalesce(new.person_id, ''),
       coalesce(new.status, 'pending'), coalesce(new.reply, ''), public.pii_encrypt(new.promptpay), coalesce(new.image, ''),
       coalesce(new.deleted, false), coalesce(new.created_at, now()), coalesce(new.updated_at, now()))
     on conflict (id) do update set
-      from_email_enc = excluded.from_email_enc, from_email_hash = excluded.from_email_hash, from_name = excluded.from_name,
+      from_email_enc = excluded.from_email_enc, from_email_hash = excluded.from_email_hash, from_name = excluded.from_name,   -- อีเมลผู้ส่งยึดจาก JWT
       to_email_enc = excluded.to_email_enc, to_email_hash = excluded.to_email_hash, amount = excluded.amount, note = excluded.note,
       expense_id = excluded.expense_id, person_id = excluded.person_id, status = excluded.status, reply = excluded.reply,
       promptpay_enc = excluded.promptpay_enc, image = excluded.image, deleted = excluded.deleted, updated_at = excluded.updated_at;
@@ -317,7 +322,8 @@ begin
     delete from public.push_subscriptions_data where endpoint = old.endpoint;
     return old;
   end if;
-  new.email := lower(btrim(coalesce(new.email, '')));
+  -- ยึดอีเมลจากบัญชีที่ล็อกอิน ไม่ให้ตั้งเป็นอีเมลคนอื่นเพื่อดักรับแจ้งเตือนของเขา
+  new.email := public.jwt_email();
   insert into public.push_subscriptions_data (endpoint, user_id, email_enc, email_hash, p256dh, auth, user_agent, created_at, updated_at)
   values (new.endpoint, new.user_id, public.pii_encrypt(new.email), public.pii_hash(new.email), new.p256dh, new.auth,
           coalesce(new.user_agent, ''), coalesce(new.created_at, now()), coalesce(new.updated_at, now()))

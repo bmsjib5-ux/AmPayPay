@@ -800,11 +800,14 @@
     $('#incomingList').innerHTML = list.map(function (c) {
       var who = c.fromName || c.fromEmail;
       var st = CLAIM_LABEL[c.status] || CLAIM_LABEL.pending;
+      /* ใครก็ส่งใบแจ้งหนี้มาที่อีเมลเราได้ จึงกันคนแปลกหน้าหลอกเก็บเงินด้วยการติดป้ายเตือนไว้ */
+      var known = !!ExpenseStore.friends.get(c.fromEmail);
       return '<div class="debt-item' + (c.status === 'confirmed' ? ' is-paid' : '') + (c.image ? ' has-img' : '') + '" data-cid="' + esc(c.id) + '">' +
-        (c.image ? '<img class="claim-thumb zoomable" src="' + c.image + '" alt="ใบเสร็จจาก ' + esc(who) + ' — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">' : '') +
+        (c.image ? '<img class="claim-thumb zoomable" src="' + esc(c.image) + '" alt="ใบเสร็จจาก ' + esc(who) + ' — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">' : '') +
         '<div class="debt-item-main">' +
-          '<span class="debt-item-name">' + esc(who) + '</span>' +
-          '<span class="debt-item-meta">' + esc(c.note || 'ไม่ได้ระบุรายการ') +
+          '<span class="debt-item-name">' + esc(who) +
+            (known ? '' : ' <span class="chip is-warn" title="อีเมลนี้ไม่ได้อยู่ในรายชื่อเพื่อนของคุณ — ตรวจสอบก่อนโอนเงิน">⚠️ ไม่ใช่เพื่อนในรายชื่อ</span>') + '</span>' +
+          '<span class="debt-item-meta">' + esc(c.fromEmail) + ' · ' + esc(c.note || 'ไม่ได้ระบุรายการ') +
             ' · <span class="chip ' + st.chip + '">' + esc(c.status === 'paid' ? 'แจ้งว่าจ่ายแล้ว' : st.text) + '</span>' +
             (c.reply ? ' · “' + esc(c.reply) + '”' : '') + '</span>' +
         '</div>' +
@@ -1502,6 +1505,7 @@
   var viewerURL = '';
   function openViewer(src, alt) {
     var pic = $('#imgModalPic');
+    if (!ExpenseStore.safeImage(src)) { toast('รูปนี้เปิดดูไม่ได้'); return; }
     pic.src = src;
     pic.alt = alt || 'รูปใบเสร็จขยาย';
     $('#imgModal').hidden = false;
@@ -1691,7 +1695,7 @@
             '<span class="bg-swatch-label">' + esc(pre.label) + '</span></button>';
         }).join('') +
         '<button type="button" class="bg-swatch' + (isImg ? ' is-on' : '') + '" data-bg="pick">' +
-          '<span class="bg-swatch-chip bg-swatch-photo"' + (isImg ? ' style="background-image:url(' + bgState.image + ')"' : '') + '>' +
+          '<span class="bg-swatch-chip bg-swatch-photo"' + (isImg ? ' style="background-image:url(&quot;' + esc(bgState.image) + '&quot;)"' : '') + '>' +
             (isImg ? '' : '🖼️') + '</span>' +
           '<span class="bg-swatch-label">รูปของฉัน</span></button>' +
       '</div>' +
@@ -2062,7 +2066,7 @@
     var p = card.parsed || {};
     return '' +
       '<div class="rcard-thumb">' + (card.thumb
-        ? '<img class="zoomable" src="' + card.thumb + '" alt="รูปใบเสร็จ — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">'
+        ? '<img class="zoomable" src="' + esc(card.thumb) + '" alt="รูปใบเสร็จ — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">'
         : '📄') + '</div>' +
       '<div class="rcard-body">' +
         '<div class="rcard-status' + (card.status === 'error' ? ' is-error' : '') + '">' +
@@ -2774,8 +2778,8 @@
   }
 
   function expenseCard(e) {
-    return '<article class="ecard" data-id="' + e.id + '">' +
-      (e.image ? '<img class="ecard-thumb zoomable" src="' + e.image + '" alt="ใบเสร็จ ' + esc(e.merchant) + ' — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">'
+    return '<article class="ecard" data-id="' + esc(e.id) + '">' +
+      (e.image ? '<img class="ecard-thumb zoomable" src="' + esc(e.image) + '" alt="ใบเสร็จ ' + esc(e.merchant) + ' — กดเพื่อขยาย" title="กดเพื่อขยาย" tabindex="0" role="button">'
                : '<span class="ecard-thumb is-cat" aria-hidden="true">' + ReceiptParser.categoryIcon(e.category) + '</span>') +
       '<div class="ecard-main">' +
         '<div class="ecard-title">' + esc(e.merchant) + '</div>' +
