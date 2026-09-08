@@ -1977,6 +1977,32 @@
     });
   });
 
+  /* iOS Safari: พอแป้นพิมพ์เด้งขึ้น แถบเมนูล่าง (position: fixed) จะไปค้างอยู่กลางจอ
+     และค้างต่อแม้ปิดแป้นพิมพ์แล้ว จึงเก็บแถบลงไปตอนแป้นพิมพ์ขึ้น แล้วสะกิดให้วาดใหม่ตอนปิด */
+  (function () {
+    var vv = window.visualViewport;
+    var nav = document.querySelector('.tabbar');
+    if (!vv || !nav) return;
+    var mobile = window.matchMedia('(max-width: 560px)');
+    function syncTabbar() {
+      var away = false;
+      if (mobile.matches && vv.scale <= 1.01) {
+        away = window.innerHeight - (vv.height + vv.offsetTop) > 80;   // ส่วนที่แป้นพิมพ์บังอยู่
+      }
+      if (away === nav.classList.contains('is-away')) return;
+      nav.classList.toggle('is-away', away);
+      if (!away) {                                   // บังคับให้ Safari วาดแถบใหม่ที่ตำแหน่งจริง
+        nav.style.transform = 'translateZ(0)';
+        requestAnimationFrame(function () { nav.style.transform = ''; });
+      }
+    }
+    vv.addEventListener('resize', syncTabbar);
+    vv.addEventListener('scroll', syncTabbar);
+    if (mobile.addEventListener) mobile.addEventListener('change', syncTabbar);
+    document.addEventListener('focusout', function () { setTimeout(syncTabbar, 250); });
+    syncTabbar();
+  })();
+
   /* ---------------- รูปภาพ ---------------- */
   function loadImage(file) {
     return new Promise(function (resolve, reject) {
