@@ -163,10 +163,19 @@ window.ExpenseStore = (function () {
     };
   }
 
+  /* รูปภาพต้องเป็น data URL ของรูปจริงเท่านั้น — กันสตริงหลอกที่แอบใส่ HTML/สคริปต์เข้ามาทาง
+     ไฟล์สำรอง หรือใบแจ้งหนี้ที่เพื่อนส่งมา (เคยเสี่ยงถูกแทรกโค้ดผ่าน src="...") */
+  var IMG_DATA_URL = /^data:image\/(png|jpe?g|webp|gif|bmp);base64,[A-Za-z0-9+/]+=*$/;
+  function safeImage(v) {
+    var str = typeof v === 'string' ? v.trim() : '';
+    if (!str || str.length > 4000000) return null;
+    return IMG_DATA_URL.test(str) ? str : null;
+  }
+
   function clean(exp) {
     var created = exp.createdAt || Date.now();
     return {
-      id: exp.id || newId('e'),
+      id: /^[\w-]{1,40}$/.test(String(exp.id || '')) ? exp.id : newId('e'),
       bookId: exp.bookId || DEFAULT_BOOK,
       date: exp.date,
       merchant: (exp.merchant || '').trim() || 'ไม่ระบุร้าน',
@@ -177,7 +186,7 @@ window.ExpenseStore = (function () {
       split: cleanSplit(exp.split),
       claimId: String(exp.claimId || ''),      // มาจากใบแจ้งหนี้ที่เพื่อนส่ง (กันบันทึกซ้ำ)
       rawText: (exp.rawText || '').slice(0, 4000),
-      image: exp.image || null,
+      image: safeImage(exp.image),
       deleted: !!exp.deleted,
       createdAt: created,
       updatedAt: exp.updatedAt || created
@@ -300,14 +309,9 @@ window.ExpenseStore = (function () {
         if (!name || name === 'ไม่ระบุร้าน') return;
         if ((e.createdAt || 0) < since) return;
         var key = name.toLowerCase();
-        if (!by[key]) by[key] = { merchant: name, category: e.category, amount: e.amount, count: 0, at: 0 };
+        /* all() เรียงวันที่ล่าสุดขึ้นก่อน — ตัวแรกที่เจอจึงเป็นครั้งล่าสุดของร้านนั้น ใช้ชื่อ/หมวด/ยอดจากใบนั้น */
+        if (!by[key]) by[key] = { merchant: name, category: e.category, amount: e.amount, count: 0, at: e.createdAt || 0 };
         by[key].count++;
-        if ((e.createdAt || 0) > by[key].at) {
-          by[key].at = e.createdAt || 0;
-          by[key].merchant = name;
-          by[key].category = e.category;
-          by[key].amount = e.amount;
-        }
       });
       return Object.keys(by).map(function (k) { return by[k]; })
         .filter(function (m) { return m.count >= 2; })
@@ -627,7 +631,10 @@ window.ExpenseStore = (function () {
     theme: {
       get: function () { try { return localStorage.getItem(THEME_KEY) || 'system'; } catch (e) { return 'system'; } },
       set: function (v) { try { localStorage.setItem(THEME_KEY, v); } catch (e) {} }
-    }
+    },
+
+    /* ให้ไฟล์อื่นใช้ตรวจรูปที่รับมาจากภายนอกได้ด้วย (คืน null ถ้าไม่ใช่รูป data URL จริง) */
+    safeImage: safeImage
   };
 
   return api;

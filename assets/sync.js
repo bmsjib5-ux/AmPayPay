@@ -150,7 +150,7 @@ window.CloudSync = (function () {
       status: row.status || 'pending',
       reply: row.reply || '',
       promptpay: row.promptpay || '',
-      image: (row.image && /^data:image\//.test(row.image)) ? row.image : '',
+      image: ExpenseStore.safeImage(row.image) || '',       // รูปจากอีกฝ่าย ต้องเป็น data URL ของรูปจริงเท่านั้น
       deleted: !!row.deleted,
       createdAt: Date.parse(row.created_at) || Date.now(),
       updatedAt: Date.parse(row.updated_at) || Date.now()
@@ -380,7 +380,7 @@ window.CloudSync = (function () {
           status: claim.status || 'pending',
           reply: claim.reply || '',
           promptpay: String(claim.promptpay || '').slice(0, 40),
-          image: (claim.image && /^data:image\//.test(claim.image) && claim.image.length <= 150000) ? claim.image : '',
+          image: (function (v) { var ok = ExpenseStore.safeImage(v); return ok && ok.length <= 150000 ? ok : ''; })(claim.image),
           deleted: false,
           updated_at: new Date().toISOString()
         };
