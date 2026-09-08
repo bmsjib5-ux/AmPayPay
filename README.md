@@ -23,7 +23,11 @@
   → ปลอมว่าเป็นคนอื่นส่งบิล, แอบเป็นคนที่เพิ่มเพื่อน, หรือลงทะเบียนดักรับแจ้งเตือนของคนอื่น ไม่ได้อีกต่อไป
 - **ป้ายเตือนคนแปลกหน้า** — ใบแจ้งหนี้จากอีเมลที่ไม่ได้อยู่ในรายชื่อเพื่อนจะขึ้น “⚠️ ไม่ใช่เพื่อนในรายชื่อ” พร้อมอีเมลผู้ส่ง
   (ใครก็ส่งบิลมาที่อีเมลเราได้ จึงต้องดูให้ชัดก่อนโอน)
-- **HTTP security headers** (`render.yaml`) — `Content-Security-Policy` (จำกัดที่มาของสคริปต์/การเชื่อมต่อ),
+- **CSP ฝังในหน้าเว็บ + กัน clickjacking** — โฮสต์ปัจจุบัน (Render Static Site ที่สร้างจากหน้า dashboard) ไม่ได้อ่าน
+  `render.yaml` จึงตั้ง header ไม่ได้ · แอปจึงใส่ `Content-Security-Policy` ไว้ใน `<meta>` ของหน้าเว็บเอง
+  และมีตัวกันไม่ให้ถูกฝังใน iframe ของเว็บอื่น (จะขึ้นคำเตือนแทน) · ถ้าอยากได้ header เต็มรูปแบบ ตั้งได้ที่
+  Render → Static Site → **Settings → Headers** ตามค่าที่เตรียมไว้ใน `render.yaml`
+- **HTTP security headers** (`render.yaml` — ใช้ได้เมื่อ deploy ด้วย Blueprint หรือคัดลอกไปตั้งใน dashboard) — `Content-Security-Policy` (จำกัดที่มาของสคริปต์/การเชื่อมต่อ),
   `X-Frame-Options: DENY` + `frame-ancestors 'none'` (กันถูกฝังใน iframe หลอกคลิก), `Permissions-Policy`
   (เปิดกล้องเฉพาะโดเมนนี้ ปิดไมค์/พิกัด/การจ่ายเงิน), `Cross-Origin-Opener-Policy`, `X-Content-Type-Options`, `Referrer-Policy`
   · ทดสอบแล้วว่า OCR (Tesseract worker + wasm) และการซิงก์ยังทำงานครบภายใต้ CSP

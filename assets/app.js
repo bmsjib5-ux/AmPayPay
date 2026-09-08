@@ -2,6 +2,24 @@
 (function () {
   'use strict';
 
+  /* กันถูกเอาไปฝังใน iframe ของเว็บอื่นเพื่อหลอกให้กด (clickjacking)
+     — ปกติกันด้วย header X-Frame-Options/frame-ancestors แต่โฮสต์สแตติกตั้งให้ไม่ได้ จึงกันจากในหน้าเว็บแทน */
+  var framed = false;
+  try { framed = window.top !== window.self; } catch (e) { framed = true; }
+  if (framed) {
+    document.addEventListener('DOMContentLoaded', function () {
+      document.body.textContent = '';
+      var p1 = document.createElement('p');
+      p1.textContent = 'เพื่อความปลอดภัย AmPayPay เปิดในหน้าต่างของเว็บอื่นไม่ได้';
+      var a = document.createElement('a');
+      a.href = location.href; a.target = '_top'; a.textContent = 'เปิดในแท็บใหม่';
+      var p2 = document.createElement('p'); p2.appendChild(a);
+      document.body.style.cssText = 'font:16px system-ui;padding:24px;text-align:center';
+      document.body.appendChild(p1); document.body.appendChild(p2);
+    });
+    return;
+  }
+
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var CATS = ReceiptParser.categories;
