@@ -562,13 +562,65 @@
             (c.reply ? ' · “' + esc(c.reply) + '”' : '') + '</span>' +
         '</div>' +
         '<span class="debt-item-amount">' + fmtMoney(c.amount) + '</span>' +
-        (c.status === 'pending'
-          ? '<button class="btn btn-primary btn-sm" data-claim="pay">จ่ายแล้ว แจ้งเพื่อน</button>'
-          : c.status === 'paid'
-            ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
-            : '<span class="chip is-ok">เรียบร้อย</span>') +
+        '<span class="debt-item-actions">' +
+          (expenseOfClaim(c)
+            ? '<span class="chip is-ok" title="อยู่ในรายการรายจ่ายของคุณแล้ว">✓ บันทึกแล้ว</span>'
+            : '<button class="btn btn-sm" data-claim="save" title="บันทึกส่วนของคุณเป็นรายจ่ายในสมุดนี้">📥 บันทึกเป็นรายจ่าย</button>') +
+          (c.status === 'pending'
+            ? '<button class="btn btn-primary btn-sm" data-claim="pay">จ่ายแล้ว แจ้งเพื่อน</button>'
+            : c.status === 'paid'
+              ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
+              : '<span class="chip is-ok">เรียบร้อย</span>') +
+        '</span>' +
       '</div>';
     }).join('');
+  }
+
+  /* ใบแจ้งหนี้ที่เพื่อนส่งมา = ส่วนที่เราต้องจ่ายจริง จึงบันทึกเป็นรายจ่ายของเราได้ (นับในรายการและสรุป)
+     note ของใบมีรูป "ร้าน · 13 ส.ค. 2569" ตามที่ฝั่งส่งสร้างไว้ จึงแกะร้านกับวันที่กลับมาได้ */
+  var TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  function parseClaimNote(c) {
+    var note = String(c.note || '');
+    var parts = note.split(' · ');
+    var merchant = (parts[0] || '').trim() || (c.fromName ? 'หารกับ ' + c.fromName : 'หารกับเพื่อน');
+    var date = '';
+    var m = note.match(/(\d{1,2})\s+(\S+\.?)\s+(\d{4})/);
+    if (m) {
+      var mi = TH_MONTHS.indexOf(m[2]);
+      if (mi < 0) mi = TH_MONTHS.findIndex(function (x) { return x.replace(/\./g, '') === m[2].replace(/\./g, ''); });
+      var y = +m[3]; if (y > 2400) y -= 543;
+      if (mi >= 0) date = y + '-' + String(mi + 1).padStart(2, '0') + '-' + String(+m[1]).padStart(2, '0');
+    }
+    if (!date) date = new Date(c.createdAt || Date.now()).toISOString().slice(0, 10);
+    return { merchant: merchant, date: date };
+  }
+  function expenseOfClaim(c) {
+    var byId = ExpenseStore.allWithDeleted().filter(function (e) { return !e.deleted && e.claimId === c.id; })[0];
+    if (byId) return byId;
+    var info = parseClaimNote(c);
+    var dup = findDuplicate({ date: info.date, amount: c.amount, merchant: info.merchant });
+    return dup ? dup.record : null;
+  }
+  function saveClaimAsExpense(id) {
+    var c = ExpenseStore.claims.all().filter(function (x) { return x.id === id; })[0];
+    if (!c) return;
+    if (expenseOfClaim(c)) { toast('รายการนี้อยู่ในสมุดแล้ว'); renderIncoming(); return; }
+    var info = parseClaimNote(c);
+    var who = c.fromName || c.fromEmail;
+    var res = ExpenseStore.add({
+      date: info.date,
+      merchant: info.merchant,
+      amount: c.amount,
+      category: ReceiptParser.guessCategory(info.merchant, ''),
+      note: 'หารกับ ' + who + ' (เพื่อนออกให้ก่อน)',
+      claimId: c.id
+    });
+    renderIncoming();
+    renderList();
+    renderBudgetAlert();
+    if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+    toast('บันทึก ' + fmtMoney(c.amount) + ' ลงสมุด “' + ExpenseStore.currentBookName() + '” แล้ว' +
+      (res && res.result && !res.result.ok ? ' (พื้นที่ใกล้เต็ม)' : ''));
   }
 
   $('#incomingList').addEventListener('click', function (ev) {
@@ -576,6 +628,7 @@
     if (!btn) return;
     var id = btn.closest('.debt-item').dataset.cid;
     var act = btn.dataset.claim;
+    if (act === 'save') { saveClaimAsExpense(id); return; }
     if (act === 'pay') {
       var reply = prompt('ข้อความถึงเพื่อน (ไม่ใส่ก็ได้)', 'โอนคืนแล้วนะ');
       if (reply === null) return;

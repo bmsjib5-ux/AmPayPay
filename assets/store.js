@@ -175,6 +175,7 @@ window.ExpenseStore = (function () {
       note: (exp.note || '').trim(),
       items: Array.isArray(exp.items) ? exp.items.slice(0, 40) : [],
       split: cleanSplit(exp.split),
+      claimId: String(exp.claimId || ''),      // มาจากใบแจ้งหนี้ที่เพื่อนส่ง (กันบันทึกซ้ำ)
       rawText: (exp.rawText || '').slice(0, 4000),
       image: exp.image || null,
       deleted: !!exp.deleted,
