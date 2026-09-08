@@ -21,6 +21,16 @@
 - เมนูลัดที่ไอคอนแอป: `#go=add` · `#go=debt` · `#go=scan` · `#go=myqr`
 - v56 เอาการ์ด “สแกนจ่ายเงิน” ออกตามที่ผู้ใช้ขอ (ตัวอ่าน QR `PromptPay.parse` ยังอยู่ใน `assets/promptpay.js` เผื่อใช้ภายหลัง)
 
+## ทำเป็นแอป iOS (TestFlight) โดยไม่ต้องมี Mac
+
+iOS ไม่มี TWA จึงห่อเว็บด้วย `WKWebView` เป็นแอป native แล้วบิลด์บน macOS runner ของ GitHub Actions
+
+- โปรเจกต์อยู่ที่ [`ios/`](ios/) · วิธีตั้งค่าและข้อจำกัดทั้งหมดอยู่ใน **[ios/README.md](ios/README.md)**
+- ต้องมี Apple Developer Program ($99/ปี) แต่**ไม่ต้องมี Mac**
+- กดรันเวิร์กโฟลว์ **iOS → TestFlight** ในแท็บ Actions แล้วบิลด์จะขึ้น TestFlight เอง
+- แอปเปิดเว็บตัวเดียวกัน → **อัปเดตเว็บแล้วแอปได้ของใหม่ทันที** ส่งบิลด์ใหม่เฉพาะตอนเปลี่ยนไอคอน/ชื่อ/สิทธิ์/โค้ด Swift
+- ข้อจำกัดสำคัญ: **Web Push ใช้ไม่ได้ใน WKWebView** (แจ้งเตือนในแอปยังทำงาน แต่ตอนปิดแอปจะไม่เด้ง)
+
 ## ทำเป็นแอป Android (.apk / .aab) ด้วย TWA (v59)
 
 TWA (Trusted Web Activity) คือแอป Android ที่เปิดเว็บนี้ด้วยเครื่องยนต์ Chrome แบบ **ไม่มีแถบ URL**

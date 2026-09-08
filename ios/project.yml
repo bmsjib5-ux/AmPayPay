@@ -1,0 +1,39 @@
+# สเปกโปรเจกต์สำหรับ XcodeGen — สร้าง .xcodeproj ตอนบิลด์ จะได้ไม่ต้องเก็บไฟล์โปรเจกต์ไว้ในรีโป
+name: AmPayPay
+options:
+  bundleIdPrefix: com.ampaypay
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"          # iPhone + iPad
+targets:
+  AmPayPay:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Sources
+      - path: App/Resources/Assets.xcassets
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ampaypay.app
+        PRODUCT_NAME: AmPayPay
+        INFOPLIST_FILE: App/Resources/Info.plist     # ใช้ไฟล์ที่เขียนไว้เอง ไม่ให้ XcodeGen สร้างทับ
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+# ประกาศ scheme ไว้เอง เพราะ xcodebuild -scheme ต้องมี shared scheme ในโปรเจกต์ที่เพิ่งสร้าง
+schemes:
+  AmPayPay:
+    build:
+      targets:
+        AmPayPay: all
+    run:
+      config: Debug
+    archive:
+      config: Release
