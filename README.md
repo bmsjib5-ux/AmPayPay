@@ -45,7 +45,7 @@ TWA (Trusted Web Activity) คือแอป Android ที่เปิดเ�
 
 | ช่อง | ค่า |
 | --- | --- |
-| Package ID | `app.ampaypay.twa` (ต้องตรงกับใน `assetlinks.json` เป๊ะ ๆ) |
+| Package ID | `com.onrender.ampaypay.twa` (ค่าเริ่มต้นที่ PWABuilder ตั้งจากชื่อโดเมน — ต้องตรงกับใน `assetlinks.json` เป๊ะ ๆ) |
 | App name | `AmPayPay` |
 | Launcher name | `AmPayPay` |
 | App version / version code | `1.0.0` / `1` |
@@ -78,7 +78,7 @@ curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list\
 **ยังขึ้นแถบ URL อยู่ ตรวจตามนี้ทีละข้อ** (สามข้อนี้คือสาเหตุเกือบทั้งหมด)
 
 1. **ชื่อแพ็กเกจไม่ตรง** — เปิดไฟล์ `assetlinks.json` ที่อยู่ในซิปของ PWABuilder ดูค่า `package_name`
-   ต้องมีชื่อนั้นอยู่ใน `.well-known/assetlinks.json` ของเว็บด้วย (ไฟล์นี้ใส่ได้หลายชื่อ ตอนนี้ใส่ไว้ 2 ชื่อ)
+   ต้องมีชื่อนั้นอยู่ใน `.well-known/assetlinks.json` ของเว็บด้วย (ไฟล์นี้ใส่ได้หลายชื่อ ถ้าต้องรองรับหลายเวอร์ชัน)
 2. **ลายนิ้วมือคนละคีย์** — คีย์ที่เซ็น `.apk` ต้องเป็นคีย์เดียวกับที่ประกาศไว้ ดูของจริงจากไฟล์ที่ติดตั้ง:
    ```bash
    keytool -printcert -jarfile app-release-signed.apk | grep SHA256
