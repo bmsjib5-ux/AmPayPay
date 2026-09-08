@@ -82,6 +82,13 @@ create table if not exists public.friends (
   primary key (user_id, email)
 );
 
+-- เพื่อนแบบสองทาง: เก็บอีเมล/ชื่อเล่นของคนที่เพิ่ม เพื่อให้ฝั่งที่ถูกเพิ่มเห็นเราในรายชื่อของเขาด้วย
+alter table public.friends add column if not exists owner_email text not null default '';
+alter table public.friends add column if not exists owner_name  text not null default '';
+
+create index if not exists friends_email_idx
+  on public.friends (lower(email));
+
 -- ---------- ใบแจ้งหนี้ระหว่างเพื่อน ----------
 -- ใช้อีเมลเป็นตัวชี้ตัวลูกหนี้ เพราะเพื่อนอาจยังไม่ได้สมัครตอนที่ส่งไป
 create table if not exists public.debt_claims (
@@ -129,6 +136,11 @@ create policy "budgets_own_row" on public.budgets
 drop policy if exists "friends_own_rows" on public.friends;
 create policy "friends_own_rows" on public.friends
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- คนที่ถูกเพิ่มเป็นเพื่อน อ่านแถวที่ชี้มาหาตัวเองได้ (แค่อ่าน แก้ไม่ได้) เพื่อเพิ่มกลับให้อัตโนมัติ
+drop policy if exists "friends_added_me_read" on public.friends;
+create policy "friends_added_me_read" on public.friends
+  for select using (lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
 
 -- ใบแจ้งหนี้มีสองฝ่าย: เจ้าหนี้ (from_user) และลูกหนี้ (to_email)
 drop policy if exists "debt_claims_owner" on public.debt_claims;

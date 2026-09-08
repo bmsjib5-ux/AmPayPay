@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>สมุดเก็บรายจ่ายของฉัน</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=40">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=40">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=41">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=41">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=40">
-<link rel="manifest" href="manifest.webmanifest?v=40">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=41">
+<link rel="manifest" href="manifest.webmanifest?v=41">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="สมุดรายจ่าย">
 <meta name="application-name" content="สมุดรายจ่าย">
-<link rel="stylesheet" href="assets/styles.css?v=40">
+<link rel="stylesheet" href="assets/styles.css?v=41">
 </head>
 <body>
 <header class="topbar">
@@ -31,8 +31,8 @@
     <button class="tab is-active" role="tab" aria-selected="true" data-tab="add"><span class="tab-ic" aria-hidden="true">📸</span><span class="tab-full">เพิ่มรายจ่าย</span><span class="tab-short">เพิ่ม</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="summary"><span class="tab-ic" aria-hidden="true">📊</span><span class="tab-full">สรุปรายจ่าย</span><span class="tab-short">สรุป</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="list"><span class="tab-ic" aria-hidden="true">🗂️</span><span class="tab-full">รายการทั้งหมด</span><span class="tab-short">รายการ</span></button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="debt"><span class="tab-ic" aria-hidden="true">🧑‍🤝‍🧑</span>ลูกหนี้<span id="debtBadge" class="pill" hidden></span></button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="friends"><span class="tab-ic" aria-hidden="true">👥</span>เพื่อน</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="debt"><span class="tab-ic" aria-hidden="true">🧑‍🤝‍🧑</span>ลูกหนี้<span id="debtBadge" class="pill tab-count" hidden></span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="friends"><span class="tab-ic" aria-hidden="true">👥</span>เพื่อน<span id="friendBadge" class="pill tab-count" hidden></span></button>
   </nav>
 </header>
 
@@ -292,7 +292,7 @@
 
 <footer class="wrap foot">
   ข้อมูลทั้งหมดถูกเก็บไว้ในเบราว์เซอร์ของคุณเครื่องเดียว (localStorage) ไม่มีการส่งรูปหรือข้อความออกไปที่เซิร์ฟเวอร์ใด
-  <span class="ver">เวอร์ชัน 40</span>
+  <span class="ver">เวอร์ชัน 41</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -336,11 +336,11 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=40"></script>
-<script src="assets/config.js?v=40"></script>
-<script src="assets/parser.js?v=40"></script>
-<script src="assets/store.js?v=40"></script>
-<script src="assets/sync.js?v=40"></script>
-<script src="assets/app.js?v=40"></script>
+<script src="assets/vendor/qrcode.js?v=41"></script>
+<script src="assets/config.js?v=41"></script>
+<script src="assets/parser.js?v=41"></script>
+<script src="assets/store.js?v=41"></script>
+<script src="assets/sync.js?v=41"></script>
+<script src="assets/app.js?v=41"></script>
 </body>
 </html>
