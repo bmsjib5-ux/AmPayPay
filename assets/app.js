@@ -1505,7 +1505,8 @@
   var viewerURL = '';
   function openViewer(src, alt) {
     var pic = $('#imgModalPic');
-    if (!ExpenseStore.safeImage(src)) { toast('รูปนี้เปิดดูไม่ได้'); return; }
+    /* blob: คือไฟล์ต้นฉบับที่แอปสร้างเองในเครื่อง (URL.createObjectURL) ปลอดภัย · นอกนั้นต้องเป็นรูป data URL ที่ตรวจแล้ว */
+    if (!/^blob:/.test(String(src)) && !ExpenseStore.safeImage(src)) { toast('รูปนี้เปิดดูไม่ได้'); return; }
     pic.src = src;
     pic.alt = alt || 'รูปใบเสร็จขยาย';
     $('#imgModal').hidden = false;

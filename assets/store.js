@@ -309,14 +309,9 @@ window.ExpenseStore = (function () {
         if (!name || name === 'ไม่ระบุร้าน') return;
         if ((e.createdAt || 0) < since) return;
         var key = name.toLowerCase();
-        if (!by[key]) by[key] = { merchant: name, category: e.category, amount: e.amount, count: 0, at: 0 };
+        /* all() เรียงวันที่ล่าสุดขึ้นก่อน — ตัวแรกที่เจอจึงเป็นครั้งล่าสุดของร้านนั้น ใช้ชื่อ/หมวด/ยอดจากใบนั้น */
+        if (!by[key]) by[key] = { merchant: name, category: e.category, amount: e.amount, count: 0, at: e.createdAt || 0 };
         by[key].count++;
-        if ((e.createdAt || 0) > by[key].at) {
-          by[key].at = e.createdAt || 0;
-          by[key].merchant = name;
-          by[key].category = e.category;
-          by[key].amount = e.amount;
-        }
       });
       return Object.keys(by).map(function (k) { return by[k]; })
         .filter(function (m) { return m.count >= 2; })
