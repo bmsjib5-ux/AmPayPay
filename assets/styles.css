@@ -1112,3 +1112,11 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .add-friend-grid .ac-ic { font-size: 26px; }
 .add-friend-grid .ac-label { font-size: 13.5px; }
 .add-friend-grid .ac-sub { font-size: 11px; }
+
+/* ปุ่มในหนี้ที่ฉันต้องจ่าย: การ์ดไอคอนขนาดย่อม */
+.claim-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.action-card.mini { min-height: 66px; padding: 8px 10px; gap: 3px; flex: 1 1 130px; max-width: 220px; }
+.action-card.mini .ac-ic { font-size: 22px; }
+.action-card.mini .ac-label { font-size: 12.5px; }
+.action-card.mini .ac-sub { font-size: 10.5px; }
+@media (max-width: 560px) { .debt-item .claim-actions { width: 100%; } .action-card.mini { max-width: none; } }

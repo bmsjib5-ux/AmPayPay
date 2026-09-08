@@ -781,19 +781,21 @@
             (c.reply ? ' · “' + esc(c.reply) + '”' : '') + '</span>' +
         '</div>' +
         '<span class="debt-item-amount">' + fmtMoney(c.amount) + '</span>' +
-        '<span class="debt-item-actions">' +
+        '<span class="debt-item-actions claim-actions">' +
           (c.promptpay && c.status !== 'confirmed' && PromptPay.payload(c.promptpay, c.amount)
-            ? '<button class="btn btn-sm btn-primary" data-claim="qr" title="QR พร้อมเพย์ของเพื่อน พร้อมยอดที่ต้องโอน">💳 QR โอนคืน</button>' : '') +
-          (expenseOfClaim(c)
-            ? '<span class="chip is-ok" title="อยู่ในรายการรายจ่ายของคุณแล้ว">✓ บันทึกแล้ว</span>'
-            : c.status === 'pending' ? ''
-            : '<button class="btn btn-sm" data-claim="save" title="บันทึกส่วนของคุณเป็นรายจ่ายในสมุดนี้">📥 บันทึกเป็นรายจ่าย</button>') +
+            ? '<button class="action-card mini" data-claim="qr" title="QR พร้อมเพย์ของเพื่อน พร้อมยอดที่ต้องโอน"><span class="ac-ic" aria-hidden="true">💳</span><span class="ac-label">QR โอนคืน</span><span class="ac-sub">สแกนจ่ายพร้อมเพย์</span></button>' : '') +
           (c.status === 'pending'
-            ? '<button class="btn btn-sm btn-primary" data-claim="payall" title="บันทึกลงสมุด (พร้อมรูปใบเสร็จ) และแจ้งเพื่อนว่าจ่ายแล้ว ในคลิกเดียว">' +
-                (expenseOfClaim(c) ? '✅ จ่ายแล้ว แจ้งเพื่อน' : '✅ จ่ายแล้ว + บันทึกรายจ่าย') + '</button>'
-            : c.status === 'paid'
-              ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
-              : '<span class="chip is-ok">เรียบร้อย</span>') +
+            ? '<button class="action-card mini is-primary" data-claim="payall" title="บันทึกลงสมุด (พร้อมรูปใบเสร็จ) และแจ้งเพื่อนว่าจ่ายแล้ว ในคลิกเดียว"><span class="ac-ic" aria-hidden="true">✅</span>' +
+                (expenseOfClaim(c) ? '<span class="ac-label">จ่ายแล้ว แจ้งเพื่อน</span><span class="ac-sub">บันทึกในสมุดแล้ว</span>'
+                                   : '<span class="ac-label">จ่ายแล้ว + บันทึก</span><span class="ac-sub">ลงสมุด + แจ้งเพื่อน</span>') + '</button>'
+            : '') +
+          (expenseOfClaim(c)
+            ? (c.status === 'pending' ? '' : '<span class="chip is-ok" title="อยู่ในรายการรายจ่ายของคุณแล้ว">✓ บันทึกแล้ว</span>')
+            : c.status === 'pending' ? ''
+            : '<button class="action-card mini" data-claim="save" title="บันทึกส่วนของคุณเป็นรายจ่ายในสมุดนี้"><span class="ac-ic" aria-hidden="true">📥</span><span class="ac-label">บันทึกรายจ่าย</span><span class="ac-sub">ลงสมุดพร้อมรูป</span></button>') +
+          (c.status === 'paid'
+            ? '<button class="btn btn-ghost btn-sm" data-claim="unpay">ยกเลิกการแจ้ง</button>'
+            : c.status === 'confirmed' ? '<span class="chip is-ok">เรียบร้อย</span>' : '') +
         '</span>' +
       '</div>';
     }).join('');
