@@ -1028,8 +1028,13 @@
   function splitBox(exp, open) {
     var people = splitOf(exp);
     return '<details class="raw split-box"' + (open || people.length ? ' open' : '') + '>' +
-      '<summary>➗ หารกับเพื่อน / ออกให้ก่อน' +
-        (people.length ? ' <span class="pill">' + people.length + ' คน</span>' : '') + '</summary>' +
+      '<summary class="split-summary">' +
+        '<span class="ss-ic" aria-hidden="true">🧑‍🤝‍🧑</span>' +
+        '<span class="ss-text"><b>หารกับเพื่อน / ออกให้ก่อน</b>' +
+          '<small>' + (people.length ? 'หารกับ ' + people.length + ' คน · ยอดค้างจะไปโผล่ในแท็บลูกหนี้' : 'แตะเพื่อเลือกเพื่อนและใส่ยอดที่เขาต้องคืน') + '</small></span>' +
+        (people.length ? '<span class="pill ss-pill">' + people.length + ' คน</span>' : '') +
+        '<span class="ss-chev" aria-hidden="true">›</span>' +
+      '</summary>' +
       '<div class="split-body">' +
         '<div class="row-actions split-tools">' +
           '<label class="field"><span class="field-label">หารกี่คน (รวมคุณ)</span>' +
@@ -1092,6 +1097,11 @@
     var people = readSplit(box).people;
     var lent = people.reduce(function (a, p) { return a + p.amount; }, 0);
     var owed = people.reduce(function (a, p) { return a + (p.paid ? 0 : p.amount); }, 0);
+    /* หัวการ์ดบอกสถานะสดๆ ว่าหารกับกี่คนแล้ว */
+    var small = $('.split-summary small', box), pill = $('.split-summary .ss-pill', box);
+    if (small) small.textContent = people.length ? 'หารกับ ' + people.length + ' คน · ยอดค้างจะไปโผล่ในแท็บลูกหนี้' : 'แตะเพื่อเลือกเพื่อนและใส่ยอดที่เขาต้องคืน';
+    if (people.length && !pill) $('.ss-chev', box).insertAdjacentHTML('beforebegin', '<span class="pill ss-pill">' + people.length + ' คน</span>');
+    else if (pill) { if (people.length) pill.textContent = people.length + ' คน'; else pill.remove(); }
     if (!people.length) { foot.textContent = 'ใส่ชื่อเพื่อนกับยอดที่เขาต้องคืน แล้วยอดค้างจะไปโผล่ในแท็บ “ลูกหนี้”'; return; }
     var mine = total - lent;
     foot.textContent = 'ส่วนของคุณ ' + fmtMoney(Math.max(0, mine)) + ' · ออกให้เพื่อน ' + fmtMoney(lent) +

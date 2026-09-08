@@ -1071,3 +1071,24 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   .debt-item.has-img { grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-areas: "img main amount" "btn btn btn"; }
   .debt-item.has-img .claim-thumb { grid-area: img; }
 }
+
+/* ---------- ปุ่มหารกับเพื่อน: การ์ดใหญ่ เห็นชัดในฟอร์มบันทึก ---------- */
+.split-box { border-top: 0; padding-top: 4px; }
+.split-summary {
+  list-style: none; display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-height: 64px;
+  border-radius: 16px; border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 40%, var(--surface-1)));
+  cursor: pointer; transition: transform .18s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.split-summary::-webkit-details-marker { display: none; }
+.split-summary:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.split-summary:active { transform: scale(.985); }
+.split-box[open] > .split-summary { border-style: solid; border-color: var(--accent); }
+.ss-ic { font-size: 30px; line-height: 1; flex: none; }
+.ss-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.ss-text b { font-size: 15px; color: var(--accent-ink); }
+.ss-text small { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+.ss-pill { background: var(--accent); color: #fff; }
+.ss-chev { font-size: 22px; color: var(--accent-ink); transition: transform .2s var(--ease); line-height: 1; }
+.split-box[open] > .split-summary .ss-chev { transform: rotate(90deg); }
+.split-body { padding-top: 12px; }
