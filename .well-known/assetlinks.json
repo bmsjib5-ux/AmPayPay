@@ -8,5 +8,15 @@
         "8C:B6:E4:F7:0D:34:70:5B:B0:0A:4A:75:68:4D:44:11:9F:41:AD:BC:FA:A7:D7:44:77:FB:6F:91:FE:E6:28:16"
       ]
     }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.onrender.ampaypay.twa",
+      "sha256_cert_fingerprints": [
+        "8C:B6:E4:F7:0D:34:70:5B:B0:0A:4A:75:68:4D:44:11:9F:41:AD:BC:FA:A7:D7:44:77:FB:6F:91:FE:E6:28:16"
+      ]
+    }
   }
 ]

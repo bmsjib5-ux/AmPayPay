@@ -67,6 +67,29 @@ curl -s https://ampaypay.onrender.com/.well-known/assetlinks.json
 ```
 
 ถ้าอยากให้ Google ตรวจให้: <https://developers.google.com/digital-asset-links/tools/generator>
+หรือเช็คตรง ๆ ว่า Google อ่านไฟล์เราเห็นเป็นอะไร:
+
+```bash
+curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list\
+?source.web.site=https://ampaypay.onrender.com\
+&relation=delegate_permission/common.handle_all_urls"
+```
+
+**ยังขึ้นแถบ URL อยู่ ตรวจตามนี้ทีละข้อ** (สามข้อนี้คือสาเหตุเกือบทั้งหมด)
+
+1. **ชื่อแพ็กเกจไม่ตรง** — เปิดไฟล์ `assetlinks.json` ที่อยู่ในซิปของ PWABuilder ดูค่า `package_name`
+   ต้องมีชื่อนั้นอยู่ใน `.well-known/assetlinks.json` ของเว็บด้วย (ไฟล์นี้ใส่ได้หลายชื่อ ตอนนี้ใส่ไว้ 2 ชื่อ)
+2. **ลายนิ้วมือคนละคีย์** — คีย์ที่เซ็น `.apk` ต้องเป็นคีย์เดียวกับที่ประกาศไว้ ดูของจริงจากไฟล์ที่ติดตั้ง:
+   ```bash
+   keytool -printcert -jarfile app-release-signed.apk | grep SHA256
+   ```
+3. **Android จำผลตรวจเก่าไว้** — ถ้าติดตั้ง `.apk` *ก่อน* ที่ไฟล์จะขึ้นเว็บ ต้อง **ถอนแล้วติดตั้งใหม่**
+   (ล้างข้อมูลแอป Chrome ด้วยยิ่งดี) เพราะผลตรวจถูกแคชไว้ตั้งแต่ตอนติดตั้ง
+
+> **สำคัญตอนขึ้น Play:** ถ้าเปิด Play App Signing (ค่าเริ่มต้น) Google จะ **เซ็นแอปใหม่ด้วยคีย์ของ Play**
+> ทำให้เวอร์ชันที่โหลดจากสโตร์มีลายนิ้วมือคนละอันกับ `.apk` ที่ทดสอบเอง
+> ต้องเข้า Play Console → *Setup → App signing* คัดลอก **SHA-256 ของ App signing key**
+> มาเพิ่มเป็นอีกค่าใน `sha256_cert_fingerprints` (ใส่ได้หลายค่าในอาร์เรย์เดียวกัน) ไม่งั้นแอปจากสโตร์จะโชว์แถบ URL
 
 **3. ทดสอบก่อนขึ้นสโตร์**
 
