@@ -6,3 +6,9 @@ window.SUPABASE_CONFIG = {
   url: 'https://wbmstqhrlnlruvpqgikw.supabase.co',
   anonKey: 'sb_publishable_O40Dp52fpK2gmPwkjB6mAg_kXdliZGE'
 };
+
+/* Web Push แจ้งเตือนตอนปิดแอป — คีย์สาธารณะ VAPID (คู่กับคีย์ลับที่เก็บใน Supabase Edge Function secrets)
+   ปล่อยว่าง = ซ่อนปุ่มเปิด push · วิธีตั้งค่าดู README หัวข้อ "แจ้งเตือนตอนปิดแอป" */
+window.PUSH_CONFIG = {
+  vapidPublicKey: 'BJhuP3IgQcMT9LtOu9JNIPytP6X9yHTnkkci5jEYeBamh3t4VJpK5SbIazNH7HmZ8eufwI34LVtchTXwUZPpKJQ'
+};
