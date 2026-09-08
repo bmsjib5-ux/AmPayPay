@@ -5,11 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AmPayPay</title>
 <meta name="description" content="อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=53">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=53">
+<!-- จำกัดว่าโค้ดและการเชื่อมต่อมาจากที่ไหนได้บ้าง ลดผลกระทบถ้ามีช่องโหว่ XSS
+     ใส่ไว้ในหน้าเว็บโดยตรงเพื่อให้มีผลแม้โฮสต์จะตั้ง header ให้ไม่ได้
+     (Tesseract.js ต้องใช้ Web Worker ผ่าน blob: และ wasm จึงต้องอนุญาตไว้) -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; manifest-src 'self'; connect-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=54">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=54">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=53">
-<link rel="manifest" href="manifest.webmanifest?v=53">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=54">
+<link rel="manifest" href="manifest.webmanifest?v=54">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +21,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=53">
+<link rel="stylesheet" href="assets/styles.css?v=54">
 </head>
 <body>
 <header class="topbar">
@@ -267,7 +271,7 @@
 
 <footer class="wrap foot">
   ข้อมูลเก็บในเครื่องของคุณ · เปิดซิงก์ ☁️ เมื่ออยากใช้หลายเครื่อง
-  <span class="ver">เวอร์ชัน 53</span>
+  <span class="ver">เวอร์ชัน 54</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -397,12 +401,12 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=53"></script>
-<script src="assets/promptpay.js?v=53"></script>
-<script src="assets/config.js?v=53"></script>
-<script src="assets/parser.js?v=53"></script>
-<script src="assets/store.js?v=53"></script>
-<script src="assets/sync.js?v=53"></script>
-<script src="assets/app.js?v=53"></script>
+<script src="assets/vendor/qrcode.js?v=54"></script>
+<script src="assets/promptpay.js?v=54"></script>
+<script src="assets/config.js?v=54"></script>
+<script src="assets/parser.js?v=54"></script>
+<script src="assets/store.js?v=54"></script>
+<script src="assets/sync.js?v=54"></script>
+<script src="assets/app.js?v=54"></script>
 </body>
 </html>
