@@ -150,9 +150,11 @@ window.ExpenseStore = (function () {
       people: people.slice(0, 20).map(function (p, i) {
         var amount = Math.max(0, Number(p && p.amount) || 0);
         var paid = !!(p && p.paid);
+        var email = String((p && p.email) || '').trim().toLowerCase();
         return {
           id: (p && p.id) || ('d' + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6)),
           name: String((p && p.name) || '').trim().slice(0, 40) || 'เพื่อน',
+          email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? email : '',   // มีเมื่อเลือกจากรายชื่อเพื่อน
           amount: Math.round(amount * 100) / 100,
           paid: paid,
           paidAt: paid ? (Number(p.paidAt) || Date.now()) : null
