@@ -1,0 +1,48 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><title>feature</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1024px; height: 500px; overflow: hidden;
+         font-family: "Noto Sans Thai", "Sarabun", -apple-system, "Segoe UI", sans-serif; }
+  .g { width: 1024px; height: 500px; position: relative; display: flex; align-items: center; gap: 34px;
+       padding: 0 56px; background: linear-gradient(135deg, #f6f1e9 0%, #fbf7f2 44%, #ece5ff 100%); }
+  .g::before { content: ''; position: absolute; inset: 0;
+       background: radial-gradient(420px 300px at 88% 14%, rgba(108,76,241,.12), transparent 70%),
+                   radial-gradient(360px 260px at 4% 94%, rgba(78,203,124,.18), transparent 70%); }
+  .icon { width: 150px; height: 150px; border-radius: 34px; flex: none; position: relative;
+          box-shadow: 0 18px 44px rgba(60,40,120,.22); }
+  .mid { position: relative; flex: 1; min-width: 0; }
+  h1 { font-size: 62px; line-height: 1; letter-spacing: -.02em; color: #2a2136; font-weight: 800;
+       text-shadow: none; }
+  .tag { margin-top: 13px; font-size: 24px; line-height: 1.42; font-weight: 600; color: #6b6478; }
+  .chips { margin-top: 20px; display: flex; gap: 9px; }
+  .chip { background: #fff; color: #4a3f7a; font-size: 17.5px; font-weight: 700;
+          padding: 8px 14px; border-radius: 999px; box-shadow: 0 6px 16px rgba(60,40,120,.12); white-space: nowrap; }
+  .card { position: relative; flex: none; width: 228px; background: #fff; border-radius: 26px; padding: 20px 22px;
+          box-shadow: 0 22px 50px rgba(60,40,120,.18); transform: rotate(-3deg); }
+  .card .lb { font-size: 16px; color: #7b8a80; font-weight: 600; }
+  .card .amt { font-size: 38px; font-weight: 800; color: #1f2a24; letter-spacing: -.02em; margin-top: 2px; }
+  .bars { display: flex; align-items: flex-end; gap: 8px; height: 68px; margin: 16px 0 13px; }
+  .bars i { flex: 1; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, #6c4cf1, #8f78ff); }
+  .row { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 700;
+         color: #1f2a24; border-top: 1px dashed #e3e7e4; padding-top: 11px; }
+  .row span { color: #6c4cf1; }
+</style></head><body>
+<div class="g">
+  <img class="icon" src="../assets/icon-512.png" alt="">
+  <div class="mid">
+    <h1>AmPayPay</h1>
+    <p class="tag">ถ่ายใบเสร็จ · รู้ยอดทันที<br>หารกับเพื่อน จบในแอปเดียว</p>
+    <div class="chips">
+      <span class="chip">📸 อ่านใบเสร็จเอง</span>
+      <span class="chip">📊 สรุปรายเดือน</span>
+      <span class="chip">💳 QR พร้อมเพย์</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="lb">รวมเดือนนี้</div>
+    <div class="amt">฿4,554</div>
+    <div class="bars"><i style="height:38%"></i><i style="height:64%"></i><i style="height:46%"></i><i style="height:88%"></i><i style="height:56%"></i><i style="height:72%"></i></div>
+    <div class="row">เพื่อนค้าง <span>฿260</span></div>
+  </div>
+</div>
+</body></html>
