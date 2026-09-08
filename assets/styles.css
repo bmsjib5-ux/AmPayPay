@@ -118,7 +118,7 @@ img { max-width: 100%; display: block; }
 .topbar {
   position: sticky; top: 0; z-index: 20;
   background: color-mix(in srgb, var(--surface-1) 92%, transparent);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-soft);
 }
 .topbar-inner { display: flex; align-items: center; gap: 12px; padding-block: 12px; }
@@ -459,13 +459,15 @@ input, select, textarea { font-size: 16px; }
    ปรับสี/มุมโค้ง/ไอคอน ให้ดูอบอุ่นขึ้น และใส่ทรานซิชันสั้นๆ ทุกจุดที่ผู้ใช้แตะ
    ========================================================================== */
 
-/* พื้นหลังนุ่มๆ มีแสงสีจางๆ สองมุม แทนพื้นเรียบทึบ */
-body {
+/* พื้นหลังนุ่มๆ มีแสงสีจางๆ สองมุม แทนพื้นเรียบทึบ
+   แสงอยู่บนชั้น fixed ของตัวเอง แทน background-attachment: fixed
+   (Safari บนมือถือวาดพื้นหลังแบบนั้นพลาดบ่อย เห็นเป็นภาพค้างทับกัน) */
+body { background: var(--bg); }
+html::before {
+  content: ''; position: fixed; inset: 0; z-index: -3; pointer-events: none;
   background:
     radial-gradient(60vw 42vh at 12% -6%,  var(--bg-blob-1) 0%, transparent 70%),
-    radial-gradient(52vw 38vh at 96% 4%,   var(--bg-blob-2) 0%, transparent 68%),
-    var(--bg);
-  background-attachment: fixed;
+    radial-gradient(52vw 38vh at 96% 4%,   var(--bg-blob-2) 0%, transparent 68%);
 }
 
 /* สลับธีมแล้วสีค่อยๆ ไล่ ไม่กระโดด */
@@ -535,7 +537,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 }
 
 /* ---------- แถบสมุด ---------- */
-.bookbar { background: color-mix(in srgb, var(--surface-1) 72%, transparent); backdrop-filter: blur(8px); }
+.bookbar { background: color-mix(in srgb, var(--surface-1) 72%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .bookbar-icon { font-size: 17px; }
 .bookbar select { border-radius: 999px; padding-inline: 14px; }
 
@@ -611,7 +613,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .empty-icon { display: block; font-size: 34px; margin-bottom: 6px; animation: bob 3.2s var(--ease) infinite; }
 
 /* ---------- ป็อปอัป ---------- */
-.modal { animation: fade-in .2s var(--ease) both; backdrop-filter: blur(3px); }
+.modal { animation: fade-in .2s var(--ease) both; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
 .modal-card { border-radius: var(--radius-lg); animation: modal-in .3s var(--ease) both; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
@@ -677,7 +679,6 @@ body.has-bg::after { content: ''; position: fixed; inset: 0; pointer-events: non
 body.has-bg::before {
   z-index: -2;
   background: var(--bg-layer) center / cover no-repeat;
-  background-attachment: fixed;
 }
 body.has-bg-image::before {
   filter: blur(var(--bg-blur, 0px));
@@ -697,6 +698,7 @@ body.has-bg .chart-card, body.has-bg .empty, body.has-bg .book-row {
   -webkit-backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
   border-color: var(--border);
 }
+body.has-bg .tabbar,
 body.has-bg .topbar, body.has-bg .bookbar {
   background-color: color-mix(in srgb, var(--surface-1) calc(var(--card-solid, 88%) - 10%), transparent);
   backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
@@ -1004,7 +1006,8 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 /* แถบเมนูหลัก: บนเดสก์ท็อปอยู่ใต้หัว (ติดขอบบนตอนเลื่อน) บนมือถือย้ายลงล่างจอ */
 .tabbar {
   position: sticky; top: 0; z-index: 19;
-  background: color-mix(in srgb, var(--surface-1) 92%, transparent); backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-soft);
 }
 @media (max-width: 560px) {
@@ -1013,9 +1016,15 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   .tabbar {
     position: fixed; top: auto; left: 0; right: 0; bottom: 0; z-index: 50; border-bottom: 0;
     padding-bottom: env(safe-area-inset-bottom);
-    background: color-mix(in srgb, var(--surface-1) 94%, transparent); backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     border-top: 1px solid var(--border-soft); box-shadow: 0 -8px 28px rgba(0, 0, 0, .08);
+    /* บังคับให้เป็นเลเยอร์ของตัวเอง — กัน Safari วาดแถบค้างทับเนื้อหา */
+    transform: translateZ(0); will-change: transform;
+    transition: transform .18s var(--ease);
   }
+  /* แป้นพิมพ์เด้งขึ้น: เก็บแถบลงไปก่อน ไม่งั้น iOS จะทิ้งแถบค้างไว้กลางจอหลังปิดแป้นพิมพ์ */
+  .tabbar.is-away { transform: translateY(calc(100% + 16px)); }
   .tabs { max-width: none; margin: 0; padding: 6px 6px; gap: 2px; overflow: visible; }
   .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
   .tab {
