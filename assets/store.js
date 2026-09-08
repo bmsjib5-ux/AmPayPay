@@ -291,6 +291,29 @@ window.ExpenseStore = (function () {
       return sortByDateDesc(read().filter(function (e) { return !e.deleted && e.bookId === book; }));
     },
     allWithDeleted: function () { return read().slice(); },
+    /* ร้านที่บันทึกบ่อยในช่วงหลัง ไว้ทำปุ่มลัด — เรียงตามจำนวนครั้ง แล้วค่อยตามวันล่าสุด */
+    frequentMerchants: function (limit) {
+      var since = Date.now() - 120 * 86400000;
+      var by = {};
+      this.all().forEach(function (e) {
+        var name = (e.merchant || '').trim();
+        if (!name || name === 'ไม่ระบุร้าน') return;
+        if ((e.createdAt || 0) < since) return;
+        var key = name.toLowerCase();
+        if (!by[key]) by[key] = { merchant: name, category: e.category, amount: e.amount, count: 0, at: 0 };
+        by[key].count++;
+        if ((e.createdAt || 0) > by[key].at) {
+          by[key].at = e.createdAt || 0;
+          by[key].merchant = name;
+          by[key].category = e.category;
+          by[key].amount = e.amount;
+        }
+      });
+      return Object.keys(by).map(function (k) { return by[k]; })
+        .filter(function (m) { return m.count >= 2; })
+        .sort(function (a, b) { return b.count - a.count || b.at - a.at; })
+        .slice(0, limit || 6);
+    },
     get: function (id) {
       var list = read();
       for (var i = 0; i < list.length; i++) if (list[i].id === id && !list[i].deleted) return list[i];
@@ -324,6 +347,20 @@ window.ExpenseStore = (function () {
         if (list[i].id === id) {
           list[i].deleted = true;
           list[i].image = null;
+          list[i].updatedAt = Date.now();
+          markDirty(id);
+          break;
+        }
+      }
+      return write(list);
+    },
+    /* เลิกทำการลบ — รูปย่อถูกทิ้งไปตอนลบ จึงคืนได้เฉพาะข้อมูลตัวเลข (ใส่รูปเดิมกลับได้ถ้าส่งมา) */
+    restore: function (id, image) {
+      var list = read().slice();
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id === id) {
+          list[i].deleted = false;
+          if (image) list[i].image = image;
           list[i].updatedAt = Date.now();
           markDirty(id);
           break;
