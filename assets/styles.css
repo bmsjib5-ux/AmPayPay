@@ -1142,3 +1142,14 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   background: var(--bg); color: var(--text-primary); border-radius: 999px; padding: 6px 12px; white-space: nowrap;
 }
 .toast-action:active { transform: scale(.95); }
+
+/* ---------- แท็บ ฉัน ---------- */
+.me-grid { grid-template-columns: repeat(3, 1fr); margin: 0 0 14px; }
+.me-grid .action-card { min-height: 116px; }
+.me-grid .ac-ic { font-size: 30px; }
+.me-grid .ac-label { font-size: 14px; }
+.me-rows { display: grid; gap: 8px; }
+.me-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); }
+.me-row span { color: var(--text-muted); font-size: 13px; }
+.me-row b { text-align: right; min-width: 0; word-break: break-word; }
+@media (max-width: 420px) { .me-grid .ac-sub { font-size: 10.5px; } }
