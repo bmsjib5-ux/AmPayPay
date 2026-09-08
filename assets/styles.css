@@ -253,7 +253,7 @@ details.raw pre {
 .trend-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; height: 100%; }
 .trend-val { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .trend-bar { display: block; width: 100%; max-width: 54px; background: var(--series-1); border-radius: 4px 4px 0 0; min-height: 2px; }
-.trend-bar.is-current { background: var(--accent-ink); }
+.trend-bar.is-current { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
 .trend-labels { display: flex; gap: 10px; margin-top: 8px; }
 .trend-label { flex: 1; text-align: center; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
@@ -504,6 +504,7 @@ body, .topbar, .bookbar, .rcard, .ecard, .tile, .chart-card, .modal-card,
               border-color .2s var(--ease), transform .18s var(--ease);
 }
 .tab .tab-ic { font-size: 15px; line-height: 1; }
+.tab .ic-pie { width: 1.15em; height: 1.15em; display: block; }
 .tab:hover { background: var(--surface-2); border-bottom-color: transparent; }
 .tab:active { transform: scale(.97); }
 .tab.is-active {
@@ -595,6 +596,24 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   transform-origin: bottom center; animation: grow-y .55s var(--ease) both;
 }
 @keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* ---------- สีแท่งตามสัดส่วนเทียบกับแท่งที่สูงสุด: เขียว (น้อย) → ส้ม → แดง (สูงสุด) ---------- */
+.bar-fill.is-cool { background: linear-gradient(90deg, color-mix(in srgb, var(--good) 74%, #fff 26%), var(--good)); }
+.bar-fill.is-warm { background: linear-gradient(90deg, color-mix(in srgb, var(--warn) 74%, #fff 26%), var(--warn)); }
+.bar-fill.is-hot  { background: linear-gradient(90deg, color-mix(in srgb, var(--crit) 74%, #fff 26%), var(--crit)); }
+.day-bar.is-cool,  .trend-bar.is-cool { background: linear-gradient(180deg, color-mix(in srgb, var(--good) 76%, #fff 24%), var(--good)); }
+.day-bar.is-warm,  .trend-bar.is-warm { background: linear-gradient(180deg, color-mix(in srgb, var(--warn) 76%, #fff 24%), var(--warn)); }
+.day-bar.is-hot,   .trend-bar.is-hot  { background: linear-gradient(180deg, color-mix(in srgb, var(--crit) 76%, #fff 24%), var(--crit)); }
+/* เกินงบยังเป็นแดงเสมอ ไม่ว่าแท่งจะสั้นแค่ไหน */
+.bar-fill.is-over { background: linear-gradient(90deg, color-mix(in srgb, var(--crit) 74%, #fff 26%), var(--crit)); }
+
+/* คำอธิบายสีใต้กราฟ */
+.heat-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.heat-legend i { width: 10px; height: 10px; border-radius: 3px; display: block; }
+.heat-legend .lg-cool { background: var(--good); }
+.heat-legend .lg-warm { background: var(--warn); }
+.heat-legend .lg-hot  { background: var(--crit); }
 .meter { height: 14px; }
 .meter-fill { animation: grow-x .6s var(--ease) both; }
 
@@ -884,7 +903,7 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   transform-origin: bottom center; animation: grow-y .5s var(--ease) both;
 }
 .day-num { font-size: 9.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; line-height: 1; }
-.day-col.is-today .day-bar { background: var(--accent-ink); }
+.day-col.is-today .day-bar { outline: 2px solid var(--accent-ink); outline-offset: 1px; }
 .day-col.is-today .day-num { color: var(--accent-ink); font-weight: 700; }
 .day-col.is-future { opacity: .45; }
 .day-top { margin-top: 14px; }

@@ -9,11 +9,11 @@
      ใส่ไว้ในหน้าเว็บโดยตรงเพื่อให้มีผลแม้โฮสต์จะตั้ง header ให้ไม่ได้
      (Tesseract.js ต้องใช้ Web Worker ผ่าน blob: และ wasm จึงต้องอนุญาตไว้) -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; manifest-src 'self'; connect-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=61">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=61">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=62">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=62">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=61">
-<link rel="manifest" href="manifest.webmanifest?v=61">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=62">
+<link rel="manifest" href="manifest.webmanifest?v=62">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,7 +21,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=61">
+<link rel="stylesheet" href="assets/styles.css?v=62">
 </head>
 <body>
 <header class="topbar">
@@ -37,7 +37,7 @@
 <nav class="tabbar" aria-label="เมนูหลัก">
   <div class="wrap tabs" role="tablist">
     <button class="tab is-active" role="tab" aria-selected="true" data-tab="add"><span class="tab-ic" aria-hidden="true">📸</span><span class="tab-full">เพิ่มรายจ่าย</span><span class="tab-short">เพิ่ม</span></button>
-    <button class="tab" role="tab" aria-selected="false" data-tab="summary"><span class="tab-ic" aria-hidden="true">📊</span><span class="tab-full">สรุปรายจ่าย</span><span class="tab-short">สรุป</span></button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="summary"><span class="tab-ic" aria-hidden="true"><svg class="ic-pie" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#7d6cf0"/><circle cx="16" cy="16" r="8" fill="none" stroke="#34b978" stroke-width="16" stroke-dasharray="20.1 50.3" transform="rotate(-90 16 16)"/><circle cx="16" cy="16" r="8" fill="none" stroke="#f0a02a" stroke-width="16" stroke-dasharray="17.6 50.3" stroke-dashoffset="-20.1" transform="rotate(-90 16 16)"/></svg></span><span class="tab-full">สรุปรายจ่าย</span><span class="tab-short">สรุป</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="list"><span class="tab-ic" aria-hidden="true">🗂️</span><span class="tab-full">รายการทั้งหมด</span><span class="tab-short">รายการ</span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="debt"><span class="tab-ic" aria-hidden="true">🧑‍🤝‍🧑</span><span class="tab-label">ลูกหนี้</span><span id="debtBadge" class="pill tab-count" hidden></span></button>
     <button class="tab" role="tab" aria-selected="false" data-tab="friends"><span class="tab-ic" aria-hidden="true">👥</span><span class="tab-label">เพื่อน</span><span id="friendBadge" class="pill tab-count" hidden></span></button>
@@ -164,6 +164,7 @@
         <p class="chart-sub" id="daySub">ยอดรวมของแต่ละวันในเดือนนี้</p>
       </figcaption>
       <div id="dayChart" class="days"></div>
+      <p class="heat-legend"><span><i class="lg-cool"></i>น้อย</span><span><i class="lg-warm"></i>ปานกลาง</span><span><i class="lg-hot"></i>สูงสุด</span></p>
       <ol id="dayTop" class="rank day-top"></ol>
     </figure>
 
@@ -173,6 +174,7 @@
         <p class="chart-sub" id="catSub">หน่วย: บาท</p>
       </figcaption>
       <div id="catChart" class="bars"></div>
+      <p class="heat-legend"><span><i class="lg-cool"></i>น้อย</span><span><i class="lg-warm"></i>ปานกลาง</span><span><i class="lg-hot"></i>สูงสุด</span></p>
     </figure>
 
     <figure class="chart-card">
@@ -285,7 +287,7 @@
 <footer class="wrap foot">
   ข้อมูลเก็บในเครื่องของคุณ · เปิดซิงก์ ☁️ เมื่ออยากใช้หลายเครื่อง
   · <a href="privacy.html">ความเป็นส่วนตัว</a>
-  <span class="ver">เวอร์ชัน 61</span>
+  <span class="ver">เวอร์ชัน 62</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -425,12 +427,12 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=61"></script>
-<script src="assets/promptpay.js?v=61"></script>
-<script src="assets/config.js?v=61"></script>
-<script src="assets/parser.js?v=61"></script>
-<script src="assets/store.js?v=61"></script>
-<script src="assets/sync.js?v=61"></script>
-<script src="assets/app.js?v=61"></script>
+<script src="assets/vendor/qrcode.js?v=62"></script>
+<script src="assets/promptpay.js?v=62"></script>
+<script src="assets/config.js?v=62"></script>
+<script src="assets/parser.js?v=62"></script>
+<script src="assets/store.js?v=62"></script>
+<script src="assets/sync.js?v=62"></script>
+<script src="assets/app.js?v=62"></script>
 </body>
 </html>
