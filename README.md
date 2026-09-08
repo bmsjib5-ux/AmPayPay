@@ -80,7 +80,7 @@ curl -s https://ampaypay.onrender.com/.well-known/assetlinks.json
 
 - สมัคร Play Console **$25 จ่ายครั้งเดียว** <https://play.google.com/console>
 - สร้างแอป → อัปโหลด `.aab` → กรอกข้อมูลร้านค้า
-- ใช้ภาพจาก `assets/screenshots/` ได้เลย (ต้องมีอย่างน้อย 2 ภาพ) + ไอคอน 512×512 (`assets/icon-512.png`) + Feature graphic 1024×500 (ยังต้องทำเพิ่ม)
+- ภาพที่ต้องใช้มีครบในรีโปแล้ว: ภาพหน้าจอ `assets/screenshots/` (ต้องมีอย่างน้อย 2 ภาพ) · ไอคอน 512×512 `assets/icon-512.png` · **Feature graphic 1024×500** `assets/store/feature-graphic.png` (แบบพื้นครีมอ่อนอยู่ที่ `feature-graphic-light.png` เลือกใช้อันไหนก็ได้)
 - Privacy policy URL: `https://ampaypay.onrender.com/privacy.html`
 - แบบฟอร์ม **Data safety** ตอบตามนี้ได้
 
@@ -94,6 +94,21 @@ curl -s https://ampaypay.onrender.com/.well-known/assetlinks.json
   | ใช้เพื่อโฆษณา/ติดตามผู้ใช้ไหม | ไม่ |
 
 - ต้องผ่าน target API level ล่าสุดที่ Play กำหนด — PWABuilder ตั้งให้อยู่แล้ว ถ้า Play เตือนให้กด *Generate* ใหม่จาก PWABuilder แล้วอัปโหลดทับ (ใช้คีย์เดิม)
+
+### แก้ Feature graphic เอง
+
+ต้นฉบับเป็น HTML อยู่ที่ `tools/feature-graphic.html` (เขียว) และ `tools/feature-graphic-light.html` (ครีม)
+แก้ข้อความ/สีในไฟล์แล้วเรนเดอร์ใหม่ด้วย Playwright:
+
+```bash
+python3 -m http.server 8125 &                     # เสิร์ฟจากรากรีโป
+node -e "const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();
+const p=await (await b.newContext({viewport:{width:1024,height:500},deviceScaleFactor:1})).newPage();
+await p.goto('http://localhost:8125/tools/feature-graphic.html');await p.waitForTimeout(700);
+await p.screenshot({path:'assets/store/feature-graphic.png'});await b.close();})()"
+```
+
+ได้ PNG ขนาด 1024×500 แบบ 24-bit ไม่มี alpha ตรงตามที่ Play ต้องการพอดี
 
 ### อัปเดตแอปหลังจากนี้
 
