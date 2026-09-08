@@ -21,6 +21,89 @@
 - เมนูลัดที่ไอคอนแอป: `#go=add` · `#go=debt` · `#go=scan` · `#go=myqr`
 - v56 เอาการ์ด “สแกนจ่ายเงิน” ออกตามที่ผู้ใช้ขอ (ตัวอ่าน QR `PromptPay.parse` ยังอยู่ใน `assets/promptpay.js` เผื่อใช้ภายหลัง)
 
+## ทำเป็นแอป Android (.apk / .aab) ด้วย TWA (v59)
+
+TWA (Trusted Web Activity) คือแอป Android ที่เปิดเว็บนี้ด้วยเครื่องยนต์ Chrome แบบ **ไม่มีแถบ URL**
+โค้ดชุดเดียวกับเว็บ อัปเดตเว็บเมื่อไหร่แอปในเครื่องผู้ใช้ก็ได้ของใหม่ทันที ไม่ต้องส่งรีวิวใหม่
+
+### ในรีโปเตรียมไว้ให้แล้ว
+
+| ไฟล์ | ใช้ทำอะไร |
+| --- | --- |
+| `.well-known/assetlinks.json` | ผูกโดเมนกับแอป — **ต้องแก้ลายนิ้วมือก่อน** ไม่งั้นแอปจะโผล่แถบ URL ด้านบน |
+| `manifest.webmanifest` | เพิ่ม `id`, `categories`, `screenshots`, `prefer_related_applications` ครบตามที่ PWABuilder/Play ต้องการ |
+| `assets/screenshots/*.png` | ภาพหน้าจอ 4 มือถือ (824×1464) + 2 จอกว้าง (1280×800) — อัตราส่วนผ่านเกณฑ์ Play ใช้ยื่นในสโตร์ได้เลย |
+| `privacy.html` | หน้านโยบายความเป็นส่วนตัว (Play บังคับต้องมี URL) — **ต้องใส่ชื่อกับอีเมลผู้ดูแลก่อน** |
+
+### ขั้นตอน
+
+**1. สร้างแพ็กเกจ**
+
+เปิด <https://www.pwabuilder.com> → ใส่ `https://ampaypay.onrender.com` → *Package For Stores* → **Android**
+
+ตั้งค่าให้ตรงกับที่เตรียมไว้:
+
+| ช่อง | ค่า |
+| --- | --- |
+| Package ID | `app.ampaypay.twa` (ต้องตรงกับใน `assetlinks.json` เป๊ะ ๆ) |
+| App name | `AmPayPay` |
+| Launcher name | `AmPayPay` |
+| App version / version code | `1.0.0` / `1` |
+| Display mode | `standalone` |
+| Signing key | *Create new* (ครั้งแรก) แล้ว **เก็บไฟล์ `signing.keystore` กับรหัสผ่านไว้ให้ดี** — หายแล้วอัปเดตแอปเดิมบน Play ไม่ได้อีกเลย |
+
+ได้ไฟล์ zip ที่มี `app-release-signed.apk` (ติดตั้งลองเองได้), `app-release-bundle.aab` (ไฟล์ที่ส่งขึ้น Play), คีย์ และ `assetlinks.json`
+
+**2. ผูกโดเมนกับแอป**
+
+เปิด `assetlinks.json` ที่ได้จาก zip → คัดลอกค่าใน `sha256_cert_fingerprints`
+(รูปแบบ `AA:BB:CC:...` 32 คู่) มาแทนที่ `REPLACE_WITH_SHA256_FINGERPRINT_FROM_PWABUILDER`
+ในไฟล์ `.well-known/assetlinks.json` ของรีโปนี้ แล้ว commit + push ขึ้น main
+
+ตรวจว่าขึ้นจริง:
+
+```bash
+curl -s https://ampaypay.onrender.com/.well-known/assetlinks.json
+```
+
+ถ้าอยากให้ Google ตรวจให้: <https://developers.google.com/digital-asset-links/tools/generator>
+
+**3. ทดสอบก่อนขึ้นสโตร์**
+
+ส่งไฟล์ `.apk` เข้าเครื่อง Android แล้วติดตั้ง (เปิด “อนุญาตติดตั้งจากแหล่งนี้”) เปิดแอปแล้วดู:
+
+- ✅ ไม่มีแถบที่อยู่เว็บด้านบน = `assetlinks.json` ถูกต้องแล้ว
+- ❌ ถ้ายังมีแถบ URL → ลายนิ้วมือไม่ตรง / ไฟล์ยังไม่ deploy / package id ไม่ตรง
+  (แก้แล้วให้ลบข้อมูลแอป Chrome หรือถอนแล้วติดตั้งใหม่ เพราะ Android แคชผลตรวจไว้)
+
+**4. ขึ้น Google Play**
+
+- สมัคร Play Console **$25 จ่ายครั้งเดียว** <https://play.google.com/console>
+- สร้างแอป → อัปโหลด `.aab` → กรอกข้อมูลร้านค้า
+- ใช้ภาพจาก `assets/screenshots/` ได้เลย (ต้องมีอย่างน้อย 2 ภาพ) + ไอคอน 512×512 (`assets/icon-512.png`) + Feature graphic 1024×500 (ยังต้องทำเพิ่ม)
+- Privacy policy URL: `https://ampaypay.onrender.com/privacy.html`
+- แบบฟอร์ม **Data safety** ตอบตามนี้ได้
+
+  | หัวข้อ | คำตอบ |
+  | --- | --- |
+  | เก็บข้อมูลไหม | เก็บ (เฉพาะเมื่อผู้ใช้เปิดซิงก์) |
+  | ประเภทข้อมูล | อีเมล (Personal info) · ข้อมูลการเงินที่ผู้ใช้กรอกเอง (App activity/User content) · รูปภาพที่ผู้ใช้เลือก |
+  | ส่งออกนอกเครื่องไหม | ส่งเมื่อเปิดซิงก์เท่านั้น เข้ารหัสระหว่างส่ง (HTTPS) |
+  | แชร์กับบุคคลที่สามไหม | ไม่ |
+  | ลบข้อมูลได้ไหม | ได้ (ปุ่มล้างข้อมูลในแอป + ขอลบบัญชีทางอีเมล) |
+  | ใช้เพื่อโฆษณา/ติดตามผู้ใช้ไหม | ไม่ |
+
+- ต้องผ่าน target API level ล่าสุดที่ Play กำหนด — PWABuilder ตั้งให้อยู่แล้ว ถ้า Play เตือนให้กด *Generate* ใหม่จาก PWABuilder แล้วอัปโหลดทับ (ใช้คีย์เดิม)
+
+### อัปเดตแอปหลังจากนี้
+
+- แก้เว็บแล้ว push ขึ้น main → **แอปได้ของใหม่เอง** ไม่ต้องทำอะไรกับ Play
+- ส่งเวอร์ชันใหม่ขึ้น Play เฉพาะตอนเปลี่ยน **ไอคอน ชื่อแอป package id หรือ target API** เท่านั้น (สร้างใหม่จาก PWABuilder ด้วยคีย์เดิม + เพิ่ม version code)
+
+### ทางเลือกที่ไม่ต้องขึ้นสโตร์
+
+ส่งไฟล์ `.apk` ให้กันตรง ๆ ก็ติดตั้งได้ หรือให้เปิดเว็บใน Chrome แล้วกดเมนู ⋮ → **ติดตั้งแอป** ก็ได้ไอคอน เปิดเต็มจอ ใช้ออฟไลน์และรับแจ้งเตือนได้เหมือนกัน
+
 ## เมนูล่างหลุดจากขอบจอบน iPhone (v58)
 
 พิมพ์ในช่องกรอกแล้วปิดแป้นพิมพ์ แถบเมนูล่าง (`position: fixed`) ค้างลอยอยู่กลางจอทับเนื้อหา — เป็นอาการของ Safari บน iOS ที่ไม่ย้ายอิลิเมนต์แบบ fixed กลับที่เดิมหลังแป้นพิมพ์ยุบ

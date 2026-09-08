@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "AmPayPay",
   "short_name": "AmPayPay",
   "description": "อัปโหลดรูปใบเสร็จ อ่านข้อความด้วย OCR แล้วเก็บเป็นสรุปรายจ่าย",
@@ -10,6 +11,12 @@
   "orientation": "portrait",
   "background_color": "#fbf7f2",
   "theme_color": "#fbf7f2",
+  "categories": [
+    "finance",
+    "productivity",
+    "utilities"
+  ],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "assets/icon-192.png",
@@ -28,6 +35,50 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/mobile-add.png",
+      "sizes": "824x1464",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "เพิ่มใบเสร็จด้วยการถ่ายรูป แล้วให้แอปอ่านยอดให้"
+    },
+    {
+      "src": "assets/screenshots/mobile-summary.png",
+      "sizes": "824x1464",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "สรุปรายจ่ายรายเดือน พร้อมงบประมาณและกราฟ"
+    },
+    {
+      "src": "assets/screenshots/mobile-list.png",
+      "sizes": "824x1464",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "รายการทั้งหมด ค้นหาและแก้ไขได้"
+    },
+    {
+      "src": "assets/screenshots/mobile-debt.png",
+      "sizes": "824x1464",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "หารบิลกับเพื่อน ติดตามยอดค้างและยอดที่ได้คืน"
+    },
+    {
+      "src": "assets/screenshots/wide-summary.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "สรุปรายจ่ายบนจอกว้าง"
+    },
+    {
+      "src": "assets/screenshots/wide-list.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "รายการรายจ่ายบนจอกว้าง"
     }
   ],
   "shortcuts": [
