@@ -440,11 +440,10 @@
     if (!m) return;
     history.replaceState(null, '', location.pathname + location.search);
     var where = m[1];
-    var tabName = where === 'scan' ? 'friends' : (where === 'pay' || where === 'myqr') ? 'me' : where;
+    var tabName = where === 'scan' ? 'friends' : where === 'myqr' ? 'me' : where;
     var tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
     if (tab) tab.click();
     if (where === 'scan') { openAddFriendModal(); setTimeout(function () { $('#scanFriendBtn').click(); }, 150); }
-    if (where === 'pay') openScanner(handleScannedPay);
     if (where === 'myqr') openMyQr();
   }
 
@@ -820,57 +819,6 @@
   $('#myQrModal').addEventListener('click', function (ev) {
     if (ev.target === this || ev.target.closest('[data-myqr="close"]')) closeMyQr();
   });
-
-  /* สแกน QR ร้านค้า → อ่านยอด/ปลายทาง แล้วบันทึกเป็นรายจ่ายได้ทันที */
-  var payScan = null;
-  function handleScannedPay(text) {
-    var info = PromptPay.parse(text);
-    if (!info) { toast('QR นี้ไม่ใช่ QR รับเงิน (พร้อมเพย์/จ่ายบิล)'); return; }
-    payScan = info;
-    var who = info.merchant || info.targetLabel || 'ไม่ทราบผู้รับ';
-    $('#payResultBody').innerHTML = '<div class="pay-body">' +
-        '<div class="pay-amount">' + (info.amount != null ? fmtMoney(info.amount) : 'ไม่ระบุยอด') + '</div>' +
-        '<div class="pay-to">จ่ายให้ <b>' + esc(who) + '</b></div>' +
-        (info.targetLabel ? '<div class="pay-id">' + esc(info.targetLabel) + '</div>' : '') +
-        (info.ref ? '<div class="muted" style="font-size:12.5px">อ้างอิง ' + esc(info.ref) + '</div>' : '') +
-        (info.valid ? '' : '<p class="banner is-warn" style="margin:0">⚠️ รหัสตรวจสอบใน QR ไม่ตรง — ตรวจกับร้านก่อนโอน</p>') +
-        '<label class="field" style="width:100%;max-width:260px"><span class="field-label">จำนวนเงินที่จ่ายจริง</span>' +
-          '<input type="number" id="payAmountInput" inputmode="decimal" min="0" step="0.01" value="' + (info.amount != null ? info.amount : '') + '" placeholder="กรอกยอดที่โอน"></label>' +
-        '<div class="row-actions">' +
-          '<button class="btn btn-primary btn-sm" type="button" id="paySaveBtn">📥 บันทึกเป็นรายจ่าย</button>' +
-          (info.target ? '<button class="btn btn-ghost btn-sm" type="button" id="payCopyTargetBtn">คัดลอกเลขปลายทาง</button>' : '') +
-        '</div>' +
-        '<p class="pay-hint">แอปนี้โอนเงินเองไม่ได้ — โอนในแอปธนาคารแล้วกดบันทึกไว้ที่นี่ จะได้ไม่ลืมลงรายจ่าย</p>' +
-      '</div>';
-    $('#payResultModal').hidden = false;
-    var copyBtn = $('#payCopyTargetBtn');
-    if (copyBtn) copyBtn.addEventListener('click', function () {
-      var d = /^0066\d{9}$/.test(info.target) ? '0' + info.target.slice(4) : info.target;
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(d).then(function () { toast('คัดลอก ' + d + ' แล้ว'); });
-      else prompt('เลขปลายทาง', d);
-    });
-    $('#paySaveBtn').addEventListener('click', function () {
-      var amt = ReceiptParser.toNumber($('#payAmountInput').value);
-      if (!amt || amt <= 0) { toast('ใส่จำนวนเงินก่อน'); $('#payAmountInput').focus(); return; }
-      var merchant = info.merchant || info.targetLabel || 'จ่ายด้วย QR';
-      ExpenseStore.add({
-        date: todayISO(),
-        merchant: merchant,
-        amount: amt,
-        category: ReceiptParser.guessCategory(merchant, ''),
-        note: 'สแกน QR จ่ายเงิน' + (info.ref ? ' · อ้างอิง ' + info.ref : '')
-      });
-      closePayResult();
-      renderList(); renderBudgetAlert();
-      if ($('#panel-summary').classList.contains('is-active')) renderSummary();
-      toast('บันทึก ' + fmtMoney(amt) + ' ลงสมุด “' + ExpenseStore.currentBookName() + '” แล้ว');
-    });
-  }
-  function closePayResult() { $('#payResultModal').hidden = true; }
-  $('#payResultModal').addEventListener('click', function (ev) {
-    if (ev.target === this || ev.target.closest('[data-payres="close"]')) closePayResult();
-  });
-  $('#scanPayBtn').addEventListener('click', function () { openScanner(handleScannedPay); });
 
   /* ---------- QR พร้อมเพย์: ลูกหนี้เปิดดู/บันทึกรูป แล้วสแกนจากรูปในแอปธนาคาร ---------- */
   function qrCanvas(text, size) {
@@ -3556,7 +3504,6 @@
     if (!$('#addFriendModal').hidden) closeAddFriendModal();
     if (!$('#scanModal').hidden) closeScanner();
     if (!$('#myQrModal').hidden) closeMyQr();
-    if (!$('#payResultModal').hidden) closePayResult();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
