@@ -203,6 +203,7 @@
       /* ชื่อเล่นติดไปกับแถวเพื่อนบนเซิร์ฟเวอร์ จึงต้องส่งแถวเพื่อนขึ้นไปใหม่ทั้งหมด */
       ExpenseStore.friends.all().forEach(function (f) { ExpenseStore.friends.save(f.email, f.name); });
       renderMeCard();
+      if ($('#panel-me').classList.contains('is-active')) renderMeTab();
       toast('บันทึกชื่อเล่นแล้ว');
     });
     $('#myPromptPayInput').addEventListener('change', function () {
@@ -210,6 +211,7 @@
       if (v && !PromptPay.normalizeId(v)) { toast('พร้อมเพย์ไม่ถูกต้อง — ใส่เบอร์ 10 หลัก หรือเลขบัตร 13 หลัก'); }
       saveProfile({ promptpay: v });
       renderMeCard();
+      if ($('#panel-me').classList.contains('is-active')) renderMeTab();
       if (v && PromptPay.normalizeId(v)) toast('บันทึกพร้อมเพย์แล้ว ยอดที่ส่งให้เพื่อนครั้งต่อไปจะมี QR โอนคืน');
     });
     $('#shareMeBtn').addEventListener('click', function () {
@@ -438,10 +440,12 @@
     if (!m) return;
     history.replaceState(null, '', location.pathname + location.search);
     var where = m[1];
-    var tabName = where === 'scan' ? 'friends' : where;
+    var tabName = where === 'scan' ? 'friends' : (where === 'pay' || where === 'myqr') ? 'me' : where;
     var tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
     if (tab) tab.click();
     if (where === 'scan') { openAddFriendModal(); setTimeout(function () { $('#scanFriendBtn').click(); }, 150); }
+    if (where === 'pay') openScanner(handleScannedPay);
+    if (where === 'myqr') openMyQr();
   }
 
   /* สแกน QR ของเพื่อนด้วยกล้องมือถือ → เปิดลิงก์ #addfriend= มาที่นี่ */
@@ -737,6 +741,136 @@
       .catch(function (e) { toast('เช็กไม่สำเร็จ: ' + e.message); })
       .then(function () { btn.disabled = false; });
   });
+
+  /* ---------- แท็บ "ฉัน": QR รับเงินของตัวเอง · สแกน QR ร้านเพื่อบันทึกรายจ่าย · บัตรของฉัน ---------- */
+  function renderMeTab() {
+    var pp = myPromptPay();
+    var info = pp ? PromptPay.normalizeId(pp) : null;
+    var name = myName();
+    $('#meSummary').innerHTML =
+      '<div class="me-rows">' +
+        '<div class="me-row"><span>ชื่อเล่น</span><b>' + (name ? esc(name) : '<span class="muted">ยังไม่ได้ตั้ง</span>') + '</b></div>' +
+        '<div class="me-row"><span>พร้อมเพย์</span><b>' + (info ? esc(info.label) : '<span class="muted">ยังไม่ได้ใส่</span>') + '</b></div>' +
+        '<div class="me-row"><span>บัญชีที่ล็อกอิน</span><b>' + (syncReady() ? esc(myEmail()) : '<span class="muted">ยังไม่ได้ล็อกอิน</span>') + '</b></div>' +
+      '</div>' +
+      '<div class="row-actions" style="margin-top:12px">' +
+        '<button class="btn btn-sm" type="button" id="meEditBtn">✏️ แก้ชื่อเล่น / พร้อมเพย์</button>' +
+      '</div>';
+    $('#meEditBtn').addEventListener('click', openMeModal);
+  }
+
+  /* QR รับเงิน: ใส่ยอดหรือไม่ใส่ก็ได้ (ไม่ใส่ = ให้ผู้โอนกรอกเอง) */
+  var myQrAmount = '';
+  function renderMyQr() {
+    var pp = myPromptPay();
+    var info = pp ? PromptPay.normalizeId(pp) : null;
+    var body = $('#myQrBody');
+    if (!info) {
+      body.innerHTML = '<p class="banner is-warn" style="margin:0">ยังไม่ได้ใส่พร้อมเพย์ — ใส่เบอร์โทรหรือเลขบัตรก่อน แล้วจะสร้าง QR รับเงินให้</p>' +
+        '<div class="row-actions" style="margin-top:12px"><button class="btn btn-primary btn-sm" type="button" id="myQrSetBtn">ใส่พร้อมเพย์</button></div>';
+      $('#myQrSetBtn').addEventListener('click', function () { closeMyQr(); openMeModal(); });
+      return;
+    }
+    var amount = ReceiptParser.toNumber(myQrAmount) || 0;
+    var text = PromptPay.payload(pp, amount);
+    body.innerHTML = '<div class="pay-body">' +
+        '<label class="field" style="width:100%;max-width:260px"><span class="field-label">จำนวนเงิน (เว้นว่างให้ผู้โอนกรอกเอง)</span>' +
+          '<input type="number" id="myQrAmountInput" inputmode="decimal" min="0" step="0.01" placeholder="เช่น 120" value="' + esc(myQrAmount) + '"></label>' +
+        '<div class="pay-qr" aria-label="QR พร้อมเพย์ของฉัน">' + qrSvg(text) + '</div>' +
+        '<div class="pay-amount">' + (amount > 0 ? fmtMoney(amount) : 'ไม่ระบุยอด') + '</div>' +
+        '<div class="pay-id">' + esc(info.label) + (myName() ? ' · ' + esc(myName()) : '') + '</div>' +
+        '<div class="row-actions">' +
+          '<button class="btn btn-primary btn-sm" type="button" id="myQrSaveBtn">💾 บันทึกรูป QR</button>' +
+          '<button class="btn btn-ghost btn-sm" type="button" id="myQrCopyBtn">คัดลอกเลขพร้อมเพย์</button>' +
+        '</div>' +
+        '<p class="pay-hint">ให้เพื่อนสแกนจาก QR นี้ได้เลย หรือบันทึกรูปแล้วส่งให้ทางแชต</p>' +
+      '</div>';
+    var input = $('#myQrAmountInput');
+    input.addEventListener('change', function () { myQrAmount = this.value.trim(); renderMyQr(); setTimeout(function () { var el = $('#myQrAmountInput'); if (el) el.focus(); }, 0); });
+    $('#myQrCopyBtn').addEventListener('click', function () {
+      var digits = info.type === '01' ? '0' + info.value.slice(4) : info.value;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(digits).then(function () { toast('คัดลอก ' + digits + ' แล้ว'); });
+      else prompt('เลขพร้อมเพย์ของคุณ', digits);
+    });
+    $('#myQrSaveBtn').addEventListener('click', function () {
+      saveQrImage(text, 'promptpay-' + (amount > 0 ? Math.round(amount) : 'any') + '.png', 'QR รับเงิน' + (amount > 0 ? ' ' + fmtMoney(amount) : ''));
+    });
+  }
+  /* บันทึก/แชร์ QR เป็นรูป — ใช้ร่วมกันทั้ง QR รับเงินและ QR โอนคืน */
+  function saveQrImage(text, name, title) {
+    qrCanvas(text, 640).toBlob(function (blob) {
+      if (!blob) { toast('สร้างรูปไม่ได้'); return; }
+      var file = null;
+      try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: title }).catch(function () {});
+        return;
+      }
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      toast('บันทึกรูป QR แล้ว');
+    }, 'image/png');
+  }
+  function openMyQr() { myQrAmount = ''; renderMyQr(); $('#myQrModal').hidden = false; }
+  function closeMyQr() { $('#myQrModal').hidden = true; }
+  $('#myQrBtn').addEventListener('click', openMyQr);
+  $('#myCardBtn').addEventListener('click', openMeModal);
+  $('#myQrModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-myqr="close"]')) closeMyQr();
+  });
+
+  /* สแกน QR ร้านค้า → อ่านยอด/ปลายทาง แล้วบันทึกเป็นรายจ่ายได้ทันที */
+  var payScan = null;
+  function handleScannedPay(text) {
+    var info = PromptPay.parse(text);
+    if (!info) { toast('QR นี้ไม่ใช่ QR รับเงิน (พร้อมเพย์/จ่ายบิล)'); return; }
+    payScan = info;
+    var who = info.merchant || info.targetLabel || 'ไม่ทราบผู้รับ';
+    $('#payResultBody').innerHTML = '<div class="pay-body">' +
+        '<div class="pay-amount">' + (info.amount != null ? fmtMoney(info.amount) : 'ไม่ระบุยอด') + '</div>' +
+        '<div class="pay-to">จ่ายให้ <b>' + esc(who) + '</b></div>' +
+        (info.targetLabel ? '<div class="pay-id">' + esc(info.targetLabel) + '</div>' : '') +
+        (info.ref ? '<div class="muted" style="font-size:12.5px">อ้างอิง ' + esc(info.ref) + '</div>' : '') +
+        (info.valid ? '' : '<p class="banner is-warn" style="margin:0">⚠️ รหัสตรวจสอบใน QR ไม่ตรง — ตรวจกับร้านก่อนโอน</p>') +
+        '<label class="field" style="width:100%;max-width:260px"><span class="field-label">จำนวนเงินที่จ่ายจริง</span>' +
+          '<input type="number" id="payAmountInput" inputmode="decimal" min="0" step="0.01" value="' + (info.amount != null ? info.amount : '') + '" placeholder="กรอกยอดที่โอน"></label>' +
+        '<div class="row-actions">' +
+          '<button class="btn btn-primary btn-sm" type="button" id="paySaveBtn">📥 บันทึกเป็นรายจ่าย</button>' +
+          (info.target ? '<button class="btn btn-ghost btn-sm" type="button" id="payCopyTargetBtn">คัดลอกเลขปลายทาง</button>' : '') +
+        '</div>' +
+        '<p class="pay-hint">แอปนี้โอนเงินเองไม่ได้ — โอนในแอปธนาคารแล้วกดบันทึกไว้ที่นี่ จะได้ไม่ลืมลงรายจ่าย</p>' +
+      '</div>';
+    $('#payResultModal').hidden = false;
+    var copyBtn = $('#payCopyTargetBtn');
+    if (copyBtn) copyBtn.addEventListener('click', function () {
+      var d = /^0066\d{9}$/.test(info.target) ? '0' + info.target.slice(4) : info.target;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(d).then(function () { toast('คัดลอก ' + d + ' แล้ว'); });
+      else prompt('เลขปลายทาง', d);
+    });
+    $('#paySaveBtn').addEventListener('click', function () {
+      var amt = ReceiptParser.toNumber($('#payAmountInput').value);
+      if (!amt || amt <= 0) { toast('ใส่จำนวนเงินก่อน'); $('#payAmountInput').focus(); return; }
+      var merchant = info.merchant || info.targetLabel || 'จ่ายด้วย QR';
+      ExpenseStore.add({
+        date: todayISO(),
+        merchant: merchant,
+        amount: amt,
+        category: ReceiptParser.guessCategory(merchant, ''),
+        note: 'สแกน QR จ่ายเงิน' + (info.ref ? ' · อ้างอิง ' + info.ref : '')
+      });
+      closePayResult();
+      renderList(); renderBudgetAlert();
+      if ($('#panel-summary').classList.contains('is-active')) renderSummary();
+      toast('บันทึก ' + fmtMoney(amt) + ' ลงสมุด “' + ExpenseStore.currentBookName() + '” แล้ว');
+    });
+  }
+  function closePayResult() { $('#payResultModal').hidden = true; }
+  $('#payResultModal').addEventListener('click', function (ev) {
+    if (ev.target === this || ev.target.closest('[data-payres="close"]')) closePayResult();
+  });
+  $('#scanPayBtn').addEventListener('click', function () { openScanner(handleScannedPay); });
 
   /* ---------- QR พร้อมเพย์: ลูกหนี้เปิดดู/บันทึกรูป แล้วสแกนจากรูปในแอปธนาคาร ---------- */
   function qrCanvas(text, size) {
@@ -1829,7 +1963,7 @@
         t.classList.toggle('is-active', on);
         t.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-      ['add', 'summary', 'list', 'debt', 'friends'].forEach(function (name) {
+      ['add', 'summary', 'list', 'debt', 'friends', 'me'].forEach(function (name) {
         var panel = $('#panel-' + name);
         var on = name === tab.dataset.tab;
         panel.classList.toggle('is-active', on);
@@ -1839,6 +1973,7 @@
       if (tab.dataset.tab === 'list') renderList();
       if (tab.dataset.tab === 'debt') renderDebts();
       if (tab.dataset.tab === 'friends') renderFriendsTab();
+      if (tab.dataset.tab === 'me') renderMeTab();
       if (tab.scrollIntoView) tab.scrollIntoView({ inline: 'center', block: 'nearest' });
     });
   });
@@ -3420,6 +3555,8 @@
     if (!$('#meModal').hidden) closeMeModal();
     if (!$('#addFriendModal').hidden) closeAddFriendModal();
     if (!$('#scanModal').hidden) closeScanner();
+    if (!$('#myQrModal').hidden) closeMyQr();
+    if (!$('#payResultModal').hidden) closePayResult();
   });
 
   CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
@@ -3490,6 +3627,7 @@
     renderBell();
     if ($('#panel-debt').classList.contains('is-active')) renderDebts();
     if ($('#panel-friends').classList.contains('is-active')) renderFriendsTab();
+    if ($('#panel-me').classList.contains('is-active')) renderMeTab();
   });
   /* ลงทะเบียน service worker ตั้งแต่เปิดแอป เพื่อให้เปิดใช้งานได้ตอนเน็ตหลุด (และพร้อมรับ push ถ้าเปิดไว้) */
   if ('serviceWorker' in navigator) {
