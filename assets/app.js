@@ -590,7 +590,7 @@
         });
       }).then(function (sub) {
         return CloudSync.savePushSubscription(sub).then(function () {
-          try { localStorage.setItem(PUSH_LOCAL_KEY, JSON.stringify({ endpoint: sub.endpoint, at: Date.now() })); } catch (e) {}
+          rememberPushSub(sub.endpoint);
           toast('เปิด push แจ้งเตือนบนเครื่องนี้แล้ว 🎉');
           return true;
         });
@@ -613,18 +613,51 @@
       .then(function (r) { renderPushBox(); return r; });
   }
   /* เปิดแอปมาแล้วเคยเปิด push ไว้ → ต่ออายุแถวในตารางเงียบๆ (endpoint อาจเปลี่ยนได้) */
+  /* บอกว่าตอนนี้บัญชีนี้เปิดรับ push ไว้กี่เครื่อง — ทุกเครื่องในรายการจะได้รับพร้อมกัน */
+  function deviceName(ua) {
+    ua = String(ua || '');
+    var os = /iPhone|iPad|iPod/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android'
+           : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'เครื่องอื่น';
+    var br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox/.test(ua) ? 'Firefox'
+           : /Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : '';
+    return os + (br ? ' · ' + br : '');
+  }
+  function deviceSummary(list) {
+    list = list || [];
+    var names = list.map(function (d) { return deviceName(d.user_agent); });
+    var seen = {};
+    names.forEach(function (n) { seen[n] = (seen[n] || 0) + 1; });
+    return list.length + ' เครื่อง — ' + Object.keys(seen).map(function (n) {
+      return n + (seen[n] > 1 ? ' ×' + seen[n] : '');
+    }).join(' · ');
+  }
+
+  function rememberPushSub(endpoint) {
+    try { localStorage.setItem(PUSH_LOCAL_KEY, JSON.stringify({ endpoint: endpoint, email: myEmail(), at: Date.now() })); } catch (e) {}
+  }
+
+  /* ทำให้แน่ใจว่า "เครื่องนี้" ลงทะเบียนรับ push ไว้กับ "บัญชีที่ล็อกอินอยู่ตอนนี้"
+     แถวบนเซิร์ฟเวอร์ใช้ endpoint เป็นคีย์ (หนึ่งแถวต่อหนึ่งเบราว์เซอร์) จึงรับได้หลายเครื่องพร้อมกัน
+     ต้องเขียนซ้ำในสามกรณี ไม่งั้นเครื่องนั้นจะเงียบไปเลย
+       · เคยอนุญาตแจ้งเตือนไว้แล้วแต่ข้อมูลในเครื่องถูกล้าง (ไม่เหลือรอยจำ)
+       · สลับบัญชีบนเครื่องเดิม — แถวยังผูกกับเจ้าของเดิม เจ้าของใหม่เลยไม่ได้ และเจ้าของเดิมได้ทั้งที่ไม่ได้ใช้เครื่องนี้แล้ว
+       · endpoint ถูกเบราว์เซอร์ออกใหม่ หรือบันทึกไว้นานเกิน 7 วัน */
+  var pushSaving = false;
   function refreshPushSub() {
-    if (!pushSupported() || !syncReady() || Notification.permission !== 'granted') return;
+    if (!pushSupported() || !syncReady() || Notification.permission !== 'granted' || pushSaving) return;
+    var me = myEmail();
     var had = null;
     try { had = JSON.parse(localStorage.getItem(PUSH_LOCAL_KEY) || 'null'); } catch (e) {}
-    if (!had) return;
+    pushSaving = true;
     currentPushSub().then(function (sub) {
       if (!sub) return;
-      if (had.endpoint === sub.endpoint && Date.now() - (had.at || 0) < 7 * 86400e3) return;
+      var fresh = had && had.endpoint === sub.endpoint && had.email === me && Date.now() - (had.at || 0) < 7 * 86400e3;
+      if (fresh) return;
       return CloudSync.savePushSubscription(sub).then(function () {
-        try { localStorage.setItem(PUSH_LOCAL_KEY, JSON.stringify({ endpoint: sub.endpoint, at: Date.now() })); } catch (e) {}
+        rememberPushSub(sub.endpoint);
+        renderPushBox();
       });
-    }).catch(function () {});
+    }).catch(function () {}).then(function () { pushSaving = false; });
   }
   function renderPushBox() {
     var box = $('#pushBox');
@@ -668,7 +701,7 @@
             [r.table, 'ตาราง push_subscriptions', r.table ? 'มีแล้ว' : 'ยังไม่มี — รันไฟล์ supabase/schema.sql ซ้ำใน SQL Editor'],
             [r.fn, 'Edge Function push-notify', r.fnDetail || ''],
             [Notification.permission === 'granted', 'สิทธิ์แจ้งเตือนของเบราว์เซอร์', Notification.permission === 'granted' ? 'อนุญาตแล้ว' : 'ยังไม่อนุญาต'],
-            [r.mine, 'เครื่องนี้ลงทะเบียนรับ push', r.mine ? 'มีแถวของบัญชีนี้แล้ว' : 'ยังไม่มี — กด “เปิดแจ้งเตือนตอนปิดแอป” หลังแก้ข้อข้างบนแล้ว']
+            [r.mine, 'เครื่องที่จะได้รับแจ้งเตือน', r.mine ? deviceSummary(r.devices) : 'ยังไม่มีเลย — กด “เปิดแจ้งเตือนตอนปิดแอป” หลังแก้ข้อข้างบนแล้ว']
           ];
           box.insertAdjacentHTML('beforeend', '<div id="pushCheck" class="push-hint">' + rows.map(function (x) {
             return '<div>' + (x[0] ? '✅' : '❌') + ' <b>' + esc(x[1]) + '</b> — ' + esc(x[2]) + '</div>';
@@ -3604,7 +3637,7 @@
     if (!$('#myQrModal').hidden) closeMyQr();
   });
 
-  CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); });
+  CloudSync.onState(function () { renderSyncBadge(); renderSyncModal(); refreshPushSub(); });
 
   /* แก้ข้อมูลในเครื่องแล้วซิงก์ตามให้อัตโนมัติ (หน่วงไว้กันซิงก์ถี่เกินไป) */
   ExpenseStore.onChange(function () {

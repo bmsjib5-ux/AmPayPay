@@ -439,12 +439,14 @@ window.CloudSync = (function () {
     },
     /* ตรวจว่าฝั่ง Supabase พร้อมสำหรับ push หรือยัง (ตาราง / Edge Function / secrets) */
     checkPushSetup: function () {
-      var out = { table: null, fn: null, fnDetail: '', mine: null };
+      var out = { table: null, fn: null, fnDetail: '', mine: null, devices: [] };
       return getClient().then(function (c) {
-        return c.from('push_subscriptions').select('endpoint').limit(1).then(function (res) {
+        /* RLS คืนเฉพาะแถวของบัญชีนี้ จึงนับได้เลยว่ามีกี่เครื่องที่จะได้รับแจ้งเตือน */
+        return c.from('push_subscriptions').select('endpoint,user_agent,updated_at').then(function (res) {
           out.table = !res.error;
           if (res.error) out.tableDetail = friendly(res.error);
-          out.mine = !res.error && (res.data || []).length > 0;
+          out.devices = res.error ? [] : (res.data || []);
+          out.mine = out.devices.length > 0;
         });
       }).then(function () {
         var cfg = config();
