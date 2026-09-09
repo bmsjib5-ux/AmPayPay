@@ -1205,3 +1205,40 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .me-row span { color: var(--text-muted); font-size: 13px; }
 .me-row b { text-align: right; min-width: 0; word-break: break-word; }
 @media (max-width: 420px) { .me-grid .ac-sub { font-size: 10.5px; } }
+
+
+/* ---------- หน้าต้อนรับตอนเปิดใช้ครั้งแรก ---------- */
+.welcome {
+  position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
+  padding: 24px 18px calc(24px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  overflow-y: auto;
+  animation: fade-in .25s var(--ease) both;
+}
+.welcome::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(70vw 46vh at 12% -8%, var(--bg-blob-1) 0%, transparent 70%),
+    radial-gradient(60vw 40vh at 96% 6%, var(--bg-blob-2) 0%, transparent 68%);
+}
+.welcome-card {
+  position: relative; width: 100%; max-width: 380px; text-align: center;
+  background: var(--surface-1); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+  padding: 28px 22px 22px; box-shadow: var(--shadow);
+}
+.welcome-logo { border-radius: 22px; box-shadow: 0 10px 26px rgba(0, 0, 0, .16); }
+.welcome-title { font-size: 30px; letter-spacing: -.02em; margin: 14px 0 4px; }
+.welcome-sub { color: var(--text-muted); font-size: 14.5px; margin: 0 0 18px; line-height: 1.5; }
+.welcome-points { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 9px; text-align: left; }
+.welcome-points li {
+  display: flex; align-items: center; gap: 10px; font-size: 14px;
+  background: var(--surface-2); border-radius: 12px; padding: 9px 12px;
+}
+.welcome-points span { font-size: 18px; line-height: 1; }
+.welcome-actions { display: grid; gap: 9px; }
+.welcome-actions .btn { width: 100%; justify-content: center; min-height: 46px; font-size: 15px; }
+.welcome-note { color: var(--text-muted); font-size: 12.5px; margin: 16px 0 0; }
+@media (max-width: 380px) {
+  .welcome-title { font-size: 26px; }
+  .welcome-points li { font-size: 13px; }
+}

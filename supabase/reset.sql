@@ -1,5 +1,6 @@
 -- =====================================================================
---  ล้างข้อมูลทั้งหมดของ "สมุดเก็บรายจ่ายของฉัน" ใน Supabase
+--  ล้างข้อมูลของ AmPayPay ใน Supabase (เพื่อน + ใบแจ้งหนี้ + การแจ้งเตือน)
+--  รายจ่ายไม่ได้เก็บบนเซิร์ฟเวอร์แล้ว จึงต้องล้างจากในแอปของแต่ละเครื่องแทน
 --  ⚠️ ลบแล้วกู้คืนไม่ได้ — สำรองข้อมูลจากในแอป (ปุ่ม "💾 สำรองข้อมูล") ก่อนถ้ายังอยากเก็บไว้
 --
 --  วิธีใช้: Supabase → SQL Editor → New query → วางเฉพาะส่วนที่ต้องการ → Run
@@ -11,9 +12,6 @@
 --  บัญชีผู้ใช้ยังอยู่ ล็อกอินเดิมได้เลย แค่ข้อมูลว่างเปล่า
 -- ---------------------------------------------------------------------
 truncate table public.debt_claims_data;
-truncate table public.expenses;
-truncate table public.budgets;
-truncate table public.books;
 truncate table public.friends_data;
 truncate table public.push_subscriptions_data;
 

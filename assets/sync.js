@@ -86,44 +86,6 @@ window.CloudSync = (function () {
     });
   }
 
-  /* ---------- แปลงรูปแบบข้อมูลระหว่างเครื่องกับฐานข้อมูล ---------- */
-  function toRemote(rec, userId) {
-    return {
-      id: rec.id,
-      user_id: userId,
-      book_id: rec.bookId || 'b_default',
-      date: rec.date,
-      merchant: rec.merchant,
-      amount: Number(rec.amount) || 0,
-      category: rec.category || 'other',
-      note: rec.note || '',
-      items: rec.items || [],
-      split: rec.split || { people: [] },
-      raw_text: rec.rawText || '',
-      deleted: !!rec.deleted,
-      created_at: new Date(rec.createdAt || Date.now()).toISOString(),
-      updated_at: new Date(rec.updatedAt || Date.now()).toISOString()
-    };
-  }
-
-  function toLocal(row) {
-    return {
-      id: row.id,
-      bookId: row.book_id || 'b_default',
-      date: row.date,
-      merchant: row.merchant || '',
-      amount: Number(row.amount) || 0,
-      category: row.category || 'other',
-      note: row.note || '',
-      items: Array.isArray(row.items) ? row.items : [],
-      split: (row.split && Array.isArray(row.split.people)) ? row.split : { people: [] },
-      rawText: row.raw_text || '',
-      deleted: !!row.deleted,
-      createdAt: Date.parse(row.created_at) || Date.now(),
-      updatedAt: Date.parse(row.updated_at) || Date.now()
-    };
-  }
-
   /* ส่วนเสริมที่ถ้าเซิร์ฟเวอร์ยังไม่มีตารางรองรับ ให้ข้ามไปเงียบๆ แทนที่จะล้มทั้งการซิงก์ */
   function optional(promise) {
     return promise.catch(function (err) {
@@ -151,27 +113,6 @@ window.CloudSync = (function () {
       reply: row.reply || '',
       promptpay: row.promptpay || '',
       image: ExpenseStore.safeImage(row.image) || '',       // รูปจากอีกฝ่าย ต้องเป็น data URL ของรูปจริงเท่านั้น
-      deleted: !!row.deleted,
-      createdAt: Date.parse(row.created_at) || Date.now(),
-      updatedAt: Date.parse(row.updated_at) || Date.now()
-    };
-  }
-
-  function bookToRemote(book, userId) {
-    return {
-      id: book.id,
-      user_id: userId,
-      name: book.name || 'สมุดของฉัน',
-      deleted: !!book.deleted,
-      created_at: new Date(book.createdAt || Date.now()).toISOString(),
-      updated_at: new Date(book.updatedAt || Date.now()).toISOString()
-    };
-  }
-
-  function bookToLocal(row) {
-    return {
-      id: row.id,
-      name: row.name || 'สมุดของฉัน',
       deleted: !!row.deleted,
       createdAt: Date.parse(row.created_at) || Date.now(),
       updatedAt: Date.parse(row.updated_at) || Date.now()
@@ -486,8 +427,6 @@ window.CloudSync = (function () {
       if (syncing) return Promise.resolve({ skipped: true });
       var startedAt = Date.now();
       featureNote = '';
-      var since = ExpenseStore.lastSync.get();
-      var sinceISO = since ? new Date(since).toISOString() : null;
       var userId, c;
       var counts = { pulled: 0, pushed: 0 };
       syncing = true;
@@ -496,45 +435,9 @@ window.CloudSync = (function () {
         c = cl;
         if (!session || !session.user) throw new Error('ยังไม่ได้ล็อกอิน');
         userId = session.user.id;
-
-        var booksQuery = c.from('books').select('*').eq('user_id', userId);
-        if (sinceISO) booksQuery = booksQuery.gt('updated_at', sinceISO);
-        return booksQuery;
-      }).then(function (res) {
-        if (res.error) throw new Error(friendly(res.error));
-        counts.pulled += ExpenseStore.mergeRemoteBooks((res.data || []).map(bookToLocal));
-
-        var pendingBooks = ExpenseStore.pendingBooks();
-        if (!pendingBooks.length) return null;
-        return c.from('books')
-          .upsert(pendingBooks.map(function (b) { return bookToRemote(b, userId); }), { onConflict: 'user_id,id' })
-          .then(function (up) {
-            if (up.error) throw new Error(friendly(up.error));
-            ExpenseStore.clearPendingBooks(pendingBooks.map(function (b) { return b.id; }));
-            counts.pushed += pendingBooks.length;
-          });
-      }).then(function () {
-        var query = c.from('expenses').select('*').eq('user_id', userId);
-        if (sinceISO) query = query.gt('updated_at', sinceISO);
-        return query;
-      }).then(function (res) {
-        if (res.error) throw new Error(friendly(res.error));
-        counts.pulled += ExpenseStore.mergeRemote((res.data || []).map(toLocal));
-
-        var pending = ExpenseStore.pendingRecords();
-        if (!pending.length) return null;
-        return c.from('expenses')
-          .upsert(pending.map(function (rec) { return toRemote(rec, userId); }), { onConflict: 'user_id,id' })
-          .then(function (up) {
-            if (up.error) throw new Error(friendly(up.error));
-            ExpenseStore.clearPending(pending.map(function (rec) { return rec.id; }));
-            counts.pushed += pending.length;
-          });
-      }).then(function () {
-        return api.syncBudgets(c, userId);
-      }).then(function () {
-        // ตารางเพื่อน/ใบแจ้งหนี้เพิ่งมาในเวอร์ชันหลัง ถ้าใครยังไม่ได้รัน schema.sql ใหม่
-        // ต้องไม่ทำให้การซิงก์รายจ่ายทั้งหมดพังตามไปด้วย
+        /* รายจ่าย งบประมาณ และสมุด ไม่ถูกส่งขึ้นเซิร์ฟเวอร์ — เก็บไว้ในเครื่องอย่างเดียว
+           บนฐานข้อมูลมีแค่บัญชีผู้ใช้ รายชื่อเพื่อน และใบแจ้งหนี้ (ลูกหนี้) */
+        // ยังไม่ได้รัน schema.sql เวอร์ชันใหม่ ก็ไม่ควรทำให้ทั้งการซิงก์ล้ม
         return optional(api.syncFriends(c, userId).then(function (n) { counts.pushed += n; }));
       }).then(function () {
         return optional(api.syncClaims(c));   // ใบแจ้งหนี้ดึงใหม่ทั้งหมดเสมอ เพราะอีกฝ่ายแก้ได้
@@ -548,40 +451,6 @@ window.CloudSync = (function () {
       }).catch(function (err) {
         syncing = false;
         throw err;
-      });
-    },
-
-    /* งบประมาณมีเล่มละชุด จึงซิงก์ทีละสมุด */
-    syncBudgets: function (c, userId) {
-      return c.from('budgets').select('*').eq('user_id', userId).then(function (res) {
-        if (res.error) throw new Error(friendly(res.error));
-        (res.data || []).forEach(function (row) {
-          var bookId = row.book_id || 'b_default';
-          var remoteAt = Date.parse(row.updated_at) || 0;
-          var local = ExpenseStore.budget.get(bookId);
-          if (remoteAt > (local.updatedAt || 0)) {
-            ExpenseStore.budget.set({
-              total: Number(row.total) || 0,
-              categories: row.categories || {},
-              updatedAt: remoteAt
-            }, true, bookId);
-          }
-        });
-
-        var pending = ExpenseStore.pendingBudgets();
-        if (!pending.length) return null;
-        return c.from('budgets').upsert(pending.map(function (p) {
-          return {
-            user_id: userId,
-            book_id: p.bookId,
-            total: p.budget.total,
-            categories: p.budget.categories,
-            updated_at: new Date(p.budget.updatedAt || Date.now()).toISOString()
-          };
-        }), { onConflict: 'user_id,book_id' }).then(function (up) {
-          if (up.error) throw new Error(friendly(up.error));
-          ExpenseStore.clearPendingBudgets(pending.map(function (p) { return p.bookId; }));
-        });
       });
     }
   };

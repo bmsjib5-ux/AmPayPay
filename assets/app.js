@@ -3366,12 +3366,12 @@
     var btn = $('#syncBtn');
     var on = CloudSync.isConfigured() && !!CloudSync.user();
     btn.classList.toggle('is-on', on);
-    btn.title = on ? 'ซิงก์ข้อมูล (' + CloudSync.email() + ')' : 'ซิงก์ข้อมูลข้ามเครื่อง';
+    btn.title = on ? 'บัญชีเพื่อน/ลูกหนี้ (' + CloudSync.email() + ')' : 'ล็อกอินเพื่อหารบิลกับเพื่อน';
   }
 
   function renderSyncModal() {
     var body = $('#syncBody');
-    var note = '<p class="chart-sub" style="margin-top:10px">รูปใบเสร็จไม่ถูกอัปโหลด เก็บไว้ในเครื่องนี้เท่านั้น · ซิงก์เฉพาะวันที่ ยอดเงิน ชื่อร้าน หมวด บันทึกช่วยจำ และงบประมาณ</p>';
+    var note = '<p class="chart-sub" style="margin-top:10px">รายจ่าย งบประมาณ สมุด และรูปใบเสร็จ <strong>เก็บไว้ในเครื่องนี้เท่านั้น</strong> ไม่ถูกอัปโหลด · บนเซิร์ฟเวอร์มีแค่บัญชีผู้ใช้ รายชื่อเพื่อน และใบแจ้งหนี้ (ลูกหนี้)</p>';
     var msg = syncUI.error
       ? '<p class="banner is-over" style="margin-top:12px">' + esc(syncUI.error) + '</p>'
       : (syncUI.message ? '<p class="banner is-ok" style="margin-top:12px">' + esc(syncUI.message) + '</p>' : '');
@@ -3396,8 +3396,8 @@
           '<button class="btn btn-ghost btn-sm" data-sync="backup">ดาวน์โหลดสำรองข้อมูลก่อน</button>' +
           '<button class="btn btn-ghost btn-sm" data-sync="signout">ออกจากระบบ (ยังไม่ตัดสินใจ)</button>' +
         '</div>' +
-        '<p class="budget-foot">“ล้างข้อมูลในเครื่อง” ลบเฉพาะสำเนาในเบราว์เซอร์นี้ ' +
-          'ข้อมูลของบัญชีเดิมที่เคยซิงก์ขึ้นไปแล้วยังอยู่ครบบนเซิร์ฟเวอร์</p>' + note;
+        '<p class="budget-foot">“ล้างข้อมูลในเครื่อง” ลบรายจ่ายในเบราว์เซอร์นี้ทิ้ง ' +
+          'และรายจ่ายไม่ได้ถูกซิงก์ขึ้นเซิร์ฟเวอร์ จึงกู้คืนไม่ได้ — สำรองไฟล์ไว้ก่อนถ้ายังไม่แน่ใจ</p>' + note;
       return;
     }
 
@@ -3442,7 +3442,7 @@
       return;
     }
 
-    body.innerHTML = '<p class="chart-sub">ล็อกอินครั้งเดียวด้วยอีเมลกับรหัสผ่าน แล้วรายจ่ายจะซิงก์ข้ามมือถือกับคอมให้อัตโนมัติ</p>' + msg +
+    body.innerHTML = '<p class="chart-sub">ล็อกอินครั้งเดียวด้วยอีเมลกับรหัสผ่าน เพื่อเพิ่มเพื่อนและหารบิลข้ามเครื่องได้ — รายจ่ายของคุณยังเก็บอยู่ในเครื่องนี้เท่านั้น</p>' + msg +
       '<div class="grid2" style="margin-top:12px;max-width:420px">' +
         '<label class="field"><span class="field-label">อีเมล</span>' +
           '<input type="email" inputmode="email" autocomplete="email" data-sf="email" value="' + esc(syncUI.email) + '" placeholder="you@example.com"></label>' +
@@ -3457,6 +3457,50 @@
       '</div>' +
       '<p class="budget-foot">ครั้งแรกให้ใส่อีเมลกับรหัสผ่านที่ต้องการ แล้วกด <strong>สมัครใหม่</strong> · เครื่องอื่นใช้อีเมลกับรหัสผ่านเดียวกันเพื่อดูข้อมูลชุดเดียวกัน</p>' + note;
   }
+
+  /* ---------------- หน้าต้อนรับตอนเปิดใช้ครั้งแรก ----------------
+     ขึ้นเฉพาะครั้งแรกจริงๆ: ยังไม่เคยปิดหน้านี้ ยังไม่ได้ล็อกอิน และยังไม่มีรายจ่ายในเครื่อง
+     (คนที่ใช้แอปอยู่ก่อนแล้วจะไม่โดนขวาง) เลือกได้ว่าจะล็อกอินเลยหรือใช้ก่อนโดยไม่ล็อกอิน */
+  var WELCOME_KEY = 'expense-book:welcome:v1';
+
+  function welcomeSeen() {
+    try { return !!localStorage.getItem(WELCOME_KEY); } catch (e) { return false; }
+  }
+  function markWelcomeSeen() {
+    try { localStorage.setItem(WELCOME_KEY, String(Date.now())); } catch (e) {}
+  }
+  function closeWelcome() {
+    markWelcomeSeen();
+    $('#welcome').hidden = true;
+  }
+  function renderWelcome() {
+    var box = $('#welcomeActions');
+    if (!box) return;
+    var canLogin = CloudSync.isConfigured();
+    box.innerHTML = (canLogin
+      ? '<button class="btn btn-primary" type="button" data-welcome="login">☁️ เข้าสู่ระบบ / สมัครสมาชิก</button>' +
+        '<button class="btn btn-ghost" type="button" data-welcome="skip">เริ่มใช้เลย ไม่ต้องล็อกอิน</button>'
+      : '<button class="btn btn-primary" type="button" data-welcome="skip">เริ่มใช้งาน</button>');
+    $('#welcomeHint').textContent = canLogin
+      ? 'ล็อกอินเมื่ออยากใช้หลายเครื่องหรือหารบิลกับเพื่อน — เปิดทีหลังจากปุ่ม ☁️ ด้านบนก็ได้'
+      : 'ข้อมูลทั้งหมดเก็บอยู่ในเครื่องนี้';
+  }
+  var welcomeDone = false;
+  function maybeShowWelcome() {
+    if (welcomeDone) return;
+    welcomeDone = true;
+    if (welcomeSeen()) return;
+    if (CloudSync.user()) { markWelcomeSeen(); return; }        // ล็อกอินค้างไว้อยู่แล้ว
+    if (ExpenseStore.all().length) { markWelcomeSeen(); return; }  // เคยใช้มาก่อน ไม่ต้องขวาง
+    renderWelcome();
+    $('#welcome').hidden = false;
+  }
+  $('#welcome').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-welcome]');
+    if (!btn) return;
+    closeWelcome();
+    if (btn.dataset.welcome === 'login') openSync();
+  });
 
   function openSync() {
     syncUI.error = '';
@@ -3758,7 +3802,10 @@
         if (session) toast('ล็อกอินสำเร็จ กำลังซิงก์ข้อมูล…');
       }
       if (session) { runSync(true); refreshPushSub(); }
+      maybeShowWelcome();
       if (/#bell$/.test(location.hash)) { history.replaceState(null, '', location.pathname + location.search); openBell(); }
-    }).catch(function () { /* ต่อเซิร์ฟเวอร์ไม่ได้ก็ใช้งานออฟไลน์ได้ตามปกติ */ });
+    }).catch(function () { maybeShowWelcome(); /* ต่อเซิร์ฟเวอร์ไม่ได้ก็ใช้งานออฟไลน์ได้ตามปกติ */ });
+  } else {
+    maybeShowWelcome();                                  // ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์ซิงก์ ก็ยังต้องต้อนรับ
   }
 })();
