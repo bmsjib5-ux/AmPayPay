@@ -20,6 +20,28 @@
     return;
   }
 
+  /* กันคลุมข้อความ/ก็อบปี้/ลากรูปออกจากหน้าจอ (CSS กันการลากคลุมไว้แล้ว ตรงนี้ปิดทางที่เหลือ)
+     ช่องกรอกข้อมูลยังทำงานปกติทุกอย่าง — พิมพ์ เลือก คัดลอก วาง ได้เหมือนเดิม
+     ปุ่ม "คัดลอก" ในแอปใช้ Clipboard API จึงไม่โดนกฎนี้
+     หมายเหตุ: กันได้แค่การหยิบข้อความออกแบบง่ายๆ ถ่ายภาพหน้าจอยังทำได้เสมอ */
+  (function () {
+    function editable(el) {
+      while (el && el !== document) {
+        if (el.nodeType === 1) {
+          if (/^(input|textarea)$/i.test(el.tagName) || el.isContentEditable) return true;
+        }
+        el = el.parentNode;
+      }
+      return false;
+    }
+    ['copy', 'cut', 'contextmenu', 'dragstart', 'selectstart'].forEach(function (type) {
+      document.addEventListener(type, function (ev) {
+        if (editable(ev.target)) return;
+        ev.preventDefault();
+      });
+    });
+  })();
+
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var CATS = ReceiptParser.categories;

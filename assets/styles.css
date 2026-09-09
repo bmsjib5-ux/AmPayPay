@@ -104,6 +104,19 @@
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+
+/* ---------- กันคลุมข้อความและก็อบปี้หน้าจอ ----------
+   ยกเว้นช่องกรอกข้อมูล ไม่งั้นพิมพ์/แก้ไข/วางข้อความไม่ได้
+   (กันได้แค่การลากคลุมกับเมนูคลิกขวา — ถ่ายภาพหน้าจอยังทำได้เสมอ) */
+body {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;                     /* iOS: ไม่ให้แตะค้างแล้วเด้งเมนูคัดลอก/บันทึกรูป */
+}
+input, textarea, select, [contenteditable="true"] {
+  -webkit-user-select: text; user-select: text;
+  -webkit-touch-callout: default;
+}
+img, canvas, svg { -webkit-user-drag: none; user-select: none; }
 body {
   background: var(--bg);
   color: var(--text-primary);
