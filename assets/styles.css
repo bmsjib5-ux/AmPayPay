@@ -1256,17 +1256,19 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 }
 .welcome-msg.is-error { background: #fdeceb; color: #a3231a; border-color: #f5c9c5; }
 
-.welcome-fields { display: grid; gap: 11px; }
+/* minmax(0,1fr) กันไม่ให้ช่องกรอกดันตัวเองกว้างเกินการ์ดบนจอ 320px */
+.welcome-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 11px; }
 .welcome-field {
-  display: flex; align-items: center; gap: 10px; padding: 0 13px;
+  display: flex; align-items: center; gap: 10px; padding: 0 13px; min-width: 0;
   background: #f7faf8; border: 1.5px solid #e2ece6; border-radius: 15px;
   transition: border-color .15s var(--ease), background .15s var(--ease);
 }
 .welcome-field:focus-within { border-color: #2bb271; background: #fff; }
 .welcome-field-ic { font-size: 16px; line-height: 1; flex: none; opacity: .65; }
 .welcome-field input {
-  flex: 1; min-width: 0; border: 0; background: none; outline: none;
-  font: inherit; font-size: 15px; color: #1b2a22; padding: 14px 0; min-height: 24px;
+  flex: 1; min-width: 0; width: 100%; border: 0; background: none; outline: none;
+  /* ต้องไม่ต่ำกว่า 16px ไม่งั้น Safari บน iPhone จะซูมหน้าจอเองตอนแตะช่องกรอก */
+  font: inherit; font-size: 16px; color: #1b2a22; padding: 13px 0; min-height: 24px;
 }
 .welcome-field input::placeholder { color: #93a99e; }
 .welcome-eye {
@@ -1287,7 +1289,7 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 }
 .welcome-link:hover { text-decoration: underline; }
 
-.welcome-actions { display: grid; gap: 11px; }
+.welcome-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 11px; }
 .welcome-btn {
   display: flex; align-items: center; justify-content: center; gap: 9px; position: relative;
   width: 100%; min-height: 52px; padding: 0 46px; border-radius: 15px;
@@ -1351,6 +1353,27 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   .welcome-skip { color: #8fb3a0; }
   .welcome-note { color: #85a695; }
   .welcome-note a { color: #55d295; }
+}
+
+/* จอเตี้ย (iPhone SE และเครื่องที่แป้นพิมพ์กินพื้นที่) — บีบระยะให้ปุ่มเข้าสู่ระบบอยู่ใกล้มือขึ้น */
+@media (max-height: 720px) {
+  .welcome { padding-top: max(14px, env(safe-area-inset-top)); }
+  .welcome-hero { gap: 11px; margin-bottom: 12px; }
+  .welcome-logo { width: 68px; height: 68px; border-radius: 17px; }
+  .welcome-title { font-size: 25px; margin-bottom: 3px; }
+  .welcome-sub { font-size: 12px; }
+  .welcome-feats { gap: 7px; margin-bottom: 12px; }
+  .welcome-feats li { padding: 9px 5px 8px; border-radius: 13px; }
+  .welcome-feats span { font-size: 20px; }
+  .welcome-feats i { display: none; }              /* เหลือแต่หัวข้อสั้น ๆ พอให้รู้ว่าแอปทำอะไรได้ */
+  .welcome-card { padding: 18px 16px 14px; border-radius: 20px; }
+  .welcome-card-title { font-size: 23px; margin-bottom: 4px; }
+  .welcome-card-sub { font-size: 12.5px; margin-bottom: 13px; }
+  .welcome-card-art { font-size: 32px; }
+  .welcome-field input { padding: 11px 0; }
+  .welcome-row { margin: 11px 0 13px; }
+  .welcome-btn { min-height: 48px; }
+  .welcome-note { margin-top: 10px; }
 }
 
 @media (max-width: 360px) {

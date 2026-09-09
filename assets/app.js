@@ -3471,9 +3471,30 @@
   function markWelcomeSeen() {
     try { localStorage.setItem(WELCOME_KEY, String(Date.now())); } catch (e) {}
   }
+  /* ตอนหน้า login เปิดอยู่ ต้องกันไม่ให้ Tab หรือโปรแกรมอ่านหน้าจอหลุดไปที่แอปข้างหลัง */
+  function welcomeBackdrop() {
+    return ['header.topbar', 'nav.tabbar', '.bookbar', 'main.wrap', 'footer.wrap']
+      .map(function (sel) { return document.querySelector(sel); }).filter(Boolean);
+  }
+  function lockBehindWelcome(on) {
+    welcomeBackdrop().forEach(function (el) {
+      if (on) { el.inert = true; el.setAttribute('aria-hidden', 'true'); }
+      else { el.inert = false; el.removeAttribute('aria-hidden'); }
+    });
+  }
+  /* เผื่อเบราว์เซอร์เก่าที่ยังไม่รองรับ inert — ถ้าโฟกัสหลุดออกไป ดึงกลับเข้ามา */
+  function keepFocusInWelcome(ev) {
+    var box = $('#welcome');
+    if (box.hidden || box.contains(ev.target)) return;
+    var first = $('#welcomeEmail');
+    (first && !first.closest('[hidden]') ? first : $('[data-welcome="skip"]') || box).focus();
+  }
+
   function closeWelcome() {
     markWelcomeSeen();
     $('#welcome').hidden = true;
+    lockBehindWelcome(false);
+    document.removeEventListener('focusin', keepFocusInWelcome);
   }
   function welcomeSay(text, isError) {
     var el = $('#welcomeMsg');
@@ -3520,6 +3541,8 @@
     renderWelcome();
     welcomeSay('');
     $('#welcome').hidden = false;
+    lockBehindWelcome(true);
+    document.addEventListener('focusin', keepFocusInWelcome);
   }
 
   /* ล็อกอิน/สมัครจากหน้าแรก — สำเร็จแล้วปิดหน้านี้แล้วเข้าแอปเลย */
