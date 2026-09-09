@@ -20,6 +20,28 @@
     return;
   }
 
+  /* กันคลุมข้อความ/ก็อบปี้/ลากรูปออกจากหน้าจอ (CSS กันการลากคลุมไว้แล้ว ตรงนี้ปิดทางที่เหลือ)
+     ช่องกรอกข้อมูลยังทำงานปกติทุกอย่าง — พิมพ์ เลือก คัดลอก วาง ได้เหมือนเดิม
+     ปุ่ม "คัดลอก" ในแอปใช้ Clipboard API จึงไม่โดนกฎนี้
+     หมายเหตุ: กันได้แค่การหยิบข้อความออกแบบง่ายๆ ถ่ายภาพหน้าจอยังทำได้เสมอ */
+  (function () {
+    function editable(el) {
+      while (el && el !== document) {
+        if (el.nodeType === 1) {
+          if (/^(input|textarea)$/i.test(el.tagName) || el.isContentEditable) return true;
+        }
+        el = el.parentNode;
+      }
+      return false;
+    }
+    ['copy', 'cut', 'contextmenu', 'dragstart', 'selectstart'].forEach(function (type) {
+      document.addEventListener(type, function (ev) {
+        if (editable(ev.target)) return;
+        ev.preventDefault();
+      });
+    });
+  })();
+
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   var CATS = ReceiptParser.categories;
@@ -2114,7 +2136,7 @@
     if (typeof Tesseract === 'undefined') {
       return Promise.reject(new Error('โหลดตัวอ่านข้อความ (Tesseract.js) ไม่สำเร็จ — ต้องต่ออินเทอร์เน็ตครั้งแรกเพื่อดาวน์โหลดชุดภาษา'));
     }
-    $('#ocrStatus').textContent = 'กำลังเตรียมตัวอ่านข้อความภาษาไทย–อังกฤษ (ครั้งแรกอาจใช้เวลาสักครู่)…';
+    $('#ocrStatus').textContent = 'กำลังเตรียมตัวอ่านข้อความภาษาไทย–อังกฤษ (ครั้งแรกโหลดชุดภาษาราว 9 MB ครั้งเดียว แล้วเก็บไว้ในเครื่อง)…';
     // window.OCR_PATHS ตั้งค่าได้ใน index.html ถ้าต้องการโฮสต์ไฟล์ Tesseract เอง (ใช้งานแบบออฟไลน์)
     var opts = {};
     ['workerPath', 'corePath', 'langPath'].forEach(function (k) {
@@ -3344,12 +3366,12 @@
     var btn = $('#syncBtn');
     var on = CloudSync.isConfigured() && !!CloudSync.user();
     btn.classList.toggle('is-on', on);
-    btn.title = on ? 'ซิงก์ข้อมูล (' + CloudSync.email() + ')' : 'ซิงก์ข้อมูลข้ามเครื่อง';
+    btn.title = on ? 'บัญชีเพื่อน/ลูกหนี้ (' + CloudSync.email() + ')' : 'ล็อกอินเพื่อหารบิลกับเพื่อน';
   }
 
   function renderSyncModal() {
     var body = $('#syncBody');
-    var note = '<p class="chart-sub" style="margin-top:10px">รูปใบเสร็จไม่ถูกอัปโหลด เก็บไว้ในเครื่องนี้เท่านั้น · ซิงก์เฉพาะวันที่ ยอดเงิน ชื่อร้าน หมวด บันทึกช่วยจำ และงบประมาณ</p>';
+    var note = '<p class="chart-sub" style="margin-top:10px">รายจ่าย งบประมาณ สมุด และรูปใบเสร็จ <strong>เก็บไว้ในเครื่องนี้เท่านั้น</strong> ไม่ถูกอัปโหลด · บนเซิร์ฟเวอร์มีแค่บัญชีผู้ใช้ รายชื่อเพื่อน และใบแจ้งหนี้ (ลูกหนี้)</p>';
     var msg = syncUI.error
       ? '<p class="banner is-over" style="margin-top:12px">' + esc(syncUI.error) + '</p>'
       : (syncUI.message ? '<p class="banner is-ok" style="margin-top:12px">' + esc(syncUI.message) + '</p>' : '');
@@ -3374,8 +3396,8 @@
           '<button class="btn btn-ghost btn-sm" data-sync="backup">ดาวน์โหลดสำรองข้อมูลก่อน</button>' +
           '<button class="btn btn-ghost btn-sm" data-sync="signout">ออกจากระบบ (ยังไม่ตัดสินใจ)</button>' +
         '</div>' +
-        '<p class="budget-foot">“ล้างข้อมูลในเครื่อง” ลบเฉพาะสำเนาในเบราว์เซอร์นี้ ' +
-          'ข้อมูลของบัญชีเดิมที่เคยซิงก์ขึ้นไปแล้วยังอยู่ครบบนเซิร์ฟเวอร์</p>' + note;
+        '<p class="budget-foot">“ล้างข้อมูลในเครื่อง” ลบรายจ่ายในเบราว์เซอร์นี้ทิ้ง ' +
+          'และรายจ่ายไม่ได้ถูกซิงก์ขึ้นเซิร์ฟเวอร์ จึงกู้คืนไม่ได้ — สำรองไฟล์ไว้ก่อนถ้ายังไม่แน่ใจ</p>' + note;
       return;
     }
 
@@ -3420,7 +3442,7 @@
       return;
     }
 
-    body.innerHTML = '<p class="chart-sub">ล็อกอินครั้งเดียวด้วยอีเมลกับรหัสผ่าน แล้วรายจ่ายจะซิงก์ข้ามมือถือกับคอมให้อัตโนมัติ</p>' + msg +
+    body.innerHTML = '<p class="chart-sub">ล็อกอินครั้งเดียวด้วยอีเมลกับรหัสผ่าน เพื่อเพิ่มเพื่อนและหารบิลข้ามเครื่องได้ — รายจ่ายของคุณยังเก็บอยู่ในเครื่องนี้เท่านั้น</p>' + msg +
       '<div class="grid2" style="margin-top:12px;max-width:420px">' +
         '<label class="field"><span class="field-label">อีเมล</span>' +
           '<input type="email" inputmode="email" autocomplete="email" data-sf="email" value="' + esc(syncUI.email) + '" placeholder="you@example.com"></label>' +
@@ -3435,6 +3457,144 @@
       '</div>' +
       '<p class="budget-foot">ครั้งแรกให้ใส่อีเมลกับรหัสผ่านที่ต้องการ แล้วกด <strong>สมัครใหม่</strong> · เครื่องอื่นใช้อีเมลกับรหัสผ่านเดียวกันเพื่อดูข้อมูลชุดเดียวกัน</p>' + note;
   }
+
+  /* ---------------- หน้าเข้าสู่ระบบตอนเปิดใช้ครั้งแรก ----------------
+     ขึ้นเฉพาะครั้งแรกจริงๆ: ยังไม่เคยผ่านหน้านี้ ยังไม่ได้ล็อกอิน และยังไม่มีรายจ่ายในเครื่อง
+     (คนที่ใช้แอปอยู่ก่อนแล้วจะไม่โดนขวาง) ล็อกอิน/สมัครได้จากหน้านี้เลย
+     หรือกด "ใช้งานโดยไม่ล็อกอิน" ไปใช้แบบเก็บข้อมูลในเครื่องอย่างเดียวก็ได้ */
+  var WELCOME_KEY = 'expense-book:welcome:v1';
+  var welcomeBusy = false;
+
+  function welcomeSeen() {
+    try { return !!localStorage.getItem(WELCOME_KEY); } catch (e) { return false; }
+  }
+  function markWelcomeSeen() {
+    try { localStorage.setItem(WELCOME_KEY, String(Date.now())); } catch (e) {}
+  }
+  function closeWelcome() {
+    markWelcomeSeen();
+    $('#welcome').hidden = true;
+  }
+  function welcomeSay(text, isError) {
+    var el = $('#welcomeMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('is-error', !!isError);
+    el.hidden = !text;
+  }
+  function renderWelcome() {
+    var box = $('#welcomeActions');
+    if (!box) return;
+    var canLogin = CloudSync.isConfigured();
+    var busy = welcomeBusy ? ' disabled' : '';
+    box.innerHTML = canLogin
+      ? '<button class="welcome-btn welcome-btn-primary" type="submit" data-welcome="login"' + busy + '>' +
+          '<span aria-hidden="true">☁️</span> ' + (welcomeBusy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ') +
+          '<span class="welcome-btn-go" aria-hidden="true">→</span>' +
+        '</button>' +
+        '<p class="welcome-or">หรือ</p>' +
+        '<button class="welcome-btn welcome-btn-ghost" type="button" data-welcome="signup"' + busy + '>' +
+          '<span aria-hidden="true">🧑‍💼</span> สมัครสมาชิก' +
+        '</button>' +
+        '<button class="welcome-skip" type="button" data-welcome="skip">ใช้งานโดยไม่ล็อกอิน</button>'
+      : '<button class="welcome-btn welcome-btn-primary" type="button" data-welcome="skip">เริ่มใช้งาน</button>';
+    $('#welcomeHint').textContent = canLogin
+      ? 'ล็อกอินเมื่ออยากหารบิลกับเพื่อน — รายจ่ายของคุณยังเก็บอยู่ในเครื่องเสมอ'
+      : 'ข้อมูลทั้งหมดเก็บอยู่ในเครื่องนี้';
+    var form = $('#welcomeForm');
+    if (form) form.classList.toggle('is-local', !canLogin);
+    var fields = $('.welcome-fields');
+    if (fields) fields.hidden = !canLogin;
+    var row = $('.welcome-row');
+    if (row) row.hidden = !canLogin;
+  }
+  var welcomeDone = false;
+  function maybeShowWelcome() {
+    if (welcomeDone) return;
+    welcomeDone = true;
+    if (welcomeSeen()) return;
+    if (CloudSync.user()) { markWelcomeSeen(); return; }        // ล็อกอินค้างไว้อยู่แล้ว
+    if (ExpenseStore.all().length) { markWelcomeSeen(); return; }  // เคยใช้มาก่อน ไม่ต้องขวาง
+    var box = $('#welcomeRemember');
+    if (box) box.checked = CloudSync.remember();
+    renderWelcome();
+    welcomeSay('');
+    $('#welcome').hidden = false;
+  }
+
+  /* ล็อกอิน/สมัครจากหน้าแรก — สำเร็จแล้วปิดหน้านี้แล้วเข้าแอปเลย */
+  function welcomeAuth(mode) {
+    if (welcomeBusy) return;
+    var mail = ($('#welcomeEmail').value || '').trim();
+    var pass = $('#welcomePass').value || '';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { welcomeSay('กรุณาใส่อีเมลให้ถูกต้อง', true); return; }
+    if (pass.length < 6) { welcomeSay('รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร', true); return; }
+    CloudSync.setRemember(!!$('#welcomeRemember').checked);
+    welcomeBusy = true;
+    renderWelcome();
+    welcomeSay(mode === 'signup' ? 'กำลังสมัครสมาชิก…' : 'กำลังเข้าสู่ระบบ…');
+    var work = mode === 'signup'
+      ? CloudSync.signUpWithPassword(mail, pass)
+      : CloudSync.signInWithPassword(mail, pass).then(function () { return { session: true }; });
+    work.then(function (res) {
+      welcomeBusy = false;
+      if (res && res.needsConfirm) {
+        renderWelcome();
+        welcomeSay('สมัครแล้ว — กดลิงก์ยืนยันในอีเมลของคุณหนึ่งครั้ง แล้วกลับมากดเข้าสู่ระบบ');
+        return;
+      }
+      welcomeSay('เข้าสู่ระบบสำเร็จ');
+      renderSyncBadge();
+      closeWelcome();
+      runSync(true);
+    }).catch(function (err) {
+      welcomeBusy = false;
+      renderWelcome();
+      welcomeSay(err.message || 'เข้าสู่ระบบไม่สำเร็จ', true);
+    });
+  }
+
+  function welcomeForgot() {
+    if (welcomeBusy) return;
+    var mail = ($('#welcomeEmail').value || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) {
+      welcomeSay('ใส่อีเมลของคุณในช่องด้านบนก่อน แล้วกด "ลืมรหัสผ่าน?" อีกครั้ง', true);
+      $('#welcomeEmail').focus();
+      return;
+    }
+    welcomeBusy = true;
+    renderWelcome();
+    welcomeSay('กำลังส่งลิงก์ตั้งรหัสผ่านใหม่…');
+    CloudSync.resetPassword(mail).then(function () {
+      welcomeBusy = false;
+      renderWelcome();
+      welcomeSay('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ' + mail + ' แล้ว — เปิดอีเมลแล้วกดลิงก์ได้เลย');
+    }).catch(function (err) {
+      welcomeBusy = false;
+      renderWelcome();
+      welcomeSay(err.message || 'ส่งอีเมลไม่สำเร็จ', true);
+    });
+  }
+
+  $('#welcomeForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (CloudSync.isConfigured()) welcomeAuth('login'); else closeWelcome();
+  });
+  $('#welcome').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-welcome]');
+    if (!btn) return;
+    var act = btn.dataset.welcome;
+    if (act === 'skip') { closeWelcome(); return; }
+    if (act === 'signup') { welcomeAuth('signup'); return; }
+    if (act === 'forgot') { welcomeForgot(); return; }
+    if (act === 'togglepw') {
+      var input = $('#welcomePass');
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+      btn.setAttribute('aria-label', show ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน');
+    }
+  });
 
   function openSync() {
     syncUI.error = '';
@@ -3736,7 +3896,10 @@
         if (session) toast('ล็อกอินสำเร็จ กำลังซิงก์ข้อมูล…');
       }
       if (session) { runSync(true); refreshPushSub(); }
+      maybeShowWelcome();
       if (/#bell$/.test(location.hash)) { history.replaceState(null, '', location.pathname + location.search); openBell(); }
-    }).catch(function () { /* ต่อเซิร์ฟเวอร์ไม่ได้ก็ใช้งานออฟไลน์ได้ตามปกติ */ });
+    }).catch(function () { maybeShowWelcome(); /* ต่อเซิร์ฟเวอร์ไม่ได้ก็ใช้งานออฟไลน์ได้ตามปกติ */ });
+  } else {
+    maybeShowWelcome();                                  // ยังไม่ได้ตั้งค่าเซิร์ฟเวอร์ซิงก์ ก็ยังต้องต้อนรับ
   }
 })();

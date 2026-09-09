@@ -8,12 +8,12 @@
 <!-- จำกัดว่าโค้ดและการเชื่อมต่อมาจากที่ไหนได้บ้าง ลดผลกระทบถ้ามีช่องโหว่ XSS
      ใส่ไว้ในหน้าเว็บโดยตรงเพื่อให้มีผลแม้โฮสต์จะตั้ง header ให้ไม่ได้
      (Tesseract.js ต้องใช้ Web Worker ผ่าน blob: และ wasm จึงต้องอนุญาตไว้) -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; manifest-src 'self'; connect-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=64">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=64">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; manifest-src 'self'; connect-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=68">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=68">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=64">
-<link rel="manifest" href="manifest.webmanifest?v=64">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=68">
+<link rel="manifest" href="manifest.webmanifest?v=68">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,7 +21,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=64">
+<link rel="stylesheet" href="assets/styles.css?v=68">
 </head>
 <body>
 <header class="topbar">
@@ -29,7 +29,7 @@
     <h1 class="brand"><span aria-hidden="true">🧾</span> AmPayPay</h1>
     <button id="bellBtn" class="icon-btn bell-btn" type="button" title="แจ้งเตือนจากเพื่อน" aria-label="แจ้งเตือน">🔔<span id="bellCount" class="bell-count" hidden></span></button>
     <button id="bgBtn" class="icon-btn" type="button" title="เปลี่ยนพื้นหลัง" aria-label="เปลี่ยนพื้นหลัง">🎨</button>
-    <button id="syncBtn" class="icon-btn" type="button" title="ซิงก์ข้อมูลข้ามเครื่อง" aria-label="ซิงก์ข้อมูล">☁️</button>
+    <button id="syncBtn" class="icon-btn" type="button" title="ล็อกอินเพื่อหารบิลกับเพื่อน" aria-label="บัญชีและการหารบิล">☁️</button>
     <button id="themeBtn" class="icon-btn" type="button" title="สลับธีมสว่าง/มืด" aria-label="สลับธีม">🌗</button>
   </div>
 </header>
@@ -285,9 +285,9 @@
 </main>
 
 <footer class="wrap foot">
-  ข้อมูลเก็บในเครื่องของคุณ · เปิดซิงก์ ☁️ เมื่ออยากใช้หลายเครื่อง
+  รายจ่ายเก็บในเครื่องของคุณ · ล็อกอิน ☁️ เมื่ออยากหารบิลกับเพื่อน
   · <a href="privacy.html">ความเป็นส่วนตัว</a>
-  <span class="ver">เวอร์ชัน 64</span>
+  <span class="ver">เวอร์ชัน 68</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -407,10 +407,69 @@
 </div>
 <input id="bgInput" class="sr-only" type="file" accept="image/*">
 
+<!-- หน้าเข้าสู่ระบบตอนเปิดใช้ครั้งแรก — ล็อกอินได้เลย หรือกดข้ามไปใช้แบบเก็บในเครื่อง -->
+<div id="welcome" class="welcome" hidden>
+  <div class="welcome-inner">
+
+    <header class="welcome-hero">
+      <img class="welcome-logo" src="assets/icon-192.png?v=68" alt="" width="92" height="92">
+      <div class="welcome-brand">
+        <h1 id="welcomeTitle" class="welcome-title">AmPayPay</h1>
+        <p class="welcome-sub">ถ่ายใบเสร็จ · รู้ยอดทันที · หารกับเพื่อนจบในแอปเดียว</p>
+      </div>
+    </header>
+
+    <ul class="welcome-feats">
+      <li><span aria-hidden="true">📸</span><b>ถ่ายใบเสร็จ</b><i>แล้วอ่านยอดให้เอง</i></li>
+      <li><span aria-hidden="true">📊</span><b>สรุปรายเดือน</b><i>ตั้งงบ เตือนเมื่อใช้เกิน</i></li>
+      <li><span aria-hidden="true">🧑‍🤝‍🧑</span><b>หารบิลกับเพื่อน</b><i>พร้อม QR พร้อมเพย์</i></li>
+    </ul>
+
+    <form id="welcomeForm" class="welcome-card" novalidate>
+      <div class="welcome-card-head">
+        <div>
+          <h2 class="welcome-card-title">เข้าสู่ระบบ</h2>
+          <p class="welcome-card-sub">ยินดีต้อนรับกลับมา 👋<br>จัดการรายจ่ายให้เป็นเรื่องง่าย</p>
+        </div>
+        <span class="welcome-card-art" aria-hidden="true">🧾</span>
+      </div>
+
+      <p id="welcomeMsg" class="welcome-msg" role="status" hidden></p>
+
+      <div class="welcome-fields">
+        <div class="welcome-field">
+          <span class="welcome-field-ic" aria-hidden="true">✉️</span>
+          <input id="welcomeEmail" type="email" inputmode="email" autocomplete="email"
+                 placeholder="อีเมล" aria-label="อีเมล" spellcheck="false">
+        </div>
+        <div class="welcome-field">
+          <span class="welcome-field-ic" aria-hidden="true">🔒</span>
+          <input id="welcomePass" type="password" autocomplete="current-password"
+                 placeholder="รหัสผ่าน" aria-label="รหัสผ่าน">
+          <button class="welcome-eye" type="button" data-welcome="togglepw"
+                  aria-label="แสดงรหัสผ่าน" aria-pressed="false">👁️</button>
+        </div>
+      </div>
+
+      <div class="welcome-row">
+        <label class="welcome-remember">
+          <input id="welcomeRemember" type="checkbox" checked> จดจำฉันไว้ในเครื่องนี้
+        </label>
+        <button class="welcome-link" type="button" data-welcome="forgot">ลืมรหัสผ่าน?</button>
+      </div>
+
+      <div id="welcomeActions" class="welcome-actions"></div>
+      <p id="welcomeHint" class="welcome-note"></p>
+      <p class="welcome-note">ข้อมูลเก็บในเครื่องคุณ · <a href="privacy.html">ความเป็นส่วนตัว</a></p>
+    </form>
+
+  </div>
+</div>
+
 <div id="syncModal" class="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
     <div class="modal-head">
-      <h2 id="syncTitle" class="section-title">☁️ ซิงก์ข้อมูลข้ามเครื่อง</h2>
+      <h2 id="syncTitle" class="section-title">☁️ บัญชีสำหรับหารบิลกับเพื่อน</h2>
       <button class="btn btn-ghost btn-sm" type="button" data-sync="close" aria-label="ปิด">✕</button>
     </div>
     <div id="syncBody"></div>
@@ -427,12 +486,13 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/vendor/qrcode.js?v=64"></script>
-<script src="assets/promptpay.js?v=64"></script>
-<script src="assets/config.js?v=64"></script>
-<script src="assets/parser.js?v=64"></script>
-<script src="assets/store.js?v=64"></script>
-<script src="assets/sync.js?v=64"></script>
-<script src="assets/app.js?v=64"></script>
+<script src="assets/ocr-paths.js?v=68"></script>
+<script src="assets/vendor/qrcode.js?v=68"></script>
+<script src="assets/promptpay.js?v=68"></script>
+<script src="assets/config.js?v=68"></script>
+<script src="assets/parser.js?v=68"></script>
+<script src="assets/store.js?v=68"></script>
+<script src="assets/sync.js?v=68"></script>
+<script src="assets/app.js?v=68"></script>
 </body>
 </html>

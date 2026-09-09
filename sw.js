@@ -2,11 +2,11 @@
    1) รับ push แจ้งเตือนตอนปิดแอป
    2) แคชไฟล์แอปไว้ให้เปิดใช้งานได้ตอนเน็ตหลุด (network-first: ออนไลน์ได้ของใหม่เสมอ ออฟไลน์ใช้ของที่แคชไว้)
    ข้อมูลรายจ่ายอยู่ใน localStorage/IndexedDB ของเบราว์เซอร์อยู่แล้ว จึงใช้งานต่อได้เต็มรูปแบบตอนออฟไลน์ */
-var CACHE = 'ampaypay-v64';
+var CACHE = 'ampaypay-v68';
 var SHELL = [
   './', './index.html', './manifest.webmanifest',
   './assets/styles.css', './assets/config.js', './assets/parser.js', './assets/store.js',
-  './assets/sync.js', './assets/promptpay.js', './assets/app.js',
+  './assets/sync.js', './assets/promptpay.js', './assets/ocr-paths.js', './assets/app.js',
   './assets/vendor/qrcode.js',
   './assets/icon-32.png', './assets/icon-180.png', './assets/icon-192.png', './assets/icon-512.png'
 ];
@@ -30,6 +30,9 @@ self.addEventListener('fetch', function (ev) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;          // ข้ามไฟล์จาก CDN และการเรียก Supabase
+  /* ชุดภาษา OCR ก้อนละหลายเมกะไบต์ tesseract.js แคชไว้ใน IndexedDB ให้อยู่แล้ว
+     ไม่ต้องเก็บซ้ำใน Cache Storage อีกชุด */
+  if (/\/assets\/tessdata\//.test(url.pathname)) return;
   ev.respondWith(
     fetch(req).then(function (res) {
       if (res && res.ok) {
