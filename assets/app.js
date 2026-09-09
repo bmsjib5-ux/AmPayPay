@@ -2066,12 +2066,15 @@
   })();
 
   /* ---------------- รูปภาพ ---------------- */
-  function loadImage(file) {
+  /* รับได้ทั้งไฟล์ที่ผู้ใช้เลือก และรูปที่แปลงเป็น data URL ไว้แล้ว */
+  function loadImage(source) {
     return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file);
+      var isUrl = typeof source === 'string';
+      var url = isUrl ? source : URL.createObjectURL(source);
+      var done = function () { if (!isUrl) URL.revokeObjectURL(url); };
       var img = new Image();
-      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('เปิดไฟล์รูปไม่ได้')); };
+      img.onload = function () { done(); resolve(img); };
+      img.onerror = function () { done(); reject(new Error('เปิดไฟล์รูปไม่ได้')); };
       img.src = url;
     });
   }
@@ -2093,9 +2096,12 @@
 
   /* เตรียมรูปให้ OCR อ่านง่ายขึ้น: ขยายรูปเล็ก, ทำเป็นขาวดำ แล้วดึงคอนทราสต์
      ช่วยมากกับสลิปธนาคารที่พื้นหลังไล่สีและตัวหนังสือบาง */
+  var lastPrepScale = 1;               // อัตราที่ย่อ/ขยายรอบล่าสุด ใช้แปลงพิกัดกลับไปหารูปต้นฉบับ
+
   function preprocessForOCR(img) {
     var longest = Math.max(img.width, img.height);
     var scale = longest < 1400 ? Math.min(2.5, 1400 / longest) : Math.min(1, 2000 / longest);
+    lastPrepScale = scale;
     var canvas = drawScaled(img, scale);
     var ctx = canvas.getContext('2d');
     try {
@@ -2161,10 +2167,103 @@
      สองคอลัมน์ได้ดีที่สุด แต่สลิปที่วางยอดเงินเป็นตัวเลขก้อนใหญ่กลางหน้า (เช่น MyMo/ออมสิน)
      โหมดนี้จะข้ามบรรทัดนั้นไปเลย จึงอ่านซ้ำด้วย PSM 4 (คอลัมน์เดียว ตัวอักษรหลายขนาด)
      เฉพาะตอนที่รอบแรกได้ข้อมูลไม่ครบ แล้วรวมผลจากทั้งสองรอบ */
-  function recognizeWith(worker, src, psm) {
+  function recognizeWith(worker, src, psm, wantLines) {
     return worker.setParameters({ tessedit_pageseg_mode: psm })
       .then(function () { return worker.recognize(src); })
-      .then(function (res) { return (res && res.data && res.data.text) || ''; });
+      .then(function (res) {
+        var d = (res && res.data) || {};
+        return wantLines ? { text: d.text || '', lines: d.lines || [] } : (d.text || '');
+      });
+  }
+
+  /* ---------- อ่านบรรทัดชื่อร้านซ้ำแบบขยาย ----------
+     ชื่อร้านบนสลิปเป็นตัวเล็กและมีไอคอนร้านติดอยู่ข้างหน้า รอบแรกจึงอ่านเพี้ยนบ่อยกว่าบรรทัดอื่น
+     (เช่น "ป้าแก้ว5" กลายเป็น "ปข้าแก้ว5") ถ้ารอบแรกให้คะแนนความมั่นใจบรรทัดนั้นต่ำ
+     จะครอปเฉพาะบรรทัดนั้นมาขยาย 3 เท่า ทำเป็นขาวดำล้วน แล้วอ่านซ้ำแบบบรรทัดเดียว */
+  var LINE_CONF_OK = 88;          // มั่นใจถึงระดับนี้แล้วไม่ต้องอ่านซ้ำ
+
+  /* ครอปบรรทัดเดียวจากรูป "ต้นฉบับ" (ยังไม่ผ่านการปรับคอนทราสต์) แล้วขยาย
+     ครอปจากรูปที่ปรับคอนทราสต์มาแล้วจะเป็นการประมวลผลซ้ำสอง ทำให้ตัวหนังสือเสียรูป */
+  function cropLineToDataURL(img, bbox, scale, mono) {
+    var pad = Math.round((bbox.y1 - bbox.y0) * 0.3);
+    var x0 = Math.max(0, Math.round(bbox.x0 - pad)), y0 = Math.max(0, Math.round(bbox.y0 - pad));
+    var x1 = Math.min(img.width, Math.round(bbox.x1 + pad)), y1 = Math.min(img.height, Math.round(bbox.y1 + pad));
+    var w = x1 - x0, h = y1 - y0;
+    if (w < 10 || h < 8) return null;
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, x0, y0, w, h, 0, 0, canvas.width, canvas.height);
+    if (mono) {
+      try {                                 // ขาวดำล้วน ตัวหนังสือคมขึ้นตอนขยาย
+        var data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var px = data.data;
+        for (var i = 0; i < px.length; i += 4) {
+          var g = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
+          px[i] = px[i + 1] = px[i + 2] = g > 150 ? 255 : 0;
+        }
+        ctx.putImageData(data, 0, 0);
+      } catch (e) { /* getImageData ถูกบล็อก ใช้รูปสีที่ขยายแล้วไปเลย */ }
+    }
+    return canvas.toDataURL('image/png');
+  }
+
+  /* หาบรรทัดที่เป็นชื่อร้าน โดยดูว่าบรรทัดไหนมีชื่อที่ตัวแยกข้อมูลอ่านได้อยู่ */
+  function findMerchantLine(lines, merchant) {
+    var key = String(merchant || '').replace(/[^ก-๙A-Za-z0-9]/g, '').toLowerCase();
+    if (key.length < 3) return null;
+    for (var i = 0; i < lines.length; i++) {
+      var flat = String(lines[i].text || '').replace(/[^ก-๙A-Za-z0-9]/g, '').toLowerCase();
+      if (flat.indexOf(key) !== -1 || (key.length >= 5 && flat.indexOf(key.slice(0, 5)) !== -1)) return lines[i];
+    }
+    return null;
+  }
+
+  function refineMerchant(worker, card, parsed, lines) {
+    if (!parsed.merchant || !lines || !lines.length || !card.file) return Promise.resolve(parsed);
+    var line = findMerchantLine(lines, parsed.merchant);
+    if (!line || !line.bbox || line.confidence >= LINE_CONF_OK) return Promise.resolve(parsed);
+    var k = card.ocrScale || 1;
+    var box = { x0: line.bbox.x0 / k, y0: line.bbox.y0 / k, x1: line.bbox.x1 / k, y1: line.bbox.y1 / k };
+    return loadImage(card.file).then(function (img) {
+      /* ลองหลายแบบแล้วเลือกอันที่ Tesseract มั่นใจที่สุด — บางสลิปตัวหนังสือบาง
+         ขาวดำล้วนจะชัดกว่า บางใบพื้นหลังไล่สี ภาพสีกลับอ่านง่ายกว่า */
+      var tries = [[3, true], [3, false], [2, false]]
+        .map(function (o) { return cropLineToDataURL(img, box, o[0], o[1]); })
+        .filter(Boolean);
+      if (!tries.length) return parsed;
+      setProgress(card, 1, 'อ่านชื่อร้านซ้ำให้ชัดขึ้น…');
+      var best = null;
+      var step = function (i) {
+        if (i >= tries.length) return Promise.resolve();
+        return recognizeWith(worker, tries[i], '7', true).then(function (res) {
+          var name = ReceiptParser.cleanMerchant(res.text);
+          var conf = (res.lines[0] && res.lines[0].confidence) || 0;
+          if (name && (!best || conf > best.conf)) best = { name: name, conf: conf };
+          // ได้ผลที่ใช้ได้แล้วก็พอ ไม่ต้องอ่านครบทุกแบบ (มือถือรุ่นเล็กจะได้ไม่ช้า)
+          if (best && best.conf >= 75 && ReceiptParser.sameName(best.name, parsed.merchant)) return;
+          return step(i + 1);
+        });
+      };
+      return step(0).then(function () {
+        if (!best || best.name.replace(/[^฀-๿A-Za-z0-9]/g, '').length < 2) return parsed;
+        /* รับเฉพาะตอนที่รอบขยายอ่านได้ "ชื่อเดียวกัน" — โครงพยัญชนะต่างจากรอบแรกไม่เกินตัวเดียว
+           แปลว่าเป็นชื่อเดิมที่สะกดต่างกันนิดเดียว จึงเชื่อรอบที่เห็นภาพใหญ่กว่าได้
+           ถ้าอ่านได้คนละเรื่องแปลว่ารอบใดรอบหนึ่งมั่ว ตัดสินไม่ได้ว่าอันไหนถูก ก็ใช้ของเดิมไว้ก่อน
+           (เคยลองเชื่อรอบที่คะแนนสูงกว่าโดยไม่เทียบชื่อ แล้วชื่ออังกฤษถูกอ่านเป็นตัวไทยมั่วทับของดี)
+           คะแนนความมั่นใจของการอ่านทั้งหน้ากับการอ่านบรรทัดเดียวเทียบกันตรงๆ ไม่ได้ ใช้เป็นเกณฑ์ขั้นต่ำเท่านั้น */
+        if (ReceiptParser.sameName(best.name, parsed.merchant) &&
+            best.conf >= Math.min(60, line.confidence - 15)) {
+          parsed.merchant = best.name;
+        }
+        return parsed;
+      });
+    }).catch(function () { return parsed; });
   }
 
   /* เทียบยอดเงินจากสองรอบ: เชื่อรอบที่คำใบ้แข็งแรงกว่า ถ้าเท่ากันให้เชื่อเลขที่มีทศนิยม
@@ -2201,21 +2300,23 @@
     if (!card.file) return Promise.resolve(card.ocrSrc);
     return loadImage(card.file).then(function (img) {
       card.ocrSrc = small ? resizeToDataURL(img, 1100, 0.85) : preprocessForOCR(img);
+      card.ocrScale = small ? Math.min(1, 1100 / Math.max(img.width, img.height)) : lastPrepScale;
       return card.ocrSrc;
     });
   }
 
   function readReceipt(worker, card, src) {
-    return recognizeWith(worker, src, '6').then(function (text1) {
+    return recognizeWith(worker, src, '6', true).then(function (pass1) {
+      var text1 = pass1.text;
       var first = ReceiptParser.parse(text1);
       var complete = first.amount != null && first.confident && first.date && first.amountHasDecimals;
-      if (complete) return first;
+      if (complete) return refineMerchant(worker, card, first, pass1.lines);
       setProgress(card, 1, 'ตรวจซ้ำอีกรอบเพื่อความแม่นยำ…');
       return recognizeWith(worker, src, '4').then(function (text2) {
         var second = ReceiptParser.parse(text2);
         var merged = mergeParsed(first, second);
         merged.text = text1 + '\n----- อ่านรอบที่สอง -----\n' + text2;
-        return merged;
+        return refineMerchant(worker, card, merged, pass1.lines);
       });
     });
   }
@@ -2542,6 +2643,7 @@
       loadImage(file).then(function (img) {
         card.thumb = resizeToDataURL(img, 360, 0.62);   // เก็บคู่กับรายการ
         card.ocrSrc = preprocessForOCR(img);            // ส่งให้ OCR
+        card.ocrScale = lastPrepScale;                  // ไว้แปลงพิกัดกลับไปครอปจากรูปต้นฉบับ
         renderCard(card);
         pump();
       }).catch(function (err) {

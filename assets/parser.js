@@ -457,7 +457,16 @@ window.ReceiptParser = (function () {
       if (letters.length <= 1) return true;
       return /^[a-z]{1,3}$/.test(t);   // เศษอักษรละตินตัวเล็ก ไม่ใช่ตัวย่ออย่าง SCB
     };
+    /* สลิปมีไอคอนร้านเล็กๆ อยู่หน้าชื่อ OCR มักอ่านออกมาเป็นตัวอักษรมั่วๆ ติดมาด้วย
+       เช่น "Gi TUNGNGERN", "ฒิ TUNGNGERN", "Sy TUNGNGERN"
+       จับเฉพาะโทเคนสั้นไม่เกิน 2 ตัวอักษร จะได้ไม่ไปกินคำจริงอย่าง "ป้า" หรือ "น้ำ" (3 ตัว) */
+    var isLogoNoise = function (t) {
+      if (t.length > 2) return false;
+      if (/^[A-Za-z]{1,2}$/.test(t)) return t !== t.toUpperCase();   // ละตินตัวเล็กปน ไม่ใช่ตัวย่อ
+      return /[ก-๙]/.test(t) && t.replace(/[^ก-ฮ]/g, '').length <= 1;
+    };
     while (tokens.length && isJunk(tokens[0])) tokens.shift();
+    while (tokens.length > 1 && isLogoNoise(tokens[0])) tokens.shift();
     while (tokens.length && isJunk(tokens[tokens.length - 1])) tokens.pop();
     var out = cleanName(tokens.join(' '));
     // OCR มักเอาตัวอักษรข้างเคียงมาติดหน้าคำนำหน้าชื่อ เช่น "วนางสาวอัครยุภา"
@@ -562,6 +571,80 @@ window.ReceiptParser = (function () {
     return names.length === 1 ? names[0].name : '';
   }
 
+  /* ร้านเล็กๆ ที่รับเงินผ่าน "ถุงเงิน" ของกรุงไทย จะขึ้นชื่อระบบรับชำระมาก่อน
+     แล้วต่อท้ายด้วยชื่อร้านจริงในวงเล็บ — คนอ่านอยากได้ชื่อในวงเล็บ
+     ถ้าในวงเล็บเป็น "-" (ร้านไม่ได้ตั้งชื่อไว้) ก็ใช้ชื่อระบบไปตามเดิม */
+  var WALLET_RE = /^(tungngern|ถุงเงิน|truemoney|true\s*money|shopeepay|airpay)\s*\((.+)\)$/i;
+
+  function unwrapWallet(name) {
+    var m = cleanName(String(name || '')).match(WALLET_RE);
+    if (!m) return name;
+    var inner = cleanName(m[2]);
+    return inner.replace(/[^฀-๿A-Za-z0-9]/g, '').length >= 2 ? inner : cleanName(m[1]);
+  }
+
+  /* คลังคำไทยที่แอปรู้จักอยู่แล้ว (ชื่ออาหาร ร้าน หมวดค่าใช้จ่าย) เอามาใช้ซ่อมคำที่ OCR อ่านเพี้ยน
+     เทียบกันที่โครงพยัญชนะ — "สัมตำ" กับ "ส้มตำ" มีโครงเดียวกันคือ สมต จึงรู้ได้ว่าเป็นคำเดียวกัน */
+  var THAI_VOCAB = null;
+  function thaiVocab() {
+    if (THAI_VOCAB) return THAI_VOCAB;
+    var seen = {}, bySkeleton = {};
+    CATEGORIES.forEach(function (cat) {
+      cat.words.forEach(function (w) {
+        if (!/^[฀-๿]{3,}$/.test(w) || seen[w]) return;
+        seen[w] = 1;
+        var sk = skeleton(w);
+        if (sk.length < 3) return;
+        (bySkeleton[sk] = bySkeleton[sk] || []).push(w);
+      });
+    });
+    THAI_VOCAB = [];
+    Object.keys(bySkeleton).forEach(function (sk) {
+      /* โครงเดียวแต่เป็นได้หลายคำ (เช่น "ค่าไฟ" กับ "คาเฟ่" โครงเดียวกันคือ คาฟ)
+         แบบนี้เดาไม่ได้ว่าคำไหน ต้องไม่แตะ ไม่งั้นจะไปแก้คำที่ถูกอยู่แล้วให้ผิด */
+      if (bySkeleton[sk].length !== 1) return;
+      THAI_VOCAB.push({ word: bySkeleton[sk][0], sk: sk });
+    });
+    return THAI_VOCAB;
+  }
+
+  /* ซ่อมคำไทยที่อยู่ "ข้างใน" ชื่อร้าน/บันทึกช่วยจำ
+     เช่น "สัมตำใบเตยเงินล้าน" → "ส้มตำใบเตยเงินล้าน"
+     วิธี: ถอดสระ/วรรณยุกต์ออกให้เหลือโครงพยัญชนะ แล้วหาโครงของคำในคลังว่าอยู่ตรงไหน
+     แทนที่เฉพาะช่วงนั้น ตัวอักษรที่เหลือไม่ถูกแตะ */
+  var COMBINING_RE = /[\u0E31\u0E33-\u0E3A\u0E47-\u0E4E]/;
+
+  function fixThaiWords(value) {
+    var text = String(value || '');
+    if (!/[฀-๿]{3,}/.test(text)) return text;
+    var vocab = thaiVocab();
+    var info = skeletonMap(text);
+    var edits = [];
+    vocab.forEach(function (v) {
+      if (v.sk.length < 3) return;
+      var at = info.sk.indexOf(v.sk);
+      while (at !== -1) {
+        var start = info.map[at];
+        var end = info.map[at + v.sk.length - 1] + 1;
+        while (end < text.length && COMBINING_RE.test(text[end])) end++;   // เก็บสระ/วรรณยุกต์ท้ายคำมาด้วย
+        var found = text.slice(start, end);
+        if (found !== v.word && Math.abs(found.length - v.word.length) <= 2) {
+          edits.push({ start: start, end: end, word: v.word });
+        }
+        at = info.sk.indexOf(v.sk, at + 1);
+      }
+    });
+    if (!edits.length) return text;
+    edits.sort(function (a, b) { return a.start - b.start || (b.end - b.start) - (a.end - a.start); });
+    var out = '', cursor = 0;
+    edits.forEach(function (e) {
+      if (e.start < cursor) return;                                        // ทับกับคำก่อนหน้า ข้ามไป
+      out += text.slice(cursor, e.start) + e.word;
+      cursor = e.end;
+    });
+    return out + text.slice(cursor);
+  }
+
   function findMerchant(lines, isSlip) {
     if (isSlip) {
       var payee = findPayee(lines);
@@ -649,8 +732,8 @@ window.ReceiptParser = (function () {
     var lines = text ? text.split('\n') : [];
     var isSlip = detectSlip(lines);
     var amountInfo = findAmount(lines);
-    var note = findNote(lines);
-    var merchantName = findMerchant(lines, isSlip);
+    var note = fixThaiWords(findNote(lines));
+    var merchantName = fixThaiWords(unwrapWallet(findMerchant(lines, isSlip)));
     return {
       text: text,
       isSlip: isSlip,
@@ -671,6 +754,15 @@ window.ReceiptParser = (function () {
   return {
     parse: parse,
     categories: CATEGORIES.concat([OTHER]),
+    /* ใช้ตอนอ่านบรรทัดชื่อร้านซ้ำ — เทียบว่าเป็นชื่อเดียวกันไหม และเก็บกวาดชื่อให้เรียบร้อย */
+    sameName: function (a, b) {
+      var sa = skeleton(String(a || '').toLowerCase());
+      var sb = skeleton(String(b || '').toLowerCase());
+      return !!sa && !!sb && (sa === sb || withinOneEdit(sa, sb));
+    },
+    cleanMerchant: function (value) {
+      return fixThaiWords(unwrapWallet(tidyName(stripBankParts(String(value || '')))));
+    },
     /* เดาหมวดจากชื่อร้าน/บันทึกช่วยจำอย่างเดียว (ใช้ตอนผู้ใช้พิมพ์ชื่อร้านเอง) */
     guessCategory: function (merchant, note) {
       var joined = (merchant || '') + ' ' + (note || '');
