@@ -3458,10 +3458,12 @@
       '<p class="budget-foot">ครั้งแรกให้ใส่อีเมลกับรหัสผ่านที่ต้องการ แล้วกด <strong>สมัครใหม่</strong> · เครื่องอื่นใช้อีเมลกับรหัสผ่านเดียวกันเพื่อดูข้อมูลชุดเดียวกัน</p>' + note;
   }
 
-  /* ---------------- หน้าต้อนรับตอนเปิดใช้ครั้งแรก ----------------
-     ขึ้นเฉพาะครั้งแรกจริงๆ: ยังไม่เคยปิดหน้านี้ ยังไม่ได้ล็อกอิน และยังไม่มีรายจ่ายในเครื่อง
-     (คนที่ใช้แอปอยู่ก่อนแล้วจะไม่โดนขวาง) เลือกได้ว่าจะล็อกอินเลยหรือใช้ก่อนโดยไม่ล็อกอิน */
+  /* ---------------- หน้าเข้าสู่ระบบตอนเปิดใช้ครั้งแรก ----------------
+     ขึ้นเฉพาะครั้งแรกจริงๆ: ยังไม่เคยผ่านหน้านี้ ยังไม่ได้ล็อกอิน และยังไม่มีรายจ่ายในเครื่อง
+     (คนที่ใช้แอปอยู่ก่อนแล้วจะไม่โดนขวาง) ล็อกอิน/สมัครได้จากหน้านี้เลย
+     หรือกด "ใช้งานโดยไม่ล็อกอิน" ไปใช้แบบเก็บข้อมูลในเครื่องอย่างเดียวก็ได้ */
   var WELCOME_KEY = 'expense-book:welcome:v1';
+  var welcomeBusy = false;
 
   function welcomeSeen() {
     try { return !!localStorage.getItem(WELCOME_KEY); } catch (e) { return false; }
@@ -3473,17 +3475,38 @@
     markWelcomeSeen();
     $('#welcome').hidden = true;
   }
+  function welcomeSay(text, isError) {
+    var el = $('#welcomeMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('is-error', !!isError);
+    el.hidden = !text;
+  }
   function renderWelcome() {
     var box = $('#welcomeActions');
     if (!box) return;
     var canLogin = CloudSync.isConfigured();
-    box.innerHTML = (canLogin
-      ? '<button class="btn btn-primary" type="button" data-welcome="login">☁️ เข้าสู่ระบบ / สมัครสมาชิก</button>' +
-        '<button class="btn btn-ghost" type="button" data-welcome="skip">เริ่มใช้เลย ไม่ต้องล็อกอิน</button>'
-      : '<button class="btn btn-primary" type="button" data-welcome="skip">เริ่มใช้งาน</button>');
+    var busy = welcomeBusy ? ' disabled' : '';
+    box.innerHTML = canLogin
+      ? '<button class="welcome-btn welcome-btn-primary" type="submit" data-welcome="login"' + busy + '>' +
+          '<span aria-hidden="true">☁️</span> ' + (welcomeBusy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ') +
+          '<span class="welcome-btn-go" aria-hidden="true">→</span>' +
+        '</button>' +
+        '<p class="welcome-or">หรือ</p>' +
+        '<button class="welcome-btn welcome-btn-ghost" type="button" data-welcome="signup"' + busy + '>' +
+          '<span aria-hidden="true">🧑‍💼</span> สมัครสมาชิก' +
+        '</button>' +
+        '<button class="welcome-skip" type="button" data-welcome="skip">ใช้งานโดยไม่ล็อกอิน</button>'
+      : '<button class="welcome-btn welcome-btn-primary" type="button" data-welcome="skip">เริ่มใช้งาน</button>';
     $('#welcomeHint').textContent = canLogin
-      ? 'ล็อกอินเมื่ออยากใช้หลายเครื่องหรือหารบิลกับเพื่อน — เปิดทีหลังจากปุ่ม ☁️ ด้านบนก็ได้'
+      ? 'ล็อกอินเมื่ออยากหารบิลกับเพื่อน — รายจ่ายของคุณยังเก็บอยู่ในเครื่องเสมอ'
       : 'ข้อมูลทั้งหมดเก็บอยู่ในเครื่องนี้';
+    var form = $('#welcomeForm');
+    if (form) form.classList.toggle('is-local', !canLogin);
+    var fields = $('.welcome-fields');
+    if (fields) fields.hidden = !canLogin;
+    var row = $('.welcome-row');
+    if (row) row.hidden = !canLogin;
   }
   var welcomeDone = false;
   function maybeShowWelcome() {
@@ -3492,14 +3515,85 @@
     if (welcomeSeen()) return;
     if (CloudSync.user()) { markWelcomeSeen(); return; }        // ล็อกอินค้างไว้อยู่แล้ว
     if (ExpenseStore.all().length) { markWelcomeSeen(); return; }  // เคยใช้มาก่อน ไม่ต้องขวาง
+    var box = $('#welcomeRemember');
+    if (box) box.checked = CloudSync.remember();
     renderWelcome();
+    welcomeSay('');
     $('#welcome').hidden = false;
   }
+
+  /* ล็อกอิน/สมัครจากหน้าแรก — สำเร็จแล้วปิดหน้านี้แล้วเข้าแอปเลย */
+  function welcomeAuth(mode) {
+    if (welcomeBusy) return;
+    var mail = ($('#welcomeEmail').value || '').trim();
+    var pass = $('#welcomePass').value || '';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) { welcomeSay('กรุณาใส่อีเมลให้ถูกต้อง', true); return; }
+    if (pass.length < 6) { welcomeSay('รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร', true); return; }
+    CloudSync.setRemember(!!$('#welcomeRemember').checked);
+    welcomeBusy = true;
+    renderWelcome();
+    welcomeSay(mode === 'signup' ? 'กำลังสมัครสมาชิก…' : 'กำลังเข้าสู่ระบบ…');
+    var work = mode === 'signup'
+      ? CloudSync.signUpWithPassword(mail, pass)
+      : CloudSync.signInWithPassword(mail, pass).then(function () { return { session: true }; });
+    work.then(function (res) {
+      welcomeBusy = false;
+      if (res && res.needsConfirm) {
+        renderWelcome();
+        welcomeSay('สมัครแล้ว — กดลิงก์ยืนยันในอีเมลของคุณหนึ่งครั้ง แล้วกลับมากดเข้าสู่ระบบ');
+        return;
+      }
+      welcomeSay('เข้าสู่ระบบสำเร็จ');
+      renderSyncBadge();
+      closeWelcome();
+      runSync(true);
+    }).catch(function (err) {
+      welcomeBusy = false;
+      renderWelcome();
+      welcomeSay(err.message || 'เข้าสู่ระบบไม่สำเร็จ', true);
+    });
+  }
+
+  function welcomeForgot() {
+    if (welcomeBusy) return;
+    var mail = ($('#welcomeEmail').value || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)) {
+      welcomeSay('ใส่อีเมลของคุณในช่องด้านบนก่อน แล้วกด "ลืมรหัสผ่าน?" อีกครั้ง', true);
+      $('#welcomeEmail').focus();
+      return;
+    }
+    welcomeBusy = true;
+    renderWelcome();
+    welcomeSay('กำลังส่งลิงก์ตั้งรหัสผ่านใหม่…');
+    CloudSync.resetPassword(mail).then(function () {
+      welcomeBusy = false;
+      renderWelcome();
+      welcomeSay('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ ' + mail + ' แล้ว — เปิดอีเมลแล้วกดลิงก์ได้เลย');
+    }).catch(function (err) {
+      welcomeBusy = false;
+      renderWelcome();
+      welcomeSay(err.message || 'ส่งอีเมลไม่สำเร็จ', true);
+    });
+  }
+
+  $('#welcomeForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (CloudSync.isConfigured()) welcomeAuth('login'); else closeWelcome();
+  });
   $('#welcome').addEventListener('click', function (ev) {
     var btn = ev.target.closest('[data-welcome]');
     if (!btn) return;
-    closeWelcome();
-    if (btn.dataset.welcome === 'login') openSync();
+    var act = btn.dataset.welcome;
+    if (act === 'skip') { closeWelcome(); return; }
+    if (act === 'signup') { welcomeAuth('signup'); return; }
+    if (act === 'forgot') { welcomeForgot(); return; }
+    if (act === 'togglepw') {
+      var input = $('#welcomePass');
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+      btn.setAttribute('aria-label', show ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน');
+    }
   });
 
   function openSync() {

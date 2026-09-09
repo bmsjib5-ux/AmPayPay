@@ -70,13 +70,32 @@ window.CloudSync = (function () {
     return libPromise;
   }
 
+  /* "จดจำฉันไว้ในเครื่องนี้" — ติ๊กไว้เก็บ session ใน localStorage (ปิดแอปแล้วยังล็อกอินอยู่)
+     ไม่ติ๊กก็เก็บใน sessionStorage แทน ปิดแท็บ/แอปแล้วต้องล็อกอินใหม่ */
+  var REMEMBER_KEY = 'expense-book:remember:v1';
+  function remember() {
+    try { return localStorage.getItem(REMEMBER_KEY) !== '0'; } catch (e) { return true; }
+  }
+  var authStorage = {
+    getItem: function (k) {
+      try { return (remember() ? localStorage : sessionStorage).getItem(k); } catch (e) { return null; }
+    },
+    setItem: function (k, v) {
+      try { (remember() ? localStorage : sessionStorage).setItem(k, v); } catch (e) {}
+    },
+    removeItem: function (k) {
+      try { localStorage.removeItem(k); } catch (e) {}
+      try { sessionStorage.removeItem(k); } catch (e) {}
+    }
+  };
+
   function getClient() {
     if (client) return Promise.resolve(client);
     if (!isConfigured()) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า Supabase ในไฟล์ assets/config.js'));
     var c = config();
     return loadLibrary().then(function (lib) {
       client = lib.createClient(c.url, c.anonKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage }
       });
       client.auth.onAuthStateChange(function (_event, next) {
         session = next;
@@ -147,6 +166,10 @@ window.CloudSync = (function () {
   var api = {
     isConfigured: isConfigured,
     onState: function (fn) { listeners.push(fn); },
+    remember: remember,
+    setRemember: function (on) {
+      try { localStorage.setItem(REMEMBER_KEY, on ? '1' : '0'); } catch (e) {}
+    },
     user: function () { return session && session.user ? session.user : null; },
     email: function () { var u = api.user(); return u ? u.email : ''; },
 
@@ -186,6 +209,16 @@ window.CloudSync = (function () {
         session = res.data.session || null;
         emit();
         return { session: session, needsConfirm: !res.data.session };
+      });
+    },
+
+    /* ลืมรหัสผ่าน — ส่งลิงก์ตั้งรหัสใหม่ไปที่อีเมล */
+    resetPassword: function (email) {
+      return getClient().then(function (c) {
+        return c.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+      }).then(function (res) {
+        if (res && res.error) throw new Error(friendly(res.error));
+        return true;
       });
     },
 
