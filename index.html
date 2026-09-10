@@ -9,11 +9,11 @@
      ใส่ไว้ในหน้าเว็บโดยตรงเพื่อให้มีผลแม้โฮสต์จะตั้ง header ให้ไม่ได้
      (Tesseract.js ต้องใช้ Web Worker ผ่าน blob: และ wasm จึงต้องอนุญาตไว้) -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' blob: 'wasm-unsafe-eval' https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; manifest-src 'self'; connect-src 'self' data: blob: https://*.supabase.co https://cdn.jsdelivr.net">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=72">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=72">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png?v=73">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png?v=73">
 <!-- iOS ไม่รองรับไอคอนแบบ SVG บนหน้าจอโฮม ต้องเป็น PNG เท่านั้น ไม่งั้นจะขึ้นเป็นตัวอักษรบนพื้นดำ -->
-<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=72">
-<link rel="manifest" href="manifest.webmanifest?v=72">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png?v=73">
+<link rel="manifest" href="manifest.webmanifest?v=73">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f2">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,7 +21,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="AmPayPay">
 <meta name="application-name" content="AmPayPay">
-<link rel="stylesheet" href="assets/styles.css?v=72">
+<link rel="stylesheet" href="assets/styles.css?v=73">
 </head>
 <body>
 <header class="topbar">
@@ -67,6 +67,7 @@
         <button id="pickBtn" class="action-card is-primary" type="button"><span class="ac-ic" aria-hidden="true">🖼️</span><span class="ac-label">เลือกรูป</span></button>
         <button id="camBtn" class="action-card" type="button"><span class="ac-ic" aria-hidden="true">📷</span><span class="ac-label">ถ่ายรูป</span></button>
         <button id="manualBtn" class="action-card" type="button"><span class="ac-ic" aria-hidden="true">✏️</span><span class="ac-label">กรอกเอง</span></button>
+        <button id="pasteSlipBtn" class="action-card" type="button" title="วางข้อความใบเสร็จที่คัดลอกมา เช่นจากคำสั่งลัดของ iPhone"><span class="ac-ic" aria-hidden="true">📋</span><span class="ac-label">วางข้อความ</span></button>
       </div>
       <input id="fileInput" class="sr-only" type="file" accept="image/*" multiple>
       <input id="camInput" class="sr-only" type="file" accept="image/*" capture="environment">
@@ -90,19 +91,45 @@
     <details class="raw shortcut-help">
       <summary>📲 ดึงใบเสร็จจากอัลบั้ม iPhone อัตโนมัติ</summary>
       <div class="shortcut-body">
-        <p>สร้าง <b>คำสั่งลัด</b> (Shortcuts) ครั้งเดียว ให้ iPhone หยิบรูปจากอัลบั้มแล้วส่งเข้าแอปนี้เอง</p>
+        <p>สร้าง <b>คำสั่งลัด</b> (Shortcuts) ครั้งเดียว ให้ iPhone หยิบรูปจากอัลบั้ม
+        อ่านข้อความด้วย Live Text แล้วส่งเข้าแอปนี้</p>
+
+        <h4 class="shortcut-h">วิธีที่ 1 — ผ่านคลิปบอร์ด <span class="chip is-ok">แนะนำ</span></h4>
+        <p class="muted">สั้นกว่า ไม่ต้องยุ่งกับลิงก์ และข้อมูลเข้าแอปที่คุณเปิดอยู่จริง (ไม่หลุดไป Safari)</p>
         <ol>
           <li>เปิดแอป <b>คำสั่งลัด</b> (Shortcuts) → กด <b>+</b> สร้างคำสั่งลัดใหม่</li>
           <li>เพิ่ม <b>ค้นหารูปภาพ</b> (Find Photos) → ตั้งเงื่อนไข เช่น <i>อัลบั้ม คือ ใบเสร็จ</i>
             หรือ <i>วันที่เพิ่ม คือ วันนี้</i> → <b>จำกัด</b> (Limit) 10 รูป เรียง <i>ใหม่สุดก่อน</i></li>
-          <li>เพิ่ม <b>ทำซ้ำกับแต่ละรายการ</b> (Repeat with Each) → ข้างในใส่
-            <b>แยกข้อความออกจากรูปภาพ</b> (Extract Text from Image) — ใช้ Live Text ของเครื่อง</li>
-          <li>ต่อท้าย (นอกลูป) ใส่ <b>รวมข้อความ</b> (Combine Text) โดยตัวคั่นเลือก
-            <b>กำหนดเอง</b> (Custom) แล้วพิมพ์ <code>###SLIP###</code>
-            <span class="muted">(พิมพ์ติดกันบรรทัดเดียว ไม่ต้องเว้นบรรทัด)</span></li>
-          <li>ปิดท้ายด้วย <b>เข้ารหัส URL</b> (URL Encode) แล้ว <b>เปิด URL</b> (Open URLs)
-            โดยพิมพ์ลิงก์ข้างล่างนี้ แล้วต่อด้วยผลลัพธ์จากขั้นก่อน</li>
+          <li>เพิ่ม <b>แยกข้อความออกจากรูปภาพ</b> (Extract Text from Image)
+            <span class="muted">— ใส่ต่อจากขั้นก่อนได้เลย ไม่ต้องมีลูป</span></li>
+          <li>เพิ่ม <b>รวมข้อความ</b> (Combine Text) ตัวคั่นเลือก <b>กำหนดเอง</b> (Custom)
+            แล้วพิมพ์ <code>###SLIP###</code></li>
+          <li>ปิดท้ายด้วย <b>คัดลอกไปยังคลิปบอร์ด</b> (Copy to Clipboard) — จบเท่านี้</li>
+          <li>รันคำสั่งลัด แล้วกลับมาที่แอปนี้ กด <b>📋 วางข้อความ</b> ด้านบน</li>
         </ol>
+
+        <details class="raw">
+          <summary>วิธีที่ 2 — ส่งผ่านลิงก์ (ถ้าอยากให้เปิดแอปให้เอง)</summary>
+          <ol>
+            <li>ทำข้อ 1–4 เหมือนวิธีที่ 1</li>
+            <li>ต่อด้วย <b>เข้ารหัส URL</b> (URL Encode)
+              <span class="muted">— ต้องรับค่ามาจาก <b>รวมข้อความ</b></span></li>
+            <li>ปิดท้ายด้วย <b>เปิด URL</b> (Open URLs) พิมพ์ลิงก์ข้างล่างนี้
+              แล้ว<b>ต่อท้ายติดกันทันที</b>ด้วยผลลัพธ์จาก <b>เข้ารหัส URL</b>
+              <span class="muted">(ห้ามมีช่องว่างหรือขึ้นบรรทัดใหม่คั่น)</span></li>
+          </ol>
+          <p class="banner is-warn" style="margin-top:10px">⚠️ ขึ้นว่า <b>“คำสั่งลัดไม่สามารถแปลงจากข้อความเป็น URL ได้”</b>
+            แปลว่าลิงก์ที่ประกอบได้ไม่ถูกต้อง เช็ค 3 อย่างนี้
+            <br>· <b>เปิด URL</b> ต้องต่อด้วยผลจาก <b>เข้ารหัส URL</b> ไม่ใช่ผลจาก <b>รวมข้อความ</b> (ข้อความดิบมีขึ้นบรรทัดใหม่ จึงไม่ใช่ลิงก์)
+            <br>· ระหว่างลิงก์กับตัวแปร ต้องไม่มีช่องว่างหรือเว้นบรรทัด
+            <br>· ถ้ายังไม่ผ่าน ใช้วิธีที่ 1 แทน — ไม่ต้องแตะเรื่องลิงก์เลย</p>
+          <p class="banner is-warn" style="margin-top:10px">⚠️ วิธีนี้เปิดลิงก์ใน <b>Safari</b> เสมอ
+            ถ้าคุณเพิ่มแอปนี้ไว้ที่หน้าจอโฮม iOS จะถือว่าเป็นคนละที่เก็บข้อมูลกับ Safari
+            รายการที่เข้ามาทางลิงก์จะไปอยู่ใน Safari เท่านั้น —
+            ให้เลือกใช้ทางใดทางหนึ่งไปเลย หรือเปิดซิงก์ ☁️ ทั้งสองฝั่งเพื่อให้ข้อมูลตรงกัน
+            <span class="muted">(วิธีที่ 1 ไม่มีปัญหานี้)</span></p>
+        </details>
+
         <div class="shortcut-url">
           <label class="field">
             <span class="field-label">ให้เข้าสมุดเล่มไหน</span>
@@ -111,10 +138,7 @@
           <code id="shortcutUrl">https://ampaypay.onrender.com/#slip=</code>
           <button type="button" class="btn btn-sm" id="copyShortcutUrl">คัดลอกลิงก์</button>
         </div>
-        <p class="banner is-warn" style="margin-top:12px">⚠️ คำสั่งลัดจะเปิดลิงก์ใน <b>Safari</b> เสมอ
-          ถ้าคุณเพิ่มแอปนี้ไว้ที่หน้าจอโฮม iOS จะถือว่าเป็นคนละที่เก็บข้อมูลกับ Safari
-          รายการที่เข้ามาทางคำสั่งลัดจะไปอยู่ใน Safari เท่านั้น —
-          ให้เลือกใช้ทางใดทางหนึ่งไปเลย หรือเปิดซิงก์ ☁️ ทั้งสองฝั่งเพื่อให้ข้อมูลตรงกัน</p>
+        <p class="muted">ลิงก์นี้ใช้กับวิธีที่ 2 · เลือกสมุดไว้ล่วงหน้าได้</p>
         <p class="muted">อยากให้ทำเองทุกวัน ตั้งเป็น <b>ระบบอัตโนมัติ</b> (Automation) แบบ <i>เวลาของวัน</i> ได้ · ชื่อในวงเล็บคือชื่อเมนูภาษาอังกฤษ</p>
       </div>
     </details>
@@ -295,7 +319,7 @@
 <footer class="wrap foot">
   รายจ่ายเก็บในเครื่องของคุณ · ล็อกอิน ☁️ เมื่ออยากหารบิลกับเพื่อน
   · <a href="privacy.html">ความเป็นส่วนตัว</a>
-  <span class="ver">เวอร์ชัน 72</span>
+  <span class="ver">เวอร์ชัน 73</span>
 </footer>
 
 <div id="bookModal" class="modal" hidden>
@@ -420,7 +444,7 @@
   <div class="welcome-inner" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
 
     <header class="welcome-hero">
-      <img class="welcome-logo" src="assets/icon-192.png?v=72" alt="" width="92" height="92">
+      <img class="welcome-logo" src="assets/icon-192.png?v=73" alt="" width="92" height="92">
       <div class="welcome-brand">
         <h1 id="welcomeTitle" class="welcome-title">AmPayPay</h1>
         <p class="welcome-sub">ถ่ายใบเสร็จ · รู้ยอดทันที · หารกับเพื่อนจบในแอปเดียว</p>
@@ -474,6 +498,21 @@
   </div>
 </div>
 
+<div id="pasteSlipModal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pasteSlipTitle">
+    <div class="modal-head">
+      <h2 id="pasteSlipTitle" class="section-title">📋 วางข้อความใบเสร็จ</h2>
+      <button class="btn btn-ghost btn-sm" type="button" data-paste="close" aria-label="ปิด">✕</button>
+    </div>
+    <p class="chart-sub">วางข้อความที่คัดลอกมา แล้วกดนำเข้า · หลายใบให้คั่นด้วย <code>###SLIP###</code></p>
+    <textarea id="pasteSlipText" class="paste-slip-text" rows="8" placeholder="แตะค้างในช่องนี้แล้วเลือก “วาง”"></textarea>
+    <div class="row-actions" style="margin-top:12px">
+      <button class="btn btn-primary btn-sm" type="button" data-paste="import">นำเข้า</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-paste="close">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
 <div id="syncModal" class="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
     <div class="modal-head">
@@ -494,13 +533,13 @@
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="assets/ocr-paths.js?v=72"></script>
-<script src="assets/vendor/qrcode.js?v=72"></script>
-<script src="assets/promptpay.js?v=72"></script>
-<script src="assets/config.js?v=72"></script>
-<script src="assets/parser.js?v=72"></script>
-<script src="assets/store.js?v=72"></script>
-<script src="assets/sync.js?v=72"></script>
-<script src="assets/app.js?v=72"></script>
+<script src="assets/ocr-paths.js?v=73"></script>
+<script src="assets/vendor/qrcode.js?v=73"></script>
+<script src="assets/promptpay.js?v=73"></script>
+<script src="assets/config.js?v=73"></script>
+<script src="assets/parser.js?v=73"></script>
+<script src="assets/store.js?v=73"></script>
+<script src="assets/sync.js?v=73"></script>
+<script src="assets/app.js?v=73"></script>
 </body>
 </html>
