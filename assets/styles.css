@@ -877,6 +877,17 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .debt-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
 .debt-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 18px; color: var(--text-muted); }
 .debt-total.is-owed { color: var(--warn-ink); }
+/* ช่องวางข้อความใบเสร็จเอง (เผื่อเบราว์เซอร์ไม่ให้อ่านคลิปบอร์ด) */
+.paste-slip-text {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 150px;
+  padding: 12px 13px; border-radius: 13px; border: 1.5px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: 14px; line-height: 1.6;
+}
+.paste-slip-text:focus { outline: none; border-color: var(--brand); background: var(--surface-1); }
+.shortcut-h { font-size: 15px; margin: 18px 0 4px; display: flex; align-items: center; gap: 8px; }
+.shortcut-h:first-of-type { margin-top: 10px; }
+
 /* ช่องติ๊กซ่อนรายการที่เคลียร์แล้ว ในการ์ด "หนี้ที่ฉันต้องจ่าย" */
 .hide-done {
   display: flex; align-items: center; gap: 9px; cursor: pointer;

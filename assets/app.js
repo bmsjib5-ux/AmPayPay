@@ -1259,6 +1259,17 @@
     }).catch(function (e) { toast('ยืนยันไม่สำเร็จ: ' + e.message); });
   }
 
+  $('#pasteSlipBtn').addEventListener('click', pasteSlipFromClipboard);
+  $('#pasteSlipModal').addEventListener('click', function (ev) {
+    if (ev.target === this) { this.hidden = true; return; }
+    var btn = ev.target.closest('[data-paste]');
+    if (!btn) return;
+    if (btn.dataset.paste === 'close') { this.hidden = true; return; }
+    if (btn.dataset.paste === 'import') {
+      if (handlePastedSlip($('#pasteSlipText').value)) this.hidden = true;
+    }
+  });
+
   $('#hideDoneClaims').addEventListener('change', function () {
     setHideDoneClaims(this.checked);
     renderIncoming();
@@ -1328,12 +1339,16 @@
     var raw;
     raw = decodeParam(m[1]).slice(0, 60000).trim();
     if (!raw) { toast('ไม่พบข้อความใบเสร็จในลิงก์'); return; }
+    importSlipText(raw, bookNote, 'Shortcut');
+  }
 
-    var chunks = raw.split(SLIP_SEPARATOR)
+  /* นำข้อความใบเสร็จ (จากลิงก์ หรือจากคลิปบอร์ด) มาแยกเป็นการ์ดรอบันทึก */
+  function importSlipText(raw, bookNote, source) {
+    var chunks = String(raw || '').split(SLIP_SEPARATOR)
       .map(function (t) { return t.trim(); })
       .filter(function (t) { return t.length >= 8; })
       .slice(0, 30);
-    if (!chunks.length) { toast('ข้อความสั้นเกินไป อ่านเป็นใบเสร็จไม่ได้'); return; }
+    if (!chunks.length) { toast('ข้อความสั้นเกินไป อ่านเป็นใบเสร็จไม่ได้'); return 0; }
 
     chunks.forEach(function (text) {
       var parsed = ReceiptParser.parse(text);
@@ -1355,8 +1370,33 @@
     var addTab = document.querySelector('.tab[data-tab="add"]');
     if (addTab) addTab.click();
     var found = chunks.filter(function (t) { return ReceiptParser.parse(t).amount != null; }).length;
-    toast('รับใบเสร็จจาก Shortcut ' + chunks.length + ' ใบ' +
-      (found < chunks.length ? ' · อ่านยอดได้ ' + found + ' ใบ' : '') + bookNote + ' — ตรวจแล้วกดบันทึกได้เลย');
+    toast('รับใบเสร็จจาก ' + (source || 'Shortcut') + ' ' + chunks.length + ' ใบ' +
+      (found < chunks.length ? ' · อ่านยอดได้ ' + found + ' ใบ' : '') + (bookNote || '') + ' — ตรวจแล้วกดบันทึกได้เลย');
+    return chunks.length;
+  }
+
+  /* ---------------- วางข้อความใบเสร็จจากคลิปบอร์ด ----------------
+     ทางที่ง่ายกว่าส่งผ่านลิงก์มาก เพราะคำสั่งลัดแค่ "คัดลอกไปยังคลิปบอร์ด" พอ
+     ไม่ต้องเข้ารหัส URL ไม่ต้องเปิด Safari และข้อมูลจึงอยู่ในแอปที่เปิดอยู่จริง */
+  function handlePastedSlip(text) {
+    var raw = String(text || '').slice(0, 60000).trim();
+    if (!raw) { toast('คลิปบอร์ดว่าง — คัดลอกข้อความใบเสร็จมาก่อน'); return 0; }
+    return importSlipText(raw, '', 'คลิปบอร์ด') || 0;
+  }
+
+  function openPasteSlip() {
+    $('#pasteSlipText').value = '';
+    $('#pasteSlipModal').hidden = false;
+    setTimeout(function () { $('#pasteSlipText').focus(); }, 50);
+  }
+
+  function pasteSlipFromClipboard() {
+    if (!(navigator.clipboard && navigator.clipboard.readText)) { openPasteSlip(); return; }
+    navigator.clipboard.readText().then(function (text) {
+      if (!handlePastedSlip(text)) openPasteSlip();      // ว่างหรือสั้นไป ให้วางเองแทน
+    }).catch(function () {
+      openPasteSlip();                                   // เบราว์เซอร์ไม่ให้อ่านคลิปบอร์ด ให้วางเองแทน
+    });
   }
 
   /* ---------------- หารบิลกับเพื่อน / ลูกหนี้ ---------------- */
