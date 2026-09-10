@@ -877,6 +877,17 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .debt-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
 .debt-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 18px; color: var(--text-muted); }
 .debt-total.is-owed { color: var(--warn-ink); }
+/* ช่องติ๊กซ่อนรายการที่เคลียร์แล้ว ในการ์ด "หนี้ที่ฉันต้องจ่าย" */
+.hide-done {
+  display: flex; align-items: center; gap: 9px; cursor: pointer;
+  margin: 2px 0 12px; font-size: 13.5px; color: var(--text-muted);
+}
+.hide-done input { width: 17px; height: 17px; margin: 0; accent-color: var(--brand); flex: none; }
+.hide-done:hover { color: var(--text); }
+.hide-done-count { color: var(--text-muted); font-size: 12.5px; }
+.hide-done-count:empty { display: none; }
+.hide-done-empty { margin: 6px 0 0; }
+
 .debt-items { display: grid; gap: 8px; }
 .debt-item {
   display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
