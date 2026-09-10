@@ -939,18 +939,41 @@
   });
 
   /* ---------- ฝั่งลูกหนี้: หนี้ที่เพื่อนส่งมา ---------- */
+  /* ติ๊กซ่อนรายการที่เคลียร์แล้ว — จำไว้ในเครื่อง เปิดแอปครั้งหน้าก็ยังเป็นค่าเดิม */
+  var HIDE_DONE_KEY = 'expense-book:hideDoneClaims:v1';
+  function hideDoneClaims() {
+    try { return localStorage.getItem(HIDE_DONE_KEY) === '1'; } catch (e) { return false; }
+  }
+  function setHideDoneClaims(on) {
+    try { localStorage.setItem(HIDE_DONE_KEY, on ? '1' : '0'); } catch (e) {}
+  }
+
   function renderIncoming() {
     var card = $('#incomingCard');
     if (!syncReady()) { card.hidden = true; return; }
-    var list = incomingClaims().filter(function (c) { return c.status !== 'cancelled'; });
-    card.hidden = !list.length;
-    if (!list.length) return;
+    var all = incomingClaims().filter(function (c) { return c.status !== 'cancelled'; });
+    card.hidden = !all.length;
+    if (!all.length) return;
 
-    var owed = list.filter(function (c) { return c.status !== 'confirmed'; })
+    var owed = all.filter(function (c) { return c.status !== 'confirmed'; })
       .reduce(function (a, c) { return a + c.amount; }, 0);
     $('#incomingTotal').textContent = fmtMoney(owed);
-    var pendingN = list.filter(function (c) { return c.status !== 'confirmed'; }).length;
+    var pendingN = all.filter(function (c) { return c.status !== 'confirmed'; }).length;
     $('#incomingSub').textContent = owed > 0.005 ? 'รอจ่าย ' + pendingN + ' รายการ' : 'เคลียร์ครบแล้ว 🎉';
+
+    var hiding = hideDoneClaims();
+    var doneN = all.length - pendingN;
+    var list = hiding ? all.filter(function (c) { return c.status !== 'confirmed'; }) : all;
+
+    var box = $('#hideDoneClaims');
+    if (box) box.checked = hiding;
+    var count = $('#hideDoneCount');
+    if (count) {
+      count.textContent = doneN ? '(' + doneN + ' รายการ)' : '';
+      count.hidden = !doneN;
+    }
+    var allDone = $('#incomingAllDone');
+    if (allDone) allDone.hidden = !(hiding && !list.length);
 
     $('#incomingList').innerHTML = list.map(function (c) {
       var who = c.fromName || c.fromEmail;
@@ -1235,6 +1258,11 @@
       toast('ยืนยันรับเงินแล้ว ตัดยอดค้างให้เรียบร้อย');
     }).catch(function (e) { toast('ยืนยันไม่สำเร็จ: ' + e.message); });
   }
+
+  $('#hideDoneClaims').addEventListener('change', function () {
+    setHideDoneClaims(this.checked);
+    renderIncoming();
+  });
 
   $('#claimSyncBtn').addEventListener('click', function () {
     if (!syncReady()) { toast('ต้องเปิดซิงก์ ☁️ และล็อกอินก่อน'); return; }
