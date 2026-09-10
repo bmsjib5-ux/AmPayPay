@@ -438,7 +438,8 @@ window.ReceiptParser = (function () {
       .replace(/\s+\)/g, ')')
       .replace(/\(\s+/g, '(')
       .replace(/^[\s:：.\-]+|[\s:：.\-]+$/g, '')
-      .replace(/^(น\.ส\.|ด\.ช\.|ด\.ญ\.|นางสาว|นาย|นาง)(?=[ก-๙])/, '$1 ')
+      /* (?!สาว) กันไม่ให้รอบถัดไปมาแยก "นางสาว x" ที่เว้นวรรคแล้วเป็น "นาง สาว x" ซ้ำอีก */
+      .replace(/^(น\.ส\.|ด\.ช\.|ด\.ญ\.|นางสาว|นาย|นาง(?!สาว))(?=[ก-๙])/, '$1 ')
       .slice(0, 60);
   }
 
@@ -480,10 +481,26 @@ window.ReceiptParser = (function () {
   var BANK_APP_RE = /^(krungthai|kasikorn|kbank|k\s*plus|scb\s*easy|scb|bualuang|ttb|gsb|uob|cimb|ktb|mymo)\b.{0,14}$/i;
   /* เทียบแบบยอมให้ OCR อ่านเพี้ยนได้ 1 ตัว เช่น "รหัสฮ้างอิง" → รหัสอ้างอิง */
   var NAME_NOISE_KEYS = ['รหัสอ้างอิง', 'เลขที่รายการ', 'รหัสการอนุมัติ', 'หมายเลขคู่ค้า', 'หมายเลขบัตร',
-    'จำนวนเงิน', 'ค่าธรรมเนียม', 'วันที่ทำรายการ', 'บันทึกช่วยจำ', 'ยอดคงเหลือ'];
+    'จำนวนเงิน', 'ค่าธรรมเนียม', 'วันที่ทำรายการ', 'บันทึกช่วยจำ', 'ยอดคงเหลือ',
+    /* หัวสลิปกับป้ายกำกับ — OCR อ่านเพี้ยนได้บ่อย (เช่น "จ่ายบิลสำเร็จ" → "จ่ายบิลสำเรือ")
+       ลิสต์นี้เทียบที่โครงพยัญชนะและยอมให้ต่างกัน 1 ตัว จึงจับคำเพี้ยนพวกนี้ได้ */
+    'จ่ายบิลสำเร็จ', 'โอนเงินสำเร็จ', 'ทำรายการสำเร็จ', 'ชำระเงินสำเร็จ',
+    'รหัสร้านค้า', 'รหัสธุรกรรม', 'เลขที่อ้างอิง', 'รหัสธุรกรรมถุงเงิน'];
+
+  /* "รหัสอ้างอิง C20260906624913569679" — บรรทัดที่มีรหัสยาวๆ คือป้ายกำกับกับค่าของมัน
+     ไม่ใช่ชื่อร้าน (ชื่อร้านจริงอย่าง FC-PUNTHAI-PF1040-HATYAI มีขีดคั่นจึงไม่เข้าเงื่อนไขนี้)
+     ต้องมีตัวเลขอย่างน้อย 4 ตัวด้วย ชื่อร้านอังกฤษยาวๆ อย่าง NAVAPORNSOMSUKCHAROE จะได้ไม่โดน */
+  function hasLongCode(line) {
+    var runs = String(line || '').match(/[A-Za-z0-9]{10,}/g) || [];
+    for (var i = 0; i < runs.length; i++) {
+      if ((runs[i].match(/\d/g) || []).length >= 4) return true;
+    }
+    return false;
+  }
 
   function nameLike(line, strict) {
     if (strict && (NAME_NOISE_RE.test(line) || hasAny(line, NAME_NOISE_KEYS) ||
+        hasLongCode(line) ||
         BANK_APP_RE.test(String(line).trim()) || BANK_RE.test(line))) return '';
     var v = tidyName(stripBankParts(line));
     if (v.length < 3 || looksLikeGarbage(v)) return '';
@@ -511,6 +528,44 @@ window.ReceiptParser = (function () {
   /* เลขบัญชีที่ถูกปิดบัง หรือเลขยาวๆ — ใช้เป็นเส้นแบ่งระหว่างบล็อกผู้โอนกับผู้รับ */
   var ACCOUNT_RE = /(x{3,}[\dx*\-]*|\d{2,}-[\dx]+-[\dx]+)/i;
 
+  /* เลขบัญชีที่ถูกปิดบังแบบที่ OCR อ่านเพี้ยนได้ เช่น XXX-X-XX547-9 หรือ KXK-X-KX547-9
+     ดูที่ "รูปทรง" แทนตัวอักษรเป๊ะๆ: มีขีดอย่างน้อยสองขีด มีตัวเลขพอสมควร และแทบไม่มีตัวไทย */
+  function looksLikeAccountLine(line) {
+    var v = String(line || '').replace(/\s+/g, '');
+    if (v.length < 7 || v.length > 28) return false;
+    if ((v.match(/-/g) || []).length < 2) return false;
+    if ((v.match(/\d/g) || []).length < 3) return false;
+    return (v.match(/[ก-๙]/g) || []).length <= 1;
+  }
+
+  /* บนสลิปไทย บล็อกผู้โอนเรียงเป็น ชื่อ → ชื่อธนาคาร → เลขบัญชีที่ถูกปิดบัง
+     ชื่อที่มีบล็อกแบบนี้ตามหลัง คือคนที่จ่ายเงิน (ตัวผู้ใช้เอง) ไม่ใช่ร้าน
+     อีกสัญญาณคือธนาคารปิดบังนามสกุลผู้โอนด้วยดอกจัน เช่น "นายธนวัฒน์ ม***" — ร้านค้าไม่เคยถูกปิดบัง */
+  function isPayerLine(lines, index) {
+    if (/\*{2,}/.test(String(lines[index] || ''))) return true;
+    var sawBank = false, sawAccount = false;
+    for (var j = index + 1; j < Math.min(index + 4, lines.length); j++) {
+      var l = String(lines[j] || '');
+      // เจอชื่อคนอื่นก่อน แปลว่าบล็อกธนาคารข้างล่างเป็นของชื่อนั้น ไม่ใช่ของบรรทัดนี้
+      if (nameLike(l, true)) break;
+      if (BANK_RE.test(l) || BANK_APP_RE.test(l.trim())) sawBank = true;
+      if (ACCOUNT_RE.test(l) || looksLikeAccountLine(l)) sawAccount = true;
+    }
+    return sawBank && sawAccount;
+  }
+
+  /* คัดชื่อผู้โอนออก และเก็บเฉพาะชื่อที่อยู่ "ถัดจาก" บล็อกผู้โอนลงมา
+     เพราะบนสลิปไทยผู้โอนอยู่ก่อนผู้รับเสมอ อะไรที่อยู่เหนือผู้โอนคือหัวสลิปหรือลายน้ำ */
+  function dropPayers(candidates, lines) {
+    var payerAt = -1;
+    candidates.forEach(function (c) {
+      if (isPayerLine(lines, c.index)) payerAt = Math.max(payerAt, c.index);
+    });
+    return candidates.filter(function (c) {
+      return !isPayerLine(lines, c.index) && (payerAt < 0 || c.index > payerAt);
+    });
+  }
+
   function pickName(candidates, lines) {
     var picked = preferTitled(candidates.map(function (c) { return c.name; }));
     for (var i = 0; i < candidates.length; i++) {
@@ -528,11 +583,11 @@ window.ReceiptParser = (function () {
       var tail = en ? en[2] : tailAfter(lines[i], TO_KEYS);
       if (tail === null) continue;
       var inline = nameLike(tail);                 // ชื่ออยู่บรรทัดเดียวกับป้ายกำกับ
-      if (inline) return withContinuation(inline, lines, i);
+      if (inline && !isPayerLine(lines, i)) return withContinuation(inline, lines, i);
       for (j = i + 1; j < Math.min(i + 4, lines.length); j++) {   // ชื่ออยู่บรรทัดถัดไป
         if (tailAfter(lines[j], TO_KEYS) !== null || FROM_RE.test(lines[j])) break;
         var next = nameLike(lines[j], true);
-        if (next) return withContinuation(next, lines, j);
+        if (next && !isPayerLine(lines, j)) return withContinuation(next, lines, j);
       }
     }
     // OCR อ่านป้าย "ไปยัง" ไม่ออก — ใช้ชื่อถัดจากชื่อผู้โอน (คนแรกคือผู้โอน คนถัดไปคือผู้รับ)
@@ -544,7 +599,8 @@ window.ReceiptParser = (function () {
         var c1 = nameLike(lines[j], true);
         if (c1) afterFrom.push({ name: c1, index: j });
       }
-      if (afterFrom.length >= 2) return pickName(afterFrom.slice(1), lines);
+      var payeesAfterFrom = dropPayers(afterFrom.slice(1), lines);
+      if (payeesAfterFrom.length) return pickName(payeesAfterFrom, lines);
       break;
     }
 
@@ -557,18 +613,29 @@ window.ReceiptParser = (function () {
         var c2 = nameLike(lines[j], true);
         if (c2) afterAccount.push({ name: c2, index: j });
       }
-      if (afterAccount.length) return pickName(afterAccount, lines);
+      var payeesAfterAccount = dropPayers(afterAccount, lines);
+      if (payeesAfterAccount.length) return pickName(payeesAfterAccount, lines);
       break;
     }
 
-    // ทางเลือกสุดท้าย: ชื่อแรกมักเป็นผู้โอน ชื่อถัดไปคือผู้รับ
+    /* ทางเลือกสุดท้าย: คัดชื่อที่เป็นผู้โอนออกก่อน แล้วค่อยเลือกจากที่เหลือ
+       (เดิมใช้วิธี "ตัดชื่อแรกทิ้งเพราะน่าจะเป็นผู้โอน" ซึ่งพลาดเมื่อ OCR
+       อ่านลวดลายหัวสลิปเป็นบรรทัดที่ดูเหมือนชื่อแทรกมาก่อน ทำให้ชื่อผู้ใช้เองกลายเป็นชื่อร้าน)
+       ถ้าคัดแล้วไม่เหลือใครเลย ปล่อยว่างดีกว่าใส่ชื่อคนจ่ายเป็นชื่อร้าน */
     var names = [];
     lines.forEach(function (line, idx) {
       var cand = nameLike(line, true);
       if (cand) names.push({ name: cand, index: idx });
     });
-    if (names.length >= 2) return pickName(names.slice(1), lines);
-    return names.length === 1 ? names[0].name : '';
+    var payees = dropPayers(names, lines);
+    if (payees.length) return pickName(payees, lines);
+    /* ทุกชื่อที่เจอมีบล็อกธนาคาร+เลขบัญชีตามหลังหมด — เป็นสลิปโอนหาคน ที่ทั้งสองฝั่งหน้าตาเหมือนกัน
+       บนสลิปไทยบล็อกผู้โอนมาก่อนผู้รับเสมอ จึงเอาชื่อสุดท้าย ไม่ใช่ชื่อแรก */
+    if (names.length >= 2) {
+      var last = names[names.length - 1];
+      return withContinuation(last.name, lines, last.index);
+    }
+    return '';
   }
 
   /* ร้านเล็กๆ ที่รับเงินผ่าน "ถุงเงิน" ของกรุงไทย จะขึ้นชื่อระบบรับชำระมาก่อน
@@ -654,6 +721,7 @@ window.ReceiptParser = (function () {
     var candidates = [];
     lines.slice(0, 7).forEach(function (line, i) {
       if (skip.test(line) || looksLikeGarbage(line)) return;
+      if (hasAny(line, NAME_NOISE_KEYS) || isPayerLine(lines, i)) return;   // ป้ายกำกับ และชื่อคนจ่าย ไม่ใช่ชื่อร้าน
       if (/\d{3,}/.test(line) || /\d+[.,]\d{2}\b/.test(line)) return;  // บรรทัดที่มีราคา/รหัส ไม่ใช่ชื่อร้าน
       var letters = line.replace(/[^฀-๿A-Za-z]/g, '');
       if (letters.length < 3 || letters.length / line.length < 0.5) return;

@@ -3631,6 +3631,24 @@
     var row = $('.welcome-row');
     if (row) row.hidden = !canLogin;
   }
+  /* เปิดหน้าเข้าสู่ระบบขึ้นมาใหม่ตามคำสั่ง (ใช้ตอนกดออกจากระบบ) */
+  function showWelcome() {
+    if (!$('#welcome').hidden) return;
+    welcomeBusy = false;
+    var box = $('#welcomeRemember');
+    if (box) box.checked = CloudSync.remember();
+    var mail = $('#welcomeEmail'), pass = $('#welcomePass');
+    if (mail) mail.value = '';
+    if (pass) { pass.value = ''; pass.type = 'password'; }
+    var eye = $('[data-welcome="togglepw"]');
+    if (eye) { eye.setAttribute('aria-pressed', 'false'); eye.setAttribute('aria-label', 'แสดงรหัสผ่าน'); }
+    renderWelcome();
+    welcomeSay('');
+    $('#welcome').hidden = false;
+    lockBehindWelcome(true);
+    document.addEventListener('focusin', keepFocusInWelcome);
+  }
+
   var welcomeDone = false;
   function maybeShowWelcome() {
     if (welcomeDone) return;
@@ -3859,10 +3877,12 @@
     if (act === 'signout') {
       CloudSync.signOut().then(function () {
         syncUI.step = 'password';
-        syncUI.message = 'ออกจากระบบแล้ว (ข้อมูลในเครื่องยังอยู่ครบ)';
+        syncUI.message = '';
         syncUI.error = '';
-        renderSyncModal();
         renderSyncBadge();
+        closeSync();
+        showWelcome();                                  // กลับไปหน้าเข้าสู่ระบบ
+        welcomeSay('ออกจากระบบแล้ว — รายจ่ายในเครื่องยังอยู่ครบ');
       });
       return;
     }
