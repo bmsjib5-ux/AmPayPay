@@ -1775,6 +1775,32 @@
     badge.setAttribute('aria-label', 'เพื่อน ' + n + ' คน');
   }
 
+  /* ---------------- กันซูมทั้งหน้าจอ ----------------
+     iOS Safari ไม่สนใจ user-scalable=no ในแท็ก viewport ตั้งแต่ iOS 10
+     จึงต้องกันการจีบนิ้วซูมด้วย gesture event เอง และกันการแตะสองครั้งเพื่อซูมอีกชั้น
+     (touch-action: manipulation ใน CSS ครอบเบราว์เซอร์ที่ทำตามมาตรฐาน)
+     ตัวดูรูปใบเสร็จได้รับการยกเว้น เพราะที่นั่นมีปุ่มซูมของแอปเองให้อ่านตัวเล็กบนสลิป */
+  (function () {
+    var inViewer = function (el) { return !!(el && el.closest && el.closest('#imgModal')); };
+
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+      document.addEventListener(name, function (ev) {
+        if (!inViewer(ev.target)) ev.preventDefault();
+      }, { passive: false });
+    });
+
+    var lastTap = 0, lastX = 0, lastY = 0;
+    document.addEventListener('touchend', function (ev) {
+      if (ev.touches.length || !ev.changedTouches.length) return;
+      var touch = ev.changedTouches[0];
+      var now = Date.now();
+      var quick = now - lastTap < 320;
+      var samePlace = Math.abs(touch.clientX - lastX) < 40 && Math.abs(touch.clientY - lastY) < 40;
+      if (quick && samePlace && !inViewer(ev.target)) ev.preventDefault();   // แตะสองครั้งเร็วๆ = จะซูม
+      lastTap = now; lastX = touch.clientX; lastY = touch.clientY;
+    }, { passive: false });
+  })();
+
   /* ---------------- ดูรูปใบเสร็จแบบขยาย ---------------- */
   var viewerURL = '';
   function openViewer(src, alt) {
@@ -1786,9 +1812,46 @@
     $('#imgModal').hidden = false;
   }
   function closeViewer() {
+    resetViewerZoom();
     $('#imgModal').hidden = true;
     $('#imgModalPic').removeAttribute('src');
     if (viewerURL) { URL.revokeObjectURL(viewerURL); viewerURL = ''; }
+  }
+
+  /* ---------------- ซูมในตัวดูรูปใบเสร็จ ----------------
+     หน้าอื่นซูมไม่ได้แล้ว ที่นี่จึงต้องมีซูมของตัวเองให้อ่านตัวเล็กบนสลิปได้
+     แตะที่รูป = สลับขยาย/ย่อ · ลากตอนขยาย = เลื่อนดูส่วนที่ต้องการ · จีบนิ้วก็ได้ */
+  var VIEWER_ZOOM = 2.6;
+  var vz = { on: false, x: 0, y: 0, dragging: false, moved: false, sx: 0, sy: 0, pinch: 0 };
+
+  function applyViewerZoom() {
+    var pic = $('#imgModalPic');
+    if (!pic) return;
+    pic.classList.toggle('is-zoomed', vz.on);
+    pic.style.transform = vz.on
+      ? 'translate(' + Math.round(vz.x) + 'px,' + Math.round(vz.y) + 'px) scale(' + VIEWER_ZOOM + ')'
+      : '';
+    var hint = $('#imgZoomHint');
+    if (hint) hint.textContent = vz.on ? 'ลากเพื่อเลื่อนดู · แตะเพื่อย่อกลับ' : 'แตะที่รูปเพื่อขยาย';
+  }
+  function resetViewerZoom() {
+    vz.on = false; vz.x = 0; vz.y = 0; vz.dragging = false; vz.moved = false; vz.pinch = 0;
+    applyViewerZoom();
+  }
+  function clampViewerPan() {
+    var pic = $('#imgModalPic');
+    if (!pic) return;
+    var r = pic.getBoundingClientRect();
+    /* ขอบเขตที่ลากได้ = ครึ่งหนึ่งของส่วนที่ล้นออกนอกกรอบ จะได้ไม่ลากจนรูปหลุดจอ */
+    var maxX = Math.max(0, (r.width - Math.min(r.width, window.innerWidth)) / 2 + 8);
+    var maxY = Math.max(0, (r.height - Math.min(r.height, window.innerHeight)) / 2 + 8);
+    vz.x = Math.max(-maxX, Math.min(maxX, vz.x));
+    vz.y = Math.max(-maxY, Math.min(maxY, vz.y));
+  }
+  function toggleViewerZoom() {
+    vz.on = !vz.on;
+    if (!vz.on) { vz.x = 0; vz.y = 0; }
+    applyViewerZoom();
   }
   function zoomFrom(img) {
     var cardEl = img.closest('.rcard');
@@ -1811,8 +1874,61 @@
     if (img) { ev.preventDefault(); zoomFrom(img); }
   });
   $('#imgModal').addEventListener('click', function (ev) {
-    if (ev.target === this || ev.target.closest('[data-img="close"]') || ev.target.id === 'imgModalPic') closeViewer();
+    if (ev.target === this || ev.target.closest('[data-img="close"]')) { closeViewer(); return; }
+    // แตะที่รูป = สลับขยาย/ย่อ (เดิมแตะแล้วปิด แต่ตอนนี้หน้าจออื่นซูมไม่ได้ ที่นี่จึงต้องซูมได้)
+    if (ev.target.id === 'imgModalPic' && !vz.moved) toggleViewerZoom();
+    vz.moved = false;
   });
+
+  (function () {
+    var pic = $('#imgModalPic');
+    var pointFrom = function (touches) {
+      return { x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2,
+               d: Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY) };
+    };
+    pic.addEventListener('touchstart', function (ev) {
+      if (ev.touches.length === 2) { vz.pinch = pointFrom(ev.touches).d; vz.moved = true; return; }
+      if (!vz.on) return;
+      vz.dragging = true; vz.moved = false;
+      vz.sx = ev.touches[0].clientX - vz.x;
+      vz.sy = ev.touches[0].clientY - vz.y;
+    }, { passive: true });
+
+    pic.addEventListener('touchmove', function (ev) {
+      if (ev.touches.length === 2 && vz.pinch) {          // จีบนิ้วในตัวดูรูป = เปิด/ปิดการขยาย
+        var d = pointFrom(ev.touches).d;
+        if (!vz.on && d > vz.pinch * 1.15) { vz.on = true; applyViewerZoom(); vz.pinch = d; }
+        else if (vz.on && d < vz.pinch * 0.85) { vz.on = false; vz.x = 0; vz.y = 0; applyViewerZoom(); vz.pinch = d; }
+        ev.preventDefault();
+        return;
+      }
+      if (!vz.dragging || ev.touches.length !== 1) return;
+      vz.x = ev.touches[0].clientX - vz.sx;
+      vz.y = ev.touches[0].clientY - vz.sy;
+      vz.moved = true;
+      clampViewerPan();
+      applyViewerZoom();
+      ev.preventDefault();
+    }, { passive: false });
+
+    pic.addEventListener('touchend', function () { vz.dragging = false; vz.pinch = 0; }, { passive: true });
+
+    // เมาส์: ลากตอนขยายให้เลื่อนดูได้เหมือนกัน
+    pic.addEventListener('pointerdown', function (ev) {
+      if (ev.pointerType === 'touch' || !vz.on) return;
+      vz.dragging = true; vz.moved = false;
+      vz.sx = ev.clientX - vz.x; vz.sy = ev.clientY - vz.y;
+      pic.setPointerCapture(ev.pointerId);
+    });
+    pic.addEventListener('pointermove', function (ev) {
+      if (!vz.dragging || ev.pointerType === 'touch') return;
+      vz.x = ev.clientX - vz.sx; vz.y = ev.clientY - vz.sy;
+      if (Math.abs(vz.x) + Math.abs(vz.y) > 3) vz.moved = true;
+      clampViewerPan();
+      applyViewerZoom();
+    });
+    pic.addEventListener('pointerup', function () { vz.dragging = false; });
+  })();
 
   /* ---------------- พื้นหลังของฉัน ----------------
      เก็บไว้ในเครื่องเท่านั้น (ไม่ซิงก์ขึ้นเซิร์ฟเวอร์ เหมือนรูปใบเสร็จ)

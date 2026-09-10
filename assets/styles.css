@@ -385,6 +385,13 @@ details.raw pre {
 /* ---------- ปรับให้ใช้ง่ายขึ้นบนมือถือ ---------- */
 /* แตะแล้วตอบสนองทันที ไม่ต้องรอเช็คดับเบิลแท็ป และไม่มีกรอบไฮไลต์กระพริบ */
 button, .tab, a, input, select, textarea { touch-action: manipulation; }
+/* กันซูมทั้งหน้า — manipulation ปิดการแตะสองครั้งเพื่อซูม แต่ยังเลื่อนหน้าได้ปกติ
+   (ส่วนการจีบนิ้วซูมบน iOS ต้องกันด้วย gesture event ใน app.js อีกชั้น) */
+html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
+/* ยกเว้นตัวดูรูปใบเสร็จ ที่นั่นมีปุ่มซูมของแอปเองให้ใช้ */
+.img-viewer { touch-action: none; }
+.img-viewer img.is-zoomed { cursor: grab; }
+.img-viewer img.is-zoomed:active { cursor: grabbing; }
 button, .tab { -webkit-tap-highlight-color: transparent; }
 
 /* iOS จะซูมหน้าจอเองถ้าตัวอักษรในช่องกรอกเล็กกว่า 16px */
@@ -833,6 +840,16 @@ img.zoomable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2
   backdrop-filter: blur(8px);
   transition: transform .18s var(--ease), background-color .2s var(--ease);
 }
+.img-hint {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  margin: 0; padding: 7px 14px; border-radius: 999px;
+  background: rgba(20, 19, 26, .72); color: #fff; font-size: 12.5px;
+  backdrop-filter: blur(8px); pointer-events: none; white-space: nowrap;
+}
+.img-viewer img { transition: transform .2s var(--ease); transform-origin: center center; }
+.img-viewer img.is-zoomed { transition: none; }
+
 .img-close:hover { background: rgba(20, 19, 26, .92); transform: scale(1.06); }
 .img-close:active { transform: scale(.94); }
 /* ตัวดูรูปต้องทึบเสมอ แม้ผู้ใช้ตั้งพื้นหลังเป็นรูป */
