@@ -2,10 +2,11 @@
    1) รับ push แจ้งเตือนตอนปิดแอป
    2) แคชไฟล์แอปไว้ให้เปิดใช้งานได้ตอนเน็ตหลุด (network-first: ออนไลน์ได้ของใหม่เสมอ ออฟไลน์ใช้ของที่แคชไว้)
    ข้อมูลรายจ่ายอยู่ใน localStorage/IndexedDB ของเบราว์เซอร์อยู่แล้ว จึงใช้งานต่อได้เต็มรูปแบบตอนออฟไลน์ */
-var CACHE = 'ampaypay-v74';
+var CACHE = 'ampaypay-v76';
 var SHELL = [
+  './assets/design.css?v=76', './assets/design.js?v=76', './assets/app.js?v=76',
   './', './index.html', './manifest.webmanifest',
-  './assets/styles.css', './assets/config.js', './assets/parser.js', './assets/store.js',
+  './assets/styles.css', './assets/mobile.css', './assets/mobile.css?v=75', './assets/styles.css?v=75', './assets/config.js', './assets/parser.js', './assets/store.js',
   './assets/sync.js', './assets/promptpay.js', './assets/ocr-paths.js', './assets/app.js',
   './assets/vendor/qrcode.js',
   './assets/icon-32.png', './assets/icon-180.png', './assets/icon-192.png', './assets/icon-512.png'

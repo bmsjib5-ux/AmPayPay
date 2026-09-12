@@ -1,0 +1,106 @@
+/* AmPayPay mobile refresh. Original styling inspired by mobile finance layouts;
+   no third-party UI code or runtime dependency. Keep legacy component contracts. */
+:root {
+  --bg: #f7f8f2;
+  --accent: #176b50;
+  --accent-ink: #10543e;
+  --accent-soft: #e5f1e8;
+  --series-1: #24795c;
+  --text-primary: #18362c;
+  --text-secondary: #52665d;
+  --text-muted: #65756c;
+  --border: #d7e0d7;
+  --border-soft: #e5eae1;
+  --radius: 20px;
+  --radius-lg: 26px;
+  --shadow: 0 4px 20px #18362c06;
+}
+:root[data-theme="dark"] { --accent: #23795d; --accent-ink: #83d7b6; --accent-soft: #19372c; --series-1: #83d7b6; --bg: #101c17; --surface-1: #192920; --surface-2: #22382c; --text-primary: #e9f5ee; --text-secondary: #bbcec2; --text-muted: #a2b7a9; --border: #3b5143; --border-soft: #2c4033; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --accent: #23795d; --accent-ink: #83d7b6; --accent-soft: #19372c; --series-1: #83d7b6; --bg: #101c17; --surface-1: #192920; --surface-2: #22382c; --text-primary: #e9f5ee; --text-secondary: #bbcec2; --text-muted: #a2b7a9; --border: #3b5143; --border-soft: #2c4033; }
+}
+body { background: var(--bg); }
+html::before { display: none; }
+.dz-icon { animation: none; transform: none; }
+.ui-icon { inline-size: 24px; block-size: 24px; display: block; flex: none; }
+.topbar { background: var(--surface-1); padding-top: env(safe-area-inset-top); }
+.topbar-inner { gap: 8px; }
+.brand { display: flex; align-items: center; gap: 9px; font-size: 1.1rem; letter-spacing: -.04em; }
+.brand img { border-radius: 10px; }
+.topbar-inner .icon-btn { margin-left: 0; inline-size: 40px; block-size: 40px; background: var(--bg); border-color: transparent; }
+.bookbar { background: transparent; border: 0; }
+.bookbar-inner { padding-block: 14px; }
+.bookbar select { background: var(--surface-1); border: 1px solid var(--border-soft); border-radius: 12px; }
+main { padding-top: 10px; }
+.page-heading { margin-block: 4px 24px; }
+.eyebrow { font-size: .625rem; letter-spacing: .16em; font-weight: 700; color: var(--accent-ink); margin-bottom: 8px; }
+.page-heading h2 { font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); letter-spacing: -.035em; margin-bottom: 6px; }
+.page-heading > p:last-child { color: var(--text-secondary); font-size: .875rem; }
+.dropzone { border: 1px solid var(--border-soft); background: var(--surface-1); padding: 32px 24px; box-shadow: var(--shadow); border-radius: 26px; }
+.dropzone:hover { transform: none; background: var(--surface-1); }
+.dz-icon { display: grid; place-items: center; width: 72px; height: 72px; margin: 0 auto 18px; border-radius: 22px; background: var(--accent-soft); color: var(--accent-ink); }
+.dz-icon .ui-icon { width: 36px; height: 36px; }
+.dz-title { font-size: 1.35rem; font-weight: 700; }
+.dz-sub { font-size: .85rem; color: var(--text-secondary); margin-top: 8px; }
+.dropzone .action-grid { max-width: 520px; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 26px; }
+.dropzone .action-card { box-shadow: none; background: var(--bg); min-height: 94px; gap: 12px; border-radius: 16px; }
+.dropzone #camBtn { grid-column: 1 / -1; grid-row: 1; flex-direction: row; min-height: 58px; background: var(--accent); color: white; }
+.dropzone .ac-label { font-size: .85rem; }
+.privacy-note { text-align: center; color: var(--text-muted); font-size: .75rem; margin: 16px 0 24px; }
+.shortcut-help { background: var(--surface-1); border: 1px solid var(--border-soft); padding: 16px; border-radius: 16px; }
+.tiles { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.tile { padding: 20px; box-shadow: none; border: 1px solid var(--border-soft); border-radius: 20px; }
+.tile:first-child { grid-column: 1 / -1; background: #17543f; color: #fff; padding: 26px; position: relative; overflow: hidden; }
+.tile:first-child::after { content: ''; position: absolute; width: 140px; height: 140px; border: 28px solid #ffffff09; border-radius: 50%; right: -44px; top: -45px; pointer-events: none; }
+.tile:first-child .tile-label, .tile:first-child .tile-foot { color: #d9eade; }
+.tile:first-child .tile-value { color: white; font-size: clamp(2rem, 1.5rem + 2vw, 3rem); letter-spacing: -.04em; margin-block: 12px; overflow-wrap: anywhere; }
+.tile-value { font-size: 1.45rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile-label, .tile-foot { font-size: .8rem; }
+.chart-card, .ecard, .debt-item { border: 1px solid var(--border-soft); box-shadow: var(--shadow); border-radius: 20px; }
+.chart-card { padding: 22px; margin-inline: 0; }
+.section-title { font-size: 1rem; }
+.filters { gap: 12px; }
+.field input, .field select, .field textarea { border-radius: 12px; min-height: 46px; font-size: 1rem; }
+.btn { border-radius: 12px; min-height: 44px; }
+.btn-primary:hover { color: white; background: #14583f; }
+.tabbar { background: var(--surface-1); }
+.tabs { padding-block: 8px; }
+.tab { min-height: 48px; }
+.tab.is-active { background: var(--accent-soft); border-color: transparent; }
+.tab.is-active .tab-ic { transform: none; }
+.tab .tab-ic { display: block; }
+:is(button, select, input, textarea, summary):focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 3px; }
+@media (max-width: 560px) {
+  .wrap { padding-inline: 20px; }
+  .topbar-inner { flex-wrap: wrap; gap: 6px; padding-block: 12px; }
+  .brand { flex: 1 0 calc(100% - 190px); }
+  .topbar-inner .icon-btn { width: 36px; height: 40px; }
+  .bookbar-inner { gap: 6px; }
+  .bookbar select { min-width: 0; flex: 1; }
+  #bookManageBtn { font-size: .75rem; padding-inline: 8px; }
+  .page-heading { margin-bottom: 20px; }
+  .dropzone { padding: 26px 16px 18px; }
+  .dropzone .action-grid { gap: 8px; }
+  .dropzone .ac-label { font-size: .75rem; }
+  .tabs { padding: 8px 8px; gap: 2px; }
+  .tab { border-radius: 14px; min-height: 58px; font-size: .6875rem; }
+  .tab .ui-icon { width: 22px; height: 22px; }
+  .tabbar { box-shadow: 0 -4px 24px #18362c08; }
+  .chart-card { padding: 18px; }
+  .tiles { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .tile { padding: 18px; }
+  .tile:first-child { padding: 24px; }
+}
+@media (max-width: 360px) {
+  .wrap { padding-inline: 14px; }
+  .brand { font-size: .95rem; gap: 5px; }
+  .brand img { width: 26px; height: 26px; }
+  .topbar-inner { gap: 4px; }
+  .topbar-inner .icon-btn { width: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel.is-active, .action-card, .tab, .tabbar { animation: none; transition: none; }
+}
+@media (forced-colors: active) {
+  .tile:first-child, .tab.is-active, .dropzone #camBtn { border: 2px solid Highlight; }
+}

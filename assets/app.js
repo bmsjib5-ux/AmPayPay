@@ -1641,7 +1641,7 @@
           '</div>' +
           '<span class="debt-total' + (g.owed > 0.005 ? ' is-owed' : '') + '">' + fmtMoney(g.owed) + '</span>' +
           (g.owed > 0.005
-            ? '<button class="btn btn-sm" data-debt="payall">รับครบแล้ว</button>'
+            ? '<button class="btn btn-sm" data-request-qr="' + g.owed + '">QR รับเงิน</button><button class="btn btn-sm" data-debt="payall">รับครบแล้ว</button>'
             : '') +
         '</header>' +
         (unpaid.length ? '<div class="debt-items">' + unpaid.map(debtRow).join('') + '</div>' : '') +
