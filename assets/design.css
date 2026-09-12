@@ -1,4 +1,7 @@
 /* Approved AmPayPay concept: native-style cards, compact dashboard, five tabs. */
+.quick-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; }
+.quick-merchants { display:flex; flex-wrap:wrap; gap:8px; width:100%; }
+.quick-merchants[hidden] { display:none; }
 .native-design { --radius: 18px; --radius-lg: 22px; }
 .native-design .wrap { max-width: 760px; }
 .native-design .eyebrow, .native-design .page-heading > p:last-child { display:none; }

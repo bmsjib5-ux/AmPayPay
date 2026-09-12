@@ -2841,17 +2841,29 @@
   $('#pickBtn').addEventListener('click', function (e) { e.stopPropagation(); $('#fileInput').click(); });
   $('#camBtn').addEventListener('click', function (e) { e.stopPropagation(); $('#camInput').click(); });
   /* ---------------- ปุ่มลัดร้านประจำ: แตะแล้วได้การ์ดกรอกไว้ให้ เหลือแค่เช็กยอดแล้วบันทึก ---------------- */
+  var quickMerchantsHidden = false;
+  try { quickMerchantsHidden = localStorage.getItem('expense-book:hideFrequentMerchants') === 'true'; } catch (e) {}
   function renderQuickAdd() {
     var box = $('#quickAdd');
     if (!box) return;
     var list = ExpenseStore.frequentMerchants(6);
     box.hidden = !list.length;
     if (!list.length) return;
-    box.innerHTML = '<span class="quick-label">⚡ ร้านประจำ</span>' + list.map(function (m, i) {
+    box.innerHTML = '<div class="quick-heading"><span class="quick-label">⚡ ร้านประจำ</span>' +
+      '<button type="button" class="btn btn-ghost btn-sm" id="quickToggle" aria-controls="quickMerchants" aria-expanded="' + !quickMerchantsHidden + '">' +
+      (quickMerchantsHidden ? 'แสดงร้านประจำ' : 'ซ่อนร้านประจำ') + '</button></div>' +
+      '<div id="quickMerchants" class="quick-merchants"' + (quickMerchantsHidden ? ' hidden' : '') + '>' + list.map(function (m, i) {
       return '<button type="button" class="quick-chip" data-quick="' + i + '">' +
         '<span aria-hidden="true">' + ReceiptParser.categoryIcon(m.category) + '</span>' +
         esc(m.merchant) + '<small>' + esc(fmtMoney(m.amount)) + '</small></button>';
-    }).join('');
+    }).join('') + '</div>';
+    $('#quickToggle').addEventListener('click', function () {
+      quickMerchantsHidden = !quickMerchantsHidden;
+      try { localStorage.setItem('expense-book:hideFrequentMerchants', String(quickMerchantsHidden)); } catch (e) {}
+      $('#quickMerchants').hidden = quickMerchantsHidden;
+      this.setAttribute('aria-expanded', String(!quickMerchantsHidden));
+      this.textContent = quickMerchantsHidden ? 'แสดงร้านประจำ' : 'ซ่อนร้านประจำ';
+    });
     $$('.quick-chip', box).forEach(function (btn) {
       btn.addEventListener('click', function () {
         var m = list[+btn.dataset.quick];
