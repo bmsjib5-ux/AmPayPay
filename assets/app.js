@@ -464,7 +464,7 @@
     var where = m[1];
     var tabName = where === 'scan' ? 'friends' : where === 'myqr' ? 'me' : where;
     var tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
-    if (tab) tab.click();
+    if (tab) { window.__deepRouted = true; tab.click(); }
     if (where === 'scan') { openAddFriendModal(); setTimeout(function () { $('#scanFriendBtn').click(); }, 150); }
     if (where === 'myqr') openMyQr();
   }
@@ -481,7 +481,7 @@
     if (!already && !confirm('เพิ่ม ' + (parsed.name ? parsed.name + ' (' + parsed.email + ')' : parsed.email) + ' เป็นเพื่อนไหม?')) return;
     ExpenseStore.friends.save(parsed.email, parsed.name || (already ? already.name : ''));
     var tab = document.querySelector('.tab[data-tab="friends"]');
-    if (tab) tab.click();
+    if (tab) { window.__deepRouted = true; tab.click(); }
     toast(already ? (parsed.name || parsed.email) + ' อยู่ในรายชื่อเพื่อนอยู่แล้ว' : 'เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
     if (isIOS() && !isStandalone()) {
       var link = location.origin + location.pathname + hash;
@@ -1460,7 +1460,7 @@
     });
 
     var addTab = document.querySelector('.tab[data-tab="add"]');
-    if (addTab) addTab.click();
+    if (addTab) { window.__deepRouted = true; addTab.click(); }
     var found = chunks.filter(function (t) { return ReceiptParser.parse(t).amount != null; }).length;
     toast('รับใบเสร็จจาก ' + (source || 'Shortcut') + ' ' + chunks.length + ' ใบ' +
       (found < chunks.length ? ' · อ่านยอดได้ ' + found + ' ใบ' : '') + (bookNote || '') + ' — ตรวจแล้วกดบันทึกได้เลย');

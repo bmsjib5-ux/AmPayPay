@@ -315,6 +315,9 @@ details.raw pre {
   /* ต้องอยู่เหนือหน้าต่างทุกชนิด (modal 60 · scanModal 70 · หน้าเข้าสู่ระบบ 90)
      ไม่งั้น toast ที่ขึ้นตอนเปิดหน้าต่างอยู่จะถูกบัง และปุ่ม "เลิกทำ" บน toast ก็กดไม่ได้ */
   z-index: 100;
+  /* แต่ตัวแถบเองต้องไม่กินการกด ไม่งั้นมันบังปุ่มที่อยู่ข้างใต้ตลอดเวลาที่ยังไม่หายไป
+     รับเฉพาะปุ่มบนแถบ (เช่น "เลิกทำ") ที่ต้องกดได้จริง */
+  pointer-events: none;
 }
 
 @media (max-width: 560px) {
@@ -1235,6 +1238,7 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .toast { display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(92vw, 460px); }
 .toast-text { flex: 1; min-width: 0; }
 .toast-action {
+  pointer-events: auto;
   appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
   background: var(--bg); color: var(--text-primary); border-radius: 999px; padding: 6px 12px; white-space: nowrap;
 }
