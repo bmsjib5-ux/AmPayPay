@@ -2,11 +2,11 @@
    1) รับ push แจ้งเตือนตอนปิดแอป
    2) แคชไฟล์แอปไว้ให้เปิดใช้งานได้ตอนเน็ตหลุด (network-first: ออนไลน์ได้ของใหม่เสมอ ออฟไลน์ใช้ของที่แคชไว้)
    ข้อมูลรายจ่ายอยู่ใน localStorage/IndexedDB ของเบราว์เซอร์อยู่แล้ว จึงใช้งานต่อได้เต็มรูปแบบตอนออฟไลน์ */
-var CACHE = 'ampaypay-v76';
+var CACHE = 'ampaypay-v77';
 var SHELL = [
-  './assets/design.css?v=76', './assets/design.js?v=76', './assets/app.js?v=76',
+  './assets/design.css?v=77', './assets/design.js?v=77', './assets/app.js?v=77',
   './', './index.html', './manifest.webmanifest',
-  './assets/styles.css', './assets/mobile.css', './assets/mobile.css?v=75', './assets/styles.css?v=75', './assets/config.js', './assets/parser.js', './assets/store.js',
+  './assets/styles.css', './assets/mobile.css', './assets/mobile.css?v=77', './assets/styles.css?v=77', './assets/config.js', './assets/parser.js', './assets/store.js',
   './assets/sync.js', './assets/promptpay.js', './assets/ocr-paths.js', './assets/app.js',
   './assets/vendor/qrcode.js',
   './assets/icon-32.png', './assets/icon-180.png', './assets/icon-192.png', './assets/icon-512.png'
@@ -71,6 +71,27 @@ self.addEventListener('push', function (ev) {
       list.forEach(function (c) { c.postMessage({ type: 'push', title: title, body: opts.body }); });
     })
   ]));
+});
+
+/* ปุ่ม "ทดสอบแบบปิดแอป" ในแอปสั่งมาทางนี้ — หน่วงไว้ก่อนแล้วค่อยเด้ง
+   ผู้ใช้จะได้มีเวลาปิดแอป/ล็อกจอ แล้วดูว่าแจ้งเตือนขึ้นจริงไหมตอนไม่ได้เปิดแอป
+   ห่อด้วย waitUntil เพื่อไม่ให้เบราว์เซอร์พัก service worker ระหว่างรอ */
+self.addEventListener('message', function (ev) {
+  var msg = ev.data || {};
+  if (msg.type !== 'test-notify') return;
+  var wait = Math.max(0, Math.min(25000, Number(msg.delay) || 0));
+  ev.waitUntil(new Promise(function (resolve) {
+    setTimeout(function () {
+      self.registration.showNotification(msg.title || '🔔 ทดสอบแจ้งเตือน AmPayPay', {
+        body: msg.body || 'ถ้าเห็นข้อความนี้ แปลว่าแจ้งเตือนตอนปิดแอปใช้งานได้',
+        icon: 'assets/icon-192.png',
+        badge: 'assets/icon-192.png',
+        tag: 'push-test',
+        renotify: true,
+        data: { url: './#bell' }
+      }).then(resolve, resolve);
+    }, wait);
+  }));
 });
 
 self.addEventListener('notificationclick', function (ev) {

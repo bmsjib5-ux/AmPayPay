@@ -439,6 +439,28 @@ window.CloudSync = (function () {
           }, function () { out.fn = false; out.fnDetail = 'เรียกฟังก์ชันไม่ได้ (ไม่พบ หรือเป็นโค้ดเวอร์ชันเก่าที่ไม่ตอบ CORS) — ให้วาง index.ts ล่าสุดแล้ว deploy ใหม่'; });
       }).then(function () { return out; });
     },
+    /* ปุ่มทดสอบในแอป — ให้เซิร์ฟเวอร์ส่ง push จริงกลับมาที่เครื่องของเราเอง
+       ใช้ JWT ของผู้ใช้ยืนยันตัวตน ฟังก์ชันจะส่งให้เฉพาะเครื่องของบัญชีนี้ */
+    sendTestPush: function () {
+      if (!session || !session.access_token) return Promise.reject(new Error('ยังไม่ได้ล็อกอิน'));
+      var cfg = config();
+      var url = String(cfg.url || '').replace(/\/$/, '') + '/functions/v1/push-notify?test=1';
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+        body: '{}'
+      }).then(function (r) {
+        if (r.status === 401) throw new Error('เซิร์ฟเวอร์ไม่รับ token — ลองออกจากระบบแล้วล็อกอินใหม่');
+        if (r.status === 404) throw new Error('ไม่พบฟังก์ชัน push-notify');
+        return r.json().catch(function () { throw new Error('ฟังก์ชันเป็นเวอร์ชันเก่า — วางไฟล์ supabase/functions/push-notify/index.ts ล่าสุดแล้ว deploy ใหม่'); })
+          .then(function (j) {
+            if (j && j.error) throw new Error(j.error === 'unauthorized' ? 'เซิร์ฟเวอร์ไม่รับ token — ลองล็อกอินใหม่' : j.error);
+            if (!j || typeof j.sent !== 'number') throw new Error('ฟังก์ชันเป็นเวอร์ชันเก่า — วางไฟล์ index.ts ล่าสุดแล้ว deploy ใหม่');
+            return j;                                  // { sent, devices, dropped }
+          });
+      }, function () { throw new Error('เรียกฟังก์ชันไม่ได้ — ตรวจอินเทอร์เน็ตหรือยัง deploy ฟังก์ชันไม่สำเร็จ'); });
+    },
+
     removePushSubscription: function (endpoint) {
       return getClient().then(function (c) {
         return c.from('push_subscriptions').delete().eq('endpoint', endpoint).then(function (res) {
