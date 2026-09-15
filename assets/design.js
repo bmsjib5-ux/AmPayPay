@@ -4,16 +4,18 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const money = value => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  /* ทุกมุมของไอคอนปัดให้มนหมด ไม่เหลือปลายแหลมหรือมุมฉาก
+     (หลังคาบ้าน มุมล่างของถุง ตัวกล้อง ตัวรถ) จะได้เข้าชุดกับปุ่มและการ์ดที่มนขึ้น */
   const icons = {
-    home: '<path d="m3 10 9-7 9 7v10H3zM9 20v-7h6v7"/>',
-    camera: '<path d="m8 5-2 3H3v12h18V8h-3l-2-3z"/><circle cx="12" cy="13" r="3"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>',
-    food: '<path d="M5 3v7m3-7v7m3-7v7M5 7h6m-3 3v11M19 3c-4 3-4 9 0 9v9m0-18v9"/>',
-    car: '<path d="m4 10 2-6h12l2 6M3 10h18v9H3zM6 19v2m12-2v2M6 14h2m8 0h2"/>',
-    bag: '<path d="M4 7h16l1 14H3zM8 7V5a4 4 0 0 1 8 0v2"/>',
-    more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
-    bell: '<path d="M6 9a6 6 0 0 1 12 0v6l2 3H4l2-3zM10 21h4"/>',
-    people: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v2"/>'
+    home: '<path d="M3.8 10.4 10.7 4.7a2 2 0 0 1 2.6 0l6.9 5.7v7.9a2.4 2.4 0 0 1-2.4 2.4H6.2a2.4 2.4 0 0 1-2.4-2.4z"/><path d="M9.6 20.7v-5.1a1.8 1.8 0 0 1 1.8-1.8h1.2a1.8 1.8 0 0 1 1.8 1.8v5.1"/>',
+    camera: '<path d="M4.4 8.2h2.2l1.5-2.3a1.8 1.8 0 0 1 1.5-.8h4.8a1.8 1.8 0 0 1 1.5.8l1.5 2.3h2.2a2.4 2.4 0 0 1 2.4 2.4v7a2.4 2.4 0 0 1-2.4 2.4H4.4A2.4 2.4 0 0 1 2 17.6v-7a2.4 2.4 0 0 1 2.4-2.4z"/><circle cx="12" cy="13.8" r="3.2"/>',
+    plus: '<path d="M12 5.4v13.2M5.4 12h13.2"/>',
+    food: '<path d="M6.4 3.4v4.8a2.6 2.6 0 0 0 5.2 0V3.4M9 8.8v11.8"/><ellipse cx="17.4" cy="7.8" rx="2.7" ry="4.4"/><path d="M17.4 12.2v8.4"/>',
+    car: '<path d="M4.6 11.2 6.2 6.4a2.4 2.4 0 0 1 2.3-1.6h7a2.4 2.4 0 0 1 2.3 1.6l1.6 4.8"/><path d="M5 11.2h14a2.4 2.4 0 0 1 2.4 2.4v3.2a2 2 0 0 1-2 2H4.6a2 2 0 0 1-2-2v-3.2A2.4 2.4 0 0 1 5 11.2z"/><path d="M6.4 18.8v1.6m11.2-1.6v1.6M6.2 15h1.6m8.4 0h1.6"/>',
+    bag: '<path d="M5.6 7.6h12.8a1.8 1.8 0 0 1 1.8 1.9l-.7 9.2a2.4 2.4 0 0 1-2.4 2.2H6.9a2.4 2.4 0 0 1-2.4-2.2l-.7-9.2a1.8 1.8 0 0 1 1.8-1.9z"/><path d="M8.8 7.6V6.2a3.2 3.2 0 0 1 6.4 0v1.4"/>',
+    more: '<circle cx="5.2" cy="12" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="18.8" cy="12" r="1.1"/>',
+    bell: '<path d="M6.2 9.6a5.8 5.8 0 0 1 11.6 0v4.6l1.5 2.2a1.2 1.2 0 0 1-1 1.9H5.7a1.2 1.2 0 0 1-1-1.9l1.5-2.2z"/><path d="M10.2 21.2h3.6"/>',
+    people: '<circle cx="9" cy="8" r="3.2"/><path d="M3.4 20.8v-2.4a5.6 5.6 0 0 1 11.2 0v2.4M16.2 5.2a3.2 3.2 0 0 1 0 6.2m1.9 3.9a5 5 0 0 1 2.8 4.1v1.4"/>'
   };
   const icon = name => '<svg class="ui-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (icons[name] || icons.more) + '</svg>';
   const categoryIcon = category => /food/.test(category) ? 'food' : /transport/.test(category) ? 'car' : /shop|grocer/.test(category) ? 'bag' : 'more';
