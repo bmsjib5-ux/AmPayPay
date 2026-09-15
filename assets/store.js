@@ -12,6 +12,7 @@ window.ExpenseStore = (function () {
   var FRIENDS_KEY = 'expense-book:friends:v1';
   var CLAIMS_KEY = 'expense-book:claims:v1';    // สำเนาใบแจ้งหนี้จากเซิร์ฟเวอร์ (เซิร์ฟเวอร์เป็นตัวจริง)
   var CLAIMS_SEEN_KEY = 'expense-book:claimsSeen:v1';
+  var CLAIMS_HIDDEN_KEY = 'expense-book:claimsHidden:v1';
   var OWNER_KEY = 'expense-book:owner:v1';        // ข้อมูลในเครื่องนี้เป็นของบัญชีไหน
   var DEFAULT_BOOK = 'b_default';
 
@@ -594,6 +595,27 @@ window.ExpenseStore = (function () {
           (ids || []).forEach(function (id) { m[id] = Date.now(); });
           writeJSON(CLAIMS_SEEN_KEY, m);
         }
+      },
+
+      /* แจ้งเตือนที่ผู้ใช้กดล้างทิ้งแล้ว — เก็บเป็นรายการคีย์ที่ไม่ต้องแสดงอีก
+         คีย์คือ "รหัสใบ:สถานะ" ถ้าใบนั้นเปลี่ยนสถานะทีหลัง คีย์จะเปลี่ยนตาม
+         แจ้งเตือนอันใหม่จึงยังขึ้นตามปกติ ไม่ได้ปิดใบนั้นไปตลอด */
+      hidden: {
+        get: function () { return readJSON(CLAIMS_HIDDEN_KEY, {}); },
+        add: function (ids) {
+          var m = readJSON(CLAIMS_HIDDEN_KEY, {});
+          (ids || []).forEach(function (id) { m[id] = Date.now(); });
+          writeJSON(CLAIMS_HIDDEN_KEY, m);
+          notify();
+        },
+        set: function (map) {
+          writeJSON(CLAIMS_HIDDEN_KEY, map || {});
+          notify();
+        },
+        clear: function () {
+          writeJSON(CLAIMS_HIDDEN_KEY, {});
+          notify();
+        }
       }
     },
 
@@ -609,7 +631,7 @@ window.ExpenseStore = (function () {
 
     /* ล้างข้อมูลของบัญชีเดิมออกจากเครื่อง (ของยังอยู่บนเซิร์ฟเวอร์ของบัญชีนั้น) */
     wipeLocal: function () {
-      [KEY, BOOKS_KEY, CURRENT_KEY, BUDGET_KEY, DIRTY_KEY, SYNC_KEY, FRIENDS_KEY, CLAIMS_KEY, CLAIMS_SEEN_KEY]
+      [KEY, BOOKS_KEY, CURRENT_KEY, BUDGET_KEY, DIRTY_KEY, SYNC_KEY, FRIENDS_KEY, CLAIMS_KEY, CLAIMS_SEEN_KEY, CLAIMS_HIDDEN_KEY]
         .forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
       cache = null;
       booksCache = null;

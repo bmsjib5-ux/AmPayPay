@@ -170,6 +170,8 @@
   $('#sumMonth').addEventListener('change', refreshOverview);
   ExpenseStore.onChange(() => queueMicrotask(refreshOverview));
   // Initial dashboard; explicit app/deep-link routes keep their existing behavior.
-  if (!location.hash) navigate('summary');
+  // แอปจะล้าง hash ทิ้งทันทีที่จัดการลิงก์เสร็จ จึงต้องดู __deepRouted ด้วย
+  // ไม่อย่างนั้นสลิปที่ส่งมาจากคำสั่งลัดจะถูกดึงกลับมาหน้าภาพรวม จนผู้ใช้ไม่เห็นการ์ดที่เพิ่งเข้ามา
+  if (!location.hash && !window.__deepRouted) navigate('summary');
   else { const active = $('.tab.is-active'); if (active) navigate(active.dataset.tab); refreshOverview(); }
 })();

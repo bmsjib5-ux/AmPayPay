@@ -47,6 +47,19 @@ async function friendName(userId: string, email: string): Promise<string> {
   return (rows[0] && rows[0].name) || email;
 }
 
+/* ปุ่ม "ทดสอบส่งแจ้งเตือน" ในแอปเรียกมาพร้อม JWT ของผู้ใช้
+   ตรวจ token กับ GoTrue ก่อน แล้วส่งให้เฉพาะเครื่องของคนคนนั้น
+   (ไม่ใช้ WEBHOOK_SECRET เพราะเบราว์เซอร์ไม่ควรรู้รหัสลับตัวนั้น) */
+async function userFromToken(token: string): Promise<{ id: string; email: string } | null> {
+  if (!token) return null;
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${token}` }
+  });
+  if (!r.ok) return null;
+  const u = await r.json();
+  return u && u.id ? { id: u.id, email: u.email ?? '' } : null;
+}
+
 /* ตัดสินว่าเหตุการณ์นี้ต้องแจ้งใคร ด้วยข้อความอะไร */
 export async function planNotification(body: WebhookBody): Promise<{ subs: SubRow[]; title: string; text: string } | null> {
   const rec = body.record;
@@ -97,8 +110,43 @@ Deno.serve(async (req: Request) => {
   /* ปุ่ม "ตรวจการตั้งค่า" ในแอปยิงมาแบบนี้ เพื่อดูว่าฟังก์ชันขึ้นแล้วและใส่ secrets ครบไหม (ไม่ต้องรู้รหัสลับ) */
   const url = new URL(req.url);
   if (url.searchParams.get('ping') === '1') {
-    return json({ ok: true, version: 2, vapid: vapidOk, secret: !!secret, subject: !!Deno.env.get('VAPID_SUBJECT') });
+    return json({ ok: true, version: 3, vapid: vapidOk, secret: !!secret, subject: !!Deno.env.get('VAPID_SUBJECT'), test: true });
   }
+
+  const vapidForTest: VapidKeys = {
+    publicKey: Deno.env.get('VAPID_PUBLIC_KEY') ?? '',
+    privateKey: Deno.env.get('VAPID_PRIVATE_KEY') ?? '',
+    subject: Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@example.com'
+  };
+
+  /* ปุ่มทดสอบในแอป — ส่ง push จริงกลับไปที่เครื่องของผู้ใช้เอง เพื่อพิสูจน์ทั้งเส้นทาง */
+  if (url.searchParams.get('test') === '1') {
+    if (!vapidForTest.publicKey || !vapidForTest.privateKey) return json({ error: 'missing VAPID keys' }, 500);
+    const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const me = await userFromToken(token);
+    if (!me) return json({ error: 'unauthorized' }, 401);
+    const subs = await subsByUser(me.id);
+    if (!subs.length) return json({ sent: 0, devices: 0 });
+    const testPayload = JSON.stringify({
+      title: '🔔 ทดสอบแจ้งเตือน AmPayPay',
+      body: 'ส่งจากเซิร์ฟเวอร์จริง — ถ้าเห็นข้อความนี้ แปลว่าแจ้งเตือนตอนปิดแอปใช้งานได้',
+      url: '/#bell', tag: 'push-test'
+    });
+    let okCount = 0, gone = 0;
+    await Promise.all(subs.map(async (s) => {
+      const sub: PushSubscription = { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } };
+      try {
+        const status = await sendWebPush(sub, testPayload, vapidForTest);
+        if (status === 404 || status === 410) {
+          await rest(`push_subscriptions?endpoint=eq.${encodeURIComponent(s.endpoint)}`, { method: 'DELETE' });
+          gone++;
+        } else if (status >= 200 && status < 300) okCount++;
+        else console.error('test push failed', status);
+      } catch (e) { console.error('test push error', e); }
+    }));
+    return json({ sent: okCount, devices: subs.length, dropped: gone });
+  }
+
   if (secret && req.headers.get('x-webhook-secret') !== secret) return json({ error: 'forbidden' }, 403);
 
   const vapid: VapidKeys = {

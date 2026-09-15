@@ -464,7 +464,7 @@
     var where = m[1];
     var tabName = where === 'scan' ? 'friends' : where === 'myqr' ? 'me' : where;
     var tab = document.querySelector('.tab[data-tab="' + tabName + '"]');
-    if (tab) tab.click();
+    if (tab) { window.__deepRouted = true; tab.click(); }
     if (where === 'scan') { openAddFriendModal(); setTimeout(function () { $('#scanFriendBtn').click(); }, 150); }
     if (where === 'myqr') openMyQr();
   }
@@ -481,7 +481,7 @@
     if (!already && !confirm('เพิ่ม ' + (parsed.name ? parsed.name + ' (' + parsed.email + ')' : parsed.email) + ' เป็นเพื่อนไหม?')) return;
     ExpenseStore.friends.save(parsed.email, parsed.name || (already ? already.name : ''));
     var tab = document.querySelector('.tab[data-tab="friends"]');
-    if (tab) tab.click();
+    if (tab) { window.__deepRouted = true; tab.click(); }
     toast(already ? (parsed.name || parsed.email) + ' อยู่ในรายชื่อเพื่อนอยู่แล้ว' : 'เพิ่ม ' + (parsed.name || parsed.email) + ' เป็นเพื่อนแล้ว');
     if (isIOS() && !isStandalone()) {
       var link = location.origin + location.pathname + hash;
@@ -511,6 +511,7 @@
     var me = myEmail();
     if (!me) return [];
     var seen = ExpenseStore.claims.seen.get();
+    var hidden = ExpenseStore.claims.hidden.get();
     var out = [];
     ExpenseStore.claims.all().forEach(function (c) {
       var ev = null;
@@ -524,6 +525,7 @@
       }
       if (!ev) return;
       ev.key = c.id + ':' + c.status;
+      if (hidden[ev.key]) return;                 // ผู้ใช้กดล้างแจ้งเตือนอันนี้ไปแล้ว
       ev.at = c.updatedAt || 0;
       ev.unseen = !seen[ev.key];
       out.push(ev);
@@ -681,6 +683,74 @@
       });
     }).catch(function () {}).then(function () { pushSaving = false; });
   }
+  /* ---------------- ปุ่มทดสอบแจ้งเตือน ----------------
+     มีสองแบบเพราะตอบคนละคำถาม
+     · "ทดสอบส่งแจ้งเตือน" ให้เซิร์ฟเวอร์ส่ง push จริงกลับมา = พิสูจน์ทั้งเส้นทาง
+       (คีย์ VAPID → บริการ push ของเครื่อง → service worker) ซึ่งเป็นจุดที่พังได้จริง
+     · "ทดสอบแบบปิดแอป" หน่วงไว้ 8 วินาทีผ่าน service worker ให้ปิดแอปทัน
+       = พิสูจน์ว่าแจ้งเตือนเด้งได้ทั้งที่ไม่ได้เปิดแอปอยู่ */
+  function pushTestNote(box, text, bad) {
+    var old = $('#pushTestNote', box);
+    if (old) old.remove();
+    box.insertAdjacentHTML('beforeend',
+      '<div id="pushTestNote" class="push-hint' + (bad ? ' is-bad' : '') + '">' + text + '</div>');
+  }
+
+  function wirePushTestButtons(box) {
+    var testBtn = $('#pushTestBtn', box);
+    if (testBtn) testBtn.addEventListener('click', function () {
+      var b = this, label = b.textContent;
+      b.disabled = true; b.textContent = '⏳ กำลังส่ง…';
+      pushTestNote(box, 'กำลังให้เซิร์ฟเวอร์ส่งแจ้งเตือนมาที่เครื่องนี้…');
+      CloudSync.sendTestPush().then(function (r) {
+        if (!r.devices) {
+          pushTestNote(box, '❌ ไม่พบเครื่องที่ลงทะเบียนรับแจ้งเตือน — กด “เปิดแจ้งเตือนตอนปิดแอป” ก่อน', true);
+        } else if (r.sent) {
+          pushTestNote(box, '✅ ส่งแล้ว ' + r.sent + ' จาก ' + r.devices + ' เครื่อง — แจ้งเตือนควรเด้งภายในไม่กี่วินาที' +
+            (r.dropped ? ' · ล้างเครื่องที่เลิกรับแล้ว ' + r.dropped + ' เครื่อง' : '') +
+            '<br><span class="muted">ไม่เห็นแจ้งเตือน? ดูที่ตั้งค่าเครื่อง → การแจ้งเตือน ว่าเปิดให้แอปนี้อยู่</span>');
+        } else {
+          pushTestNote(box, '❌ ส่งไม่สำเร็จสักเครื่อง (มี ' + r.devices + ' เครื่องลงทะเบียนไว้) — ตรวจว่าใส่คีย์ VAPID ใน Secrets ตรงกับใน assets/config.js', true);
+        }
+      }).catch(function (err) {
+        pushTestNote(box, '❌ ' + esc(err.message), true);
+      }).then(function () { b.disabled = false; b.textContent = label; });
+    });
+
+    var bgBtn = $('#pushTestBgBtn', box);
+    if (bgBtn) bgBtn.addEventListener('click', function () {
+      var b = this, label = b.textContent, left = 8;
+      if (!(navigator.serviceWorker && navigator.serviceWorker.ready)) {
+        pushTestNote(box, '❌ เบราว์เซอร์นี้ไม่รองรับ', true);
+        return;
+      }
+      b.disabled = true;
+      navigator.serviceWorker.ready.then(function (reg) {
+        if (!reg.active) throw new Error('service worker ยังไม่พร้อม ลองรีเฟรชหน้าแล้วกดใหม่');
+        reg.active.postMessage({
+          type: 'test-notify', delay: left * 1000,
+          title: '🔔 ทดสอบแจ้งเตือน AmPayPay',
+          body: 'เห็นข้อความนี้ทั้งที่ปิดแอปอยู่ = ใช้งานได้'
+        });
+        pushTestNote(box, '⏱ <b>ปิดแอปหรือล็อกจอได้เลยตอนนี้</b> — จะเด้งแจ้งเตือนใน <b id="pushTestCount">' + left + '</b> วินาที');
+        var tick = setInterval(function () {
+          left--;
+          var el = $('#pushTestCount');
+          if (el) el.textContent = String(left);
+          if (left <= 0) {
+            clearInterval(tick);
+            b.disabled = false; b.textContent = label;
+            pushTestNote(box, 'ส่งแล้ว — ถ้าไม่เห็นแจ้งเตือนตอนปิดแอป ลองกด “🔔 ทดสอบส่งแจ้งเตือน” ดูว่าฝั่งเซิร์ฟเวอร์ผ่านไหม' +
+              (isIOS() && !isStandalone() ? '<br>บน iPhone ต้องเปิดแอปจากไอคอนหน้าจอโฮมเท่านั้น แจ้งเตือนถึงจะทำงาน' : ''));
+          }
+        }, 1000);
+      }).catch(function (err) {
+        b.disabled = false;
+        pushTestNote(box, '❌ ' + esc(err.message), true);
+      });
+    });
+  }
+
   function renderPushBox() {
     var box = $('#pushBox');
     if (!box) return;
@@ -714,7 +784,10 @@
       if (onBtn) onBtn.addEventListener('click', function () { onBtn.disabled = true; enablePush(); });
       if (offBtn) offBtn.addEventListener('click', function () { offBtn.disabled = true; disablePush(); });
       $('.row-actions', box).insertAdjacentHTML('beforeend',
+        (on ? '<button class="btn btn-sm" type="button" id="pushTestBtn" title="ให้เซิร์ฟเวอร์ส่งแจ้งเตือนจริงกลับมาที่เครื่องนี้">🔔 ทดสอบส่งแจ้งเตือน</button>' +
+              '<button class="btn btn-ghost btn-sm" type="button" id="pushTestBgBtn" title="หน่วง 8 วินาที ให้คุณปิดแอปก่อน แล้วดูว่าแจ้งเตือนเด้งไหม">⏱ ทดสอบแบบปิดแอป</button>' : '') +
         '<button class="btn btn-ghost btn-sm" type="button" id="pushCheckBtn">🩺 ตรวจการตั้งค่า</button>');
+      wirePushTestButtons(box);
       $('#pushCheckBtn').addEventListener('click', function () {
         var b = this; b.disabled = true; b.textContent = '⏳ กำลังตรวจ…';
         var old = $('#pushCheck'); if (old) old.remove();
@@ -788,6 +861,25 @@
     ExpenseStore.claims.seen.mark(bellEvents().map(function (e) { return e.key; }));
     renderBell(); renderBellList(); renderDebtBadge();
   });
+  /* ล้างเฉพาะแจ้งเตือนที่อ่านแล้ว — อันที่ยังไม่ได้อ่านคงไว้ จะได้ไม่พลาดของใหม่
+     ล้างแล้วถ้าใบนั้นเปลี่ยนสถานะทีหลัง จะมีแจ้งเตือนอันใหม่ขึ้นตามปกติ */
+  $('#bellClearReadBtn').addEventListener('click', function () {
+    var read = bellEvents().filter(function (e) { return !e.unseen; });
+    if (!read.length) { toast('ยังไม่มีแจ้งเตือนที่อ่านแล้ว'); return; }
+    var keys = read.map(function (e) { return e.key; });
+    ExpenseStore.claims.hidden.add(keys);
+    renderBell(); renderBellList(); renderDebtBadge();
+    toast('ล้างแจ้งเตือนที่อ่านแล้ว ' + keys.length + ' รายการ', {
+      label: '↩️ เลิกทำ',
+      onClick: function () {
+        var m = ExpenseStore.claims.hidden.get();
+        keys.forEach(function (k) { delete m[k]; });
+        ExpenseStore.claims.hidden.set(m);
+        renderBell(); renderBellList(); renderDebtBadge();
+      }
+    });
+  });
+
   $('#bellRefreshBtn').addEventListener('click', function () {
     if (!syncReady()) { toast('ต้องล็อกอิน ☁️ ก่อน'); return; }
     var btn = this; btn.disabled = true;
@@ -1368,7 +1460,7 @@
     });
 
     var addTab = document.querySelector('.tab[data-tab="add"]');
-    if (addTab) addTab.click();
+    if (addTab) { window.__deepRouted = true; addTab.click(); }
     var found = chunks.filter(function (t) { return ReceiptParser.parse(t).amount != null; }).length;
     toast('รับใบเสร็จจาก ' + (source || 'Shortcut') + ' ' + chunks.length + ' ใบ' +
       (found < chunks.length ? ' · อ่านยอดได้ ' + found + ' ใบ' : '') + (bookNote || '') + ' — ตรวจแล้วกดบันทึกได้เลย');
@@ -3373,7 +3465,23 @@
     '</div>';
   }
 
+  /* ---------------- กันฟอร์มแก้ไขหายระหว่างพิมพ์ ----------------
+     ฟอร์มแก้ไขถูกใส่ไว้ใน DOM ของการ์ด พอ renderList() วาดใหม่ทั้งลิสต์ ฟอร์มก็หายไปพร้อมสิ่งที่พิมพ์ค้างไว้
+     ซึ่งเกิดได้เองโดยผู้ใช้ไม่ได้ทำอะไร — ซิงก์อัตโนมัติทุก 2 นาที, สลับกลับมาที่แอป, หรือมี push เข้ามา
+     จึงพักการวาดใหม่ไว้ก่อนระหว่างที่ยังแก้ไขค้างอยู่ แล้วค่อยวาดทีเดียวตอนกดบันทึกหรือยกเลิก */
+  var editingId = null;
+  var listDirty = false;
+
+  function stopEditing() {
+    editingId = null;
+    if (listDirty) { listDirty = false; renderList(); }
+  }
+
   function renderList() {
+    if (editingId) {                       // ยังพิมพ์ค้างอยู่ — จำไว้ว่าต้องวาดใหม่ทีหลัง
+      if ($('.ecard-edit')) { listDirty = true; return; }
+      editingId = null;                    // ฟอร์มหายไปแล้วด้วยเหตุอื่น (เช่น ล้างข้อมูล) ไม่ต้องกันแล้ว
+    }
     var catSel = $('#fCat');
     if (!catSel.options.length) {
       catSel.innerHTML = '<option value="all">ทุกหมวด</option>' +
@@ -3408,6 +3516,7 @@
     if (act === 'del') {
       var keptImage = exp.image || null;              // รูปถูกทิ้งตอนลบ เก็บไว้เผื่อกดเลิกทำ
       ExpenseStore.remove(id);
+      editingId = null; listDirty = false;            // ลบเองแล้ว ไม่ต้องกันการวาดใหม่
       renderList();
       renderBudgetAlert();
       renderDebtBadge();
@@ -3425,10 +3534,12 @@
       });
     } else if (act === 'edit') {
       if ($('.ecard-edit', card)) return;
+      editingId = id;
       card.insertAdjacentHTML('beforeend', editForm(exp));
     } else if (act === 'cancel') {
       var box = $('.ecard-edit', card);
       if (box) box.remove();
+      stopEditing();
     } else if (act === 'save') {
       var patch = {};
       card.querySelectorAll('[data-ef]').forEach(function (input) { patch[input.dataset.ef] = input.value; });
@@ -3437,6 +3548,7 @@
       patch.amount = amount;
       patch.split = readSplit(card);
       ExpenseStore.update(id, patch);
+      editingId = null; listDirty = false;
       renderList();
       renderBudgetAlert();
       renderDebtBadge();
@@ -3483,6 +3595,7 @@
     }
 
     var after = function () {
+      editingId = null; listDirty = false;
       renderList(); renderBudgetAlert(); renderBookBar(); renderDebtBadge();
       if ($('#panel-summary').classList.contains('is-active')) renderSummary();
       toast('ล้างข้อมูลในเครื่องนี้แล้ว');
@@ -3561,6 +3674,7 @@
 
   function switchBook(id) {
     ExpenseStore.setCurrentBook(id);
+    editingId = null; listDirty = false;              // เปลี่ยนสมุดแล้ว รายการที่แก้ค้างไว้ไม่ใช่ของสมุดนี้
     queue.slice().forEach(removeCard);         // ใบเสร็จที่ค้างในคิวเป็นของสมุดเดิม
     $('#ocrStatus').textContent = '';
     renderBookBar();

@@ -311,7 +311,13 @@ details.raw pre {
 .toast {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
   background: var(--text-primary); color: var(--bg); padding: 10px 16px; border-radius: 999px;
-  font-size: 13.5px; box-shadow: var(--shadow); z-index: 50; max-width: 90vw;
+  font-size: 13.5px; box-shadow: var(--shadow); max-width: 90vw;
+  /* ต้องอยู่เหนือหน้าต่างทุกชนิด (modal 60 · scanModal 70 · หน้าเข้าสู่ระบบ 90)
+     ไม่งั้น toast ที่ขึ้นตอนเปิดหน้าต่างอยู่จะถูกบัง และปุ่ม "เลิกทำ" บน toast ก็กดไม่ได้ */
+  z-index: 100;
+  /* แต่ตัวแถบเองต้องไม่กินการกด ไม่งั้นมันบังปุ่มที่อยู่ข้างใต้ตลอดเวลาที่ยังไม่หายไป
+     รับเฉพาะปุ่มบนแถบ (เช่น "เลิกทำ") ที่ต้องกดได้จริง */
+  pointer-events: none;
 }
 
 @media (max-width: 560px) {
@@ -1062,6 +1068,9 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .push-box { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--surface-2); display: grid; gap: 8px; }
 .push-box .push-state { font-weight: 600; }
 .push-box .push-hint { font-size: 12.5px; color: var(--text-secondary); line-height: 1.55; }
+/* ผลการทดสอบส่งแจ้งเตือน — แดงเมื่อไม่ผ่าน จะได้เห็นชัดว่าต้องแก้ */
+.push-box .push-hint.is-bad { color: var(--danger, #c0392f); }
+#pushTestNote { margin-top: 8px; }
 
 /* ---------- v45: ปุ่มแบบการ์ดพร้อมไอคอน + เมนูล่างบนมือถือ ---------- */
 .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
@@ -1229,6 +1238,7 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
 .toast { display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(92vw, 460px); }
 .toast-text { flex: 1; min-width: 0; }
 .toast-action {
+  pointer-events: auto;
   appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
   background: var(--bg); color: var(--text-primary); border-radius: 999px; padding: 6px 12px; white-space: nowrap;
 }
