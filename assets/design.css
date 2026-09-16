@@ -28,13 +28,18 @@
 #panel-summary .tile:first-child .tile-value { margin:8px 0 16px; font-size:clamp(2rem,6vw,2.75rem); max-width:65%; }
 #panel-summary .tile:first-child::after { opacity:.5; }
 #panel-summary #sumCompare { display:none; }
-.hero-budget { position:absolute; right:24px; top:66px; max-width:32%; display:grid; gap:4px; text-align:right; font-size:.75rem; color:#dceee3; }
+/* สองชิ้นนี้เป็นปุ่มแล้ว แต่ต้องดูเหมือนเนื้อหาเดิม ไม่ใช่ปุ่มสี่เหลี่ยม */
+.hero-budget, .hero-progress { border:0; background:none; color:inherit; font:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.hero-budget:active, .hero-progress:active { opacity:.72; }
+.hero-budget:focus-visible, .hero-progress:focus-visible { outline:2px solid #c2f0d8; outline-offset:4px; border-radius:14px; }
+.hero-budget { position:absolute; right:24px; top:66px; max-width:32%; display:grid; gap:4px; text-align:right; font-size:.75rem; color:#dceee3; padding:6px 0 6px 6px; }
+.hero-progress { display:block; width:100%; padding:0; text-align:left; }
 .hero-budget strong { color:white; font-size:.95rem; overflow-wrap:anywhere; }
 .hero-progress progress { display:block; width:100%; height:8px; border:0; border-radius:999px; overflow:hidden; background:#ffffff24; }
 .hero-progress progress::-webkit-progress-bar { background:#ffffff24; }
 .hero-progress progress::-webkit-progress-value { background:#c2f0d8; border-radius:999px; }
 .hero-progress progress::-moz-progress-bar { background:#c2f0d8; }
-.hero-progress > div { display:flex; justify-content:space-between; gap:8px; margin-top:8px; font-size:.75rem; color:#e0efe6; }
+.hero-progress > span { display:flex; justify-content:space-between; gap:8px; margin-top:8px; font-size:.75rem; color:#e0efe6; }
 .overview-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:28px; }
 .overview-actions button { display:flex; align-items:center; gap:12px; text-align:left; border:1px solid var(--border); border-radius:20px; padding:14px; background:var(--surface-1); color:var(--text-primary); font:inherit; cursor:pointer; }
 .overview-actions .ui-icon { width:28px; height:28px; color:var(--accent-ink); }

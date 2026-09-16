@@ -82,7 +82,12 @@
   overviewHead.append($('.page-heading', summary), $('.filters', summary)); summary.prepend(overviewHead);
   const hero = $('.tile', summary);
   $('.tile-label', hero).textContent = 'รายจ่ายเดือนนี้';
-  hero.insertAdjacentHTML('beforeend', '<div class="hero-budget"><span id="remainingLabel">งบคงเหลือ</span><strong id="designRemaining"></strong></div><div id="designProgress" class="hero-progress"><progress id="designBudgetProgress" max="100" value="0" aria-label="สัดส่วนการใช้งบ"></progress><div><span id="designBudgetLimit"></span><span id="designBudgetPercent"></span></div></div>');
+  /* แถบงบเป็นปุ่มจริงทั้งสองชิ้น เพราะการ์ดใบนี้คือที่เดียวที่ผู้ใช้เห็นเรื่องงบตั้งแต่เปิดแอป
+     ส่วนการ์ดตั้งงบจริงถูกยุบอยู่ใน "สถิติและงบประมาณเพิ่มเติม" ถ้าแถบนี้กดไม่ได้
+     ผู้ใช้จะเห็นคำว่า "ยังไม่ตั้งงบ" แล้วกดยังไงก็ไม่มีอะไรเกิดขึ้น
+     ที่ไม่ครอบทั้งสองชิ้นด้วยปุ่มเดียว เพราะชิ้นบนวางแบบ absolute ส่วนชิ้นล่างอยู่ในสายการวางปกติ
+     ปุ่มที่ครอบจะสูงศูนย์ตอนยังไม่ตั้งงบ (ชิ้นล่างถูกซ่อน) แล้วกลายเป็นกดไม่โดนอีก */
+  hero.insertAdjacentHTML('beforeend', '<button type="button" class="hero-budget" data-overview="budget"><span id="remainingLabel">งบคงเหลือ</span><strong id="designRemaining"></strong></button><button type="button" id="designProgress" class="hero-progress" data-overview="budget"><progress id="designBudgetProgress" max="100" value="0" aria-label="สัดส่วนการใช้งบ"></progress><span><span id="designBudgetLimit"></span><span id="designBudgetPercent"></span></span></button>');
   const quick = htmlElement('div', 'overview-actions', '<button type="button" data-overview="camera">' + icon('camera') + '<span><b>ถ่ายใบเสร็จ</b><small>อ่านและบันทึกรายจ่าย</small></span></button><button type="button" data-overview="manual">' + icon('plus') + '<span><b>กรอกเอง</b><small>เพิ่มรายการด้วยตัวเอง</small></span></button>');
   $('.tiles', summary).after(quick);
   const categories = htmlElement('section', 'overview-categories', '<div class="section-row"><h2>หมวดรายจ่าย</h2><button type="button" data-overview="categories">ดูทั้งหมด ›</button></div><div class="category-overview"><div class="donut" id="designDonut" aria-hidden="true"><div><strong id="designDonutTotal"></strong><small>ทั้งหมด</small></div></div><table class="category-legend"><caption class="sr-only">รายจ่ายแต่ละหมวดและสัดส่วน</caption><thead class="sr-only"><tr><th>หมวด</th><th>จำนวนเงิน</th><th>สัดส่วน</th></tr></thead><tbody id="designCategories"></tbody></table></div><p id="designCategoryEmpty" class="empty" hidden>ยังไม่มีรายจ่ายในเดือนนี้</p></section>');
@@ -99,7 +104,19 @@
     if (action === 'categories') { details.open = true; $('#catChart').scrollIntoView({block:'center'}); }
     if (action === 'camera') { navigate('add'); setEntryMode('receipt'); $('#camBtn').click(); }
     if (action === 'manual') { navigate('add'); setEntryMode('manual'); }
+    if (action === 'budget') openBudget();
   });
+  /* กางกล่องสถิติ เลื่อนไปที่การ์ดงบ แล้วเข้าโหมดแก้ไขให้เลย — กดครั้งเดียวจบ */
+  function openBudget() {
+    details.open = true;
+    const card = $('#budgetCard');
+    if (!card) return;
+    const edit = $('[data-bact="edit"]', card);
+    if (edit) edit.click();
+    card.scrollIntoView({ block: 'center' });
+    const total = $('[data-bf="total"]', card);
+    if (total) setTimeout(() => { total.focus(); total.select?.(); }, 120);
+  }
 
   const addPanel = $('#panel-add');
   $('.page-heading h2', addPanel).textContent = 'เพิ่มรายจ่าย';
@@ -140,8 +157,9 @@
     const rows = ExpenseStore.all().filter(row => row.date?.slice(0,7) === selectedMonth);
     const total = rows.reduce((sum,row) => sum + (Number(row.amount) || 0),0);
     const limit = ExpenseStore.budget.get().total;
-    $('#designRemaining').textContent = limit ? money(Math.abs(limit-total)) : 'ยังไม่ตั้งงบ';
-    $('#remainingLabel').textContent = limit && total > limit ? 'เกินงบ' : 'งบคงเหลือ';
+    /* ยังไม่ตั้งงบ ให้ข้อความอ่านเป็น "ปุ่ม" ไม่ใช่คำบอกสถานะเฉยๆ ผู้ใช้จะได้รู้ว่ากดได้ */
+    $('#designRemaining').textContent = limit ? money(Math.abs(limit-total)) : 'ตั้งงบ ›';
+    $('#remainingLabel').textContent = !limit ? 'งบประมาณ' : total > limit ? 'เกินงบ' : 'งบคงเหลือ';
     $('#designProgress').hidden = !limit;
     $('#designBudgetProgress').value = limit ? Math.min(100,total/limit*100) : 0;
     $('#designBudgetLimit').textContent = 'จากงบ ' + money(limit);
