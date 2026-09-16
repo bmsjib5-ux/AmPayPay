@@ -631,7 +631,8 @@ window.ExpenseStore = (function () {
 
     /* ล้างข้อมูลของบัญชีเดิมออกจากเครื่อง (ของยังอยู่บนเซิร์ฟเวอร์ของบัญชีนั้น) */
     wipeLocal: function () {
-      [KEY, BOOKS_KEY, CURRENT_KEY, BUDGET_KEY, DIRTY_KEY, SYNC_KEY, FRIENDS_KEY, CLAIMS_KEY, CLAIMS_SEEN_KEY, CLAIMS_HIDDEN_KEY]
+      [KEY, BOOKS_KEY, CURRENT_KEY, BUDGET_KEY, DIRTY_KEY, SYNC_KEY, FRIENDS_KEY, CLAIMS_KEY, CLAIMS_SEEN_KEY, CLAIMS_HIDDEN_KEY,
+       'expense-book:lastEmail']
         .forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
       cache = null;
       booksCache = null;
