@@ -32,6 +32,12 @@
   --heat-4:      #c0392f;   /* แดง    — 100% */
   /* สเกลความโค้ง — ไล่จากชิ้นเล็กไปใหญ่ ใช้ร่วมกันทั้งแอปจะได้โค้งเป็นชุดเดียวกัน
      ของชิ้นใหญ่โค้งมากกว่าของชิ้นเล็ก มุมถึงจะดูสม่ำเสมอเวลามองรวมๆ */
+  /* ชุดสีพื้นหลังสำเร็จรูป — ประกาศไว้ที่นี่เพื่อให้สลับตามธีมเองโดยไม่ต้องพึ่ง JS
+     ชุดสว่างไว้ใช้กับธีมสว่าง ส่วนธีมมืดมีชุดของตัวเองด้านล่าง */
+  --preset-mint:   linear-gradient(160deg,#d8f3e6 0%,#eef7ff 55%,#fdf1e3 100%);
+  --preset-sunset: linear-gradient(160deg,#ffe3d3 0%,#ffd9e8 52%,#e7e2ff 100%);
+  --preset-sky:    linear-gradient(160deg,#dbe9ff 0%,#e8e2ff 50%,#fde9f3 100%);
+  --preset-matcha: linear-gradient(160deg,#e6f0d4 0%,#f6f2df 55%,#e3f1ec 100%);
   --radius-xs: 10px;   /* ป้ายเล็ก โค้ด กล่องจิ๋ว */
   --radius-sm: 14px;   /* ปุ่มเล็ก ช่องกรอก รูปย่อ */
   --radius-ctl: 16px;  /* ปุ่มและช่องกรอกขนาดปกติ */
@@ -44,6 +50,11 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
+    /* ชุดสีเดียวกันในเวอร์ชันมืด — โทนเดิมแต่เข้มพอให้ตัวหนังสือสีอ่อนอ่านออก */
+    --preset-mint:   linear-gradient(160deg,#102a21 0%,#121d2b 55%,#241d18 100%);
+    --preset-sunset: linear-gradient(160deg,#2b1a14 0%,#2a151f 52%,#1d1b2e 100%);
+    --preset-sky:    linear-gradient(160deg,#131f33 0%,#1a1830 50%,#2a1724 100%);
+    --preset-matcha: linear-gradient(160deg,#1c2415 0%,#242315 55%,#152520 100%);
     --bg:          #14131a;
     --bg-blob-1:   #211d33;
     --bg-blob-2:   #2a2020;
@@ -78,6 +89,11 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
+    /* ชุดสีเดียวกันในเวอร์ชันมืด — โทนเดิมแต่เข้มพอให้ตัวหนังสือสีอ่อนอ่านออก */
+  --preset-mint:   linear-gradient(160deg,#102a21 0%,#121d2b 55%,#241d18 100%);
+  --preset-sunset: linear-gradient(160deg,#2b1a14 0%,#2a151f 52%,#1d1b2e 100%);
+  --preset-sky:    linear-gradient(160deg,#131f33 0%,#1a1830 50%,#2a1724 100%);
+  --preset-matcha: linear-gradient(160deg,#1c2415 0%,#242315 55%,#152520 100%);
   --bg:          #14131a;
   --bg-blob-1:   #211d33;
   --bg-blob-2:   #2a2020;
@@ -751,14 +767,26 @@ body.has-bg::after {
   backdrop-filter: saturate(1.05);
 }
 /* มีพื้นหลังแล้วการ์ดกลายเป็นกระจกฝ้า — เห็นรูปทะลุขึ้นมา แต่ตัวหนังสือยังอ่านง่าย
-   ความทึบปรับได้เองในกล่อง 🎨 (--card-solid) */
-body.has-bg .rcard, body.has-bg .ecard, body.has-bg .tile,
-body.has-bg .chart-card, body.has-bg .empty, body.has-bg .book-row {
+   ความทึบปรับได้เองในกล่อง 🎨 (--card-solid)
+   :not(:first-child) กันการ์ดยอดรวมใบแรกไว้ เพราะมันเป็นแผ่นสีเขียวเข้มตัวหนังสือขาว
+   ถ้าโดนทำให้เป็นกระจกฝ้าด้วย พื้นจะกลายเป็นสีอ่อนแต่ตัวหนังสือยังขาว — อ่านไม่ออกเลย */
+body.has-bg .rcard, body.has-bg .ecard, body.has-bg .tile:not(:first-child),
+body.has-bg .chart-card, body.has-bg .empty, body.has-bg .book-row,
+/* กล่องที่หน้าตาใหม่ (v76) เพิ่มเข้ามา ต้องเป็นกระจกฝ้าด้วย ไม่งั้นตัวหนังสือลอยอยู่บนรูปเปล่าๆ */
+body.has-bg .overview-categories, body.has-bg .overview-recent,
+body.has-bg .recent-list, body.has-bg .overview-actions button,
+body.has-bg .debt-card, body.has-bg .appearance-settings,
+body.has-bg .category-picks button, body.has-bg .segmented {
   background-color: color-mix(in srgb, var(--surface-1) var(--card-solid, 88%), transparent);
   backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
   -webkit-backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
   border-color: var(--border);
 }
+/* กล่องพวกนี้เดิมไม่มีขอบ พอเป็นกระจกฝ้าแล้วต้องมีเส้นคั่น ไม่งั้นขอบการ์ดหายไปกับรูป */
+body.has-bg .overview-categories, body.has-bg .overview-recent {
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 14px;
+}
+body.has-bg .overview-recent .recent-list { background: none; border: 0; padding: 0; backdrop-filter: none; }
 body.has-bg .tabbar,
 body.has-bg .topbar, body.has-bg .bookbar {
   background-color: color-mix(in srgb, var(--surface-1) calc(var(--card-solid, 88%) - 10%), transparent);
@@ -788,6 +816,22 @@ body.bg-sheer .ecard-meta, body.bg-sheer .bar-name, body.bg-sheer .bar-pct,
 body.bg-sheer .dz-sub, body.bg-sheer .book-count, body.bg-sheer .rcard-status,
 body.bg-sheer .btn-ghost, body.bg-sheer .tab { color: var(--text-secondary); }
 body.bg-sheer .btn-ghost, body.bg-sheer .tile-value, body.bg-sheer .bar-value { color: var(--text-primary); }
+/* หัวข้อกับลิงก์ที่วางบนพื้นหลังตรงๆ ไม่มีการ์ดรอง ถ้าผู้ใช้เลือกรูปที่สว่างใกล้สีตัวหนังสือ
+   (หรือรูปเข้มในธีมสว่าง) ตัวหนังสือจะกลืนไปเลย ใส่เงาสีพื้นหลังของธีมไว้ข้างหลัง
+   เงาจะเป็นสีตรงข้ามกับตัวหนังสือเสมอ เพราะสองค่านี้มาจากธีมเดียวกัน */
+/* แถบหัวเรื่องของหน้าไม่มีการ์ดรองอยู่เลย ถ้าผู้ใช้เลือกรูปสว่างแล้วอยู่ในธีมมืด
+   (หรือรูปเข้มในธีมสว่าง) ตัวหนังสือจะกลืนหายไปกับรูป — ใช้วิธีเดียวกับ .hint/.foot
+   คือรองด้วยกระจกฝ้าบางๆ พื้นหลังจึงเป็นสีของธีมเสมอ ไม่ว่ารูปจะสว่างหรือมืด */
+body.has-bg .overview-head, body.has-bg .page-heading {
+  background: color-mix(in srgb, var(--surface-1) calc(var(--card-solid, 88%) - 18%), transparent);
+  backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
+  -webkit-backdrop-filter: blur(var(--card-blur, 16px)) saturate(1.1);
+  border-radius: var(--radius); padding: 10px 14px; margin-inline: -14px;
+}
+body.has-bg .section-title, body.has-bg .bill-switch h2 {
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--bg) 88%, transparent);
+}
+
 /* ตัวหนังสือเล็กๆ ที่วางบนพื้นหลังตรงๆ ต้องมีแผ่นรองบางๆ ไม่งั้นอ่านไม่ออกบนรูปที่มีลาย */
 body.has-bg .hint, body.has-bg .foot {
   background: color-mix(in srgb, var(--surface-1) 72%, transparent);

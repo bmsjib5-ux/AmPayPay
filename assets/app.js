@@ -2058,12 +2058,15 @@
   function bgImgPut(url) { return bgIDB('readwrite', function (st) { return st.put(url, BG_ROW); }); }
   function bgImgGet() { return bgIDB('readonly',  function (st) { return st.get(BG_ROW); }); }
   function bgImgDel() { return bgIDB('readwrite', function (st) { return st.delete(BG_ROW); }); }
+  /* ไล่สีจริงอยู่ใน styles.css เป็นตัวแปร CSS ที่มีทั้งชุดสว่างและชุดมืด
+     ที่ไม่เก็บค่าสีไว้ตรงนี้เพราะพอผู้ใช้สลับธีม พื้นหลังต้องเปลี่ยนตามทันที
+     ถ้าฝัง hex ไว้ใน JS พื้นหลังจะค้างเป็นชุดสว่าง แล้วตัวหนังสือสีอ่อนของธีมมืดจะหายไปกับพื้น */
   var BG_PRESETS = [
     { id: 'none',   label: 'ค่าเริ่มต้น', swatch: 'linear-gradient(135deg,#efe9ff,#ffeede)' },
-    { id: 'mint',   label: 'มินต์',      css: 'linear-gradient(160deg,#d8f3e6 0%,#eef7ff 55%,#fdf1e3 100%)', swatch: 'linear-gradient(135deg,#d8f3e6,#fdf1e3)' },
-    { id: 'sunset', label: 'พระอาทิตย์', css: 'linear-gradient(160deg,#ffe3d3 0%,#ffd9e8 52%,#e7e2ff 100%)', swatch: 'linear-gradient(135deg,#ffe3d3,#e7e2ff)' },
-    { id: 'sky',    label: 'ท้องฟ้า',    css: 'linear-gradient(160deg,#dbe9ff 0%,#e8e2ff 50%,#fde9f3 100%)', swatch: 'linear-gradient(135deg,#dbe9ff,#fde9f3)' },
-    { id: 'matcha', label: 'ชาเขียว',    css: 'linear-gradient(160deg,#e6f0d4 0%,#f6f2df 55%,#e3f1ec 100%)', swatch: 'linear-gradient(135deg,#e6f0d4,#e3f1ec)' }
+    { id: 'mint',   label: 'มินต์',      css: 'var(--preset-mint)',   swatch: 'var(--preset-mint)' },
+    { id: 'sunset', label: 'พระอาทิตย์', css: 'var(--preset-sunset)', swatch: 'var(--preset-sunset)' },
+    { id: 'sky',    label: 'ท้องฟ้า',    css: 'var(--preset-sky)',    swatch: 'var(--preset-sky)' },
+    { id: 'matcha', label: 'ชาเขียว',    css: 'var(--preset-matcha)', swatch: 'var(--preset-matcha)' }
   ];
   var bgState = { kind: 'none', image: '', preset: '', dim: 24, blur: 0, cardSolid: 88, cardBlur: 8 };
 
