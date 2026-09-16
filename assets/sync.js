@@ -45,7 +45,17 @@ window.CloudSync = (function () {
     return !!(c.url && c.anonKey);
   }
 
+  /* จำอีเมลของบัญชีไว้ในเครื่อง — ใบแจ้งหนี้ที่ซิงก์มาแล้วจะได้รู้ว่าใบไหนของเรา
+     ตอนที่ session หลุดหรือเน็ตล่ม ไม่งั้นหน้า "หนี้ที่ฉันต้องจ่าย" จะว่างเปล่าทั้งที่ข้อมูลอยู่ครบ */
+  var LAST_EMAIL_KEY = 'expense-book:lastEmail';
+  function rememberEmail() {
+    var e = session && session.user && session.user.email;
+    if (!e) return;
+    try { localStorage.setItem(LAST_EMAIL_KEY, String(e).trim().toLowerCase()); } catch (err) {}
+  }
+
   function emit() {
+    rememberEmail();
     listeners.forEach(function (fn) {
       try { fn(); } catch (e) {}
     });
@@ -172,6 +182,12 @@ window.CloudSync = (function () {
     },
     user: function () { return session && session.user ? session.user : null; },
     email: function () { var u = api.user(); return u ? u.email : ''; },
+    /* อีเมลที่ใช้ระบุว่า "ใบไหนของเรา" — ใช้ค่าที่จำไว้ต่อเมื่อยังไม่มี session */
+    lastEmail: function () {
+      var live = api.email();
+      if (live) return live;
+      try { return localStorage.getItem(LAST_EMAIL_KEY) || ''; } catch (e) { return ''; }
+    },
 
     /* เรียกตอนเปิดแอป — คืนค่าว่ามี session ค้างอยู่ไหม */
     init: function () {
@@ -319,7 +335,9 @@ window.CloudSync = (function () {
 
     /* ---------- ใบแจ้งหนี้: มีสองฝ่าย จึงดึงใหม่ทั้งชุดทุกครั้ง ---------- */
     syncClaims: function (c) {
-      var email = (session && session.user && session.user.email) || '';
+      /* ฝั่งที่ส่งบันทึก to_email เป็นตัวพิมพ์เล็กเสมอ (ดู sendClaim) ตรงนี้จึงต้องพิมพ์เล็กด้วย
+         ไม่งั้นบัญชีที่อีเมลมีตัวใหญ่จะกรองไม่เจอใบของตัวเองเลยสักใบ โดยไม่มี error อะไรขึ้น */
+      var email = String((session && session.user && session.user.email) || '').trim().toLowerCase();
       return detectPiiMode(c).then(function (pii) {
         if (!pii) return c.from('debt_claims').select('*').or('from_user.eq.' + session.user.id + ',to_email.eq.' + email);
         return sha256Hex(email).then(function (h) {

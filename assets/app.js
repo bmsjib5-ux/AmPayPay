@@ -139,7 +139,8 @@
   function syncReady() {
     return CloudSync.isConfigured() && !!CloudSync.user();
   }
-  function myEmail() { return (CloudSync.email() || '').toLowerCase(); }
+  /* ใช้อีเมลที่จำไว้ด้วย ใบแจ้งหนี้ที่ซิงก์มาแล้วจะได้ยังแสดงตอน session หลุด */
+  function myEmail() { return ((CloudSync.lastEmail ? CloudSync.lastEmail() : CloudSync.email()) || '').toLowerCase(); }
 
   function claimsFor(kind) {
     var me = myEmail();
@@ -1042,10 +1043,16 @@
 
   function renderIncoming() {
     var card = $('#incomingCard');
-    if (!syncReady()) { card.hidden = true; return; }
+    /* ใบแจ้งหนี้ที่ซิงก์มาแล้วอยู่ในเครื่อง ต่อให้ล็อกอินหลุดไปก็ยังต้องเห็น
+       เดิมซ่อนทั้งการ์ดเมื่อยังไม่พร้อมซิงก์ กลายเป็นว่ามีหนี้ค้างอยู่แต่หน้าจอว่างเปล่า
+       และไม่มีอะไรบอกสาเหตุเลย — ป้ายตัวเลขบนแท็บยังนับให้ด้วยซ้ำ เพราะมันอ่านจากเครื่อง */
+    var ready = syncReady();
     var all = incomingClaims().filter(function (c) { return c.status !== 'cancelled'; });
     card.hidden = !all.length;
     if (!all.length) return;
+    card.classList.toggle('is-offline', !ready);
+    var warn = $('#incomingOffline');
+    if (warn) warn.hidden = ready;
 
     var owed = all.filter(function (c) { return c.status !== 'confirmed'; })
       .reduce(function (a, c) { return a + c.amount; }, 0);
@@ -1174,6 +1181,12 @@
     if (!btn) return;
     var id = btn.closest('.debt-item').dataset.cid;
     var act = btn.dataset.claim;
+    /* บันทึกลงสมุดกับดู QR ทำได้ในเครื่องล้วน ส่วนที่ต้องบอกเพื่อนต้องมีเซิร์ฟเวอร์
+       บอกให้ชัดตั้งแต่ตอนกด ดีกว่าปล่อยให้ยิงแล้วค่อยเด้ง error */
+    if (!syncReady() && /^(payall|pay|unpay)$/.test(act)) {
+      toast('ต้องล็อกอิน ☁️ ก่อน ถึงจะแจ้งเพื่อนได้ — กด "บัญชีและการหารบิล" ในแท็บฉัน');
+      return;
+    }
     if (act === 'save') { saveClaimAsExpense(id); return; }
     if (act === 'qr') { openPayModal(id); return; }
     if (act === 'payall') { payAndSave(id, btn); return; }
