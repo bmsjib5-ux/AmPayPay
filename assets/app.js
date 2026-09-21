@@ -1657,16 +1657,28 @@
   });
 
   /* ---------------- แท็บลูกหนี้: รวมยอดค้างรายคน ---------------- */
+  /* "ใครค้างเราอยู่" เป็นเรื่องของตัวเรา ไม่ใช่ของสมุดเล่มใดเล่มหนึ่ง
+     เดิมอ่านจาก all() ซึ่งกรองเฉพาะสมุดปัจจุบัน แต่ป้ายตัวเลขบนแท็บนับจากทุกสมุด
+     คนที่แยกสมุดไว้จึงเห็นป้ายขึ้นเลข แต่เปิดเข้ามาแล้วหน้าจอบอกว่า "ยังไม่มีลูกหนี้"
+     ฝั่งหนี้ที่เราต้องจ่ายก็ไม่ได้ผูกกับสมุดอยู่แล้ว และปุ่มรับเงิน/ส่งให้เพื่อน
+     ก็ทำงานข้ามสมุดได้ (ExpenseStore.get/update ค้นทุกเล่ม) จึงรวมทุกสมุดให้ตรงกันหมด */
+  function bookNameOf(id) {
+    var found = ExpenseStore.allBooks().filter(function (b) { return b.id === id; })[0];
+    return found ? found.name : '';
+  }
   function debtGroups() {
     var byName = {};
-    ExpenseStore.all().forEach(function (e) {
+    var manyBooks = ExpenseStore.books().length > 1;
+    ExpenseStore.allWithDeleted().forEach(function (e) {
+      if (e.deleted) return;
       splitOf(e).forEach(function (p) {
         var key = p.name.trim().toLowerCase() || 'เพื่อน';
         if (!byName[key]) byName[key] = { name: p.name.trim() || 'เพื่อน', owed: 0, paid: 0, items: [] };
         var g = byName[key];
         if (p.paid) g.paid += p.amount; else g.owed += p.amount;
         g.items.push({ expenseId: e.id, personId: p.id, date: e.date, merchant: e.merchant,
-                       amount: p.amount, paid: p.paid, total: e.amount });
+                       amount: p.amount, paid: p.paid, total: e.amount,
+                       book: manyBooks ? bookNameOf(e.bookId) : '' });
       });
     });
     return Object.keys(byName).map(function (k) { return byName[k]; })
@@ -1700,6 +1712,7 @@
       '<div class="debt-item-main">' +
         '<span class="debt-item-name">' + esc(it.merchant) + '</span>' +
         '<span class="debt-item-meta">' + esc(dateLabel(it.date)) + ' · บิลรวม ' + esc(moneyShort.format(it.total)) +
+          (it.book ? ' · <span class="tag">📒 ' + esc(it.book) + '</span>' : '') +
           claimBits + '</span>' +
       '</div>' +
       '<span class="debt-item-amount">' + fmtMoney(it.amount) + '</span>' +
