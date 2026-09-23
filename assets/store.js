@@ -508,18 +508,22 @@ window.ExpenseStore = (function () {
         var list = readJSON(FRIENDS_KEY, []).slice();
         var now = Date.now();
         var found = false;
+        var saved = String(name || '').trim().slice(0, 60);
         list = list.map(function (f) {
           if (f.email !== key) return f;
           found = true;
-          return { email: key, name: String(name || f.name || '').trim().slice(0, 60), deleted: false,
+          /* เพิ่มคนเดิมซ้ำโดยไม่ใส่ชื่อ = เก็บชื่อเล่นเดิมไว้ ไม่ใช่ล้างทิ้ง */
+          saved = String(name || f.name || '').trim().slice(0, 60);
+          return { email: key, name: saved, deleted: false,
                    createdAt: f.createdAt || now, updatedAt: now };
         });
-        if (!found) list.push({ email: key, name: String(name || '').trim().slice(0, 60), deleted: false,
+        if (!found) list.push({ email: key, name: saved, deleted: false,
                                 createdAt: now, updatedAt: now });
         writeJSON(FRIENDS_KEY, list);
         markFriendDirty(key);
         notify();
-        return { ok: true, friend: { email: key, name: String(name || '').trim() } };
+        /* คืนชื่อที่เก็บจริง ไม่ใช่ชื่อที่เพิ่งพิมพ์มา ข้อความยืนยันจะได้เรียกชื่อเขาถูก */
+        return { ok: true, friend: { email: key, name: saved }, existed: found };
       },
       remove: function (email) {
         var key = String(email || '').trim().toLowerCase();

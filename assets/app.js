@@ -252,14 +252,38 @@
     });
   }
 
-  /* ยอดค้างระหว่างเรากับเพื่อนแต่ละคน ไว้โชว์ในรายชื่อ */
+  /* ยอดค้างระหว่างเรากับเพื่อนแต่ละคน ไว้โชว์ในรายชื่อ
+     "เขาค้างเรา" ต้องนับจากรายการที่หารไว้ในเครื่อง (split) เหมือนกับที่แท็บลูกหนี้นับ
+     เดิมนับจากใบแจ้งหนี้อย่างเดียว คนที่หารบิลไว้แต่ยังไม่ได้กด "ส่งให้เพื่อน"
+     จึงขึ้นยอดในแท็บลูกหนี้ แต่ในรายชื่อเพื่อนว่างเปล่า — ตัวเลขสองหน้าไม่ตรงกัน
+     ส่วนใบแจ้งหนี้ที่ส่งไปแล้วนับเฉพาะใบที่ไม่มีรายการหารผูกอยู่ จะได้ไม่นับซ้ำ */
   function friendBalance(email) {
     var me = myEmail();
+    var key = String(email || '').trim().toLowerCase();
+    var friend = ExpenseStore.friends.get(key);
+    var nick = friend && friend.name ? friend.name.trim().toLowerCase() : '';
     var theyOwe = 0, iOwe = 0;
+    var counted = {};
+
+    ExpenseStore.allWithDeleted().forEach(function (e) {
+      if (e.deleted) return;
+      splitOf(e).forEach(function (p) {
+        if (p.paid) return;
+        var pe = String(p.email || '').trim().toLowerCase();
+        var pn = String(p.name || '').trim().toLowerCase();
+        /* จับคู่ด้วยอีเมลก่อน ถ้าคนนั้นใส่ไว้แค่ชื่อก็เทียบกับชื่อเล่นในรายชื่อแทน */
+        if (pe ? pe !== key : !(nick && pn === nick)) return;
+        theyOwe += p.amount;
+        counted[e.id + '|' + p.id] = true;
+      });
+    });
+
     ExpenseStore.claims.all().forEach(function (c) {
       if (c.status === 'confirmed' || c.status === 'cancelled') return;
-      if (c.fromEmail === me && c.toEmail === email) theyOwe += c.amount;
-      if (c.toEmail === me && c.fromEmail === email) iOwe += c.amount;
+      if (c.fromEmail === me && c.toEmail === key) {
+        if (!counted[c.expenseId + '|' + c.personId]) theyOwe += c.amount;
+      }
+      if (c.toEmail === me && c.fromEmail === key) iOwe += c.amount;
     });
     return { theyOwe: theyOwe, iOwe: iOwe };
   }
@@ -307,7 +331,9 @@
     $('#newFriendEmail').value = ''; $('#newFriendName').value = '';
     renderFriendList();
     closeAddFriendModal();
-    toast('เพิ่ม ' + (res.friend.name || res.friend.email) + ' เป็นเพื่อนแล้ว');
+    toast(res.existed
+      ? (res.friend.name || res.friend.email) + ' อยู่ในรายชื่อเพื่อนอยู่แล้ว'
+      : 'เพิ่ม ' + (res.friend.name || res.friend.email) + ' เป็นเพื่อนแล้ว');
   }
   $('#addFriendBtn').addEventListener('click', addFriendFromForm);
   $('#newFriendEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') addFriendFromForm(); });
