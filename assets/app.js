@@ -288,6 +288,101 @@
     return { theyOwe: theyOwe, iOwe: iOwe };
   }
 
+  /* ---------- QR พร้อมเพย์ของเพื่อน ----------
+     เลขพร้อมเพย์มาได้สองทาง: ใบแจ้งหนี้ที่เขาเคยส่งมาจะแนบมาด้วย (เรียนรู้เก็บไว้ให้เอง)
+     หรือเราพิมพ์เก็บไว้เอง ทั้งสองทางเก็บในเครื่องเท่านั้น ไม่ได้ส่งขึ้นเซิร์ฟเวอร์ */
+  function promptPayFromClaims(email) {
+    var key = String(email || '').trim().toLowerCase();
+    var hit = ExpenseStore.claims.all()
+      .filter(function (c) { return c.fromEmail === key && c.promptpay && PromptPay.normalizeId(c.promptpay); })
+      .sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
+    return hit ? hit.promptpay : '';
+  }
+  function friendPromptPay(email) {
+    var f = ExpenseStore.friends.get(email);
+    if (f && f.promptpay && PromptPay.normalizeId(f.promptpay)) return f.promptpay;
+    var learned = promptPayFromClaims(email);
+    /* จำไว้เลย ครั้งต่อไปจะได้เปิดได้ทันทีแม้ใบแจ้งหนี้ถูกเคลียร์ไปแล้ว */
+    if (learned && f) ExpenseStore.friends.setPromptPay(email, learned);
+    return learned;
+  }
+
+  function openFriendQr(email) {
+    var f = ExpenseStore.friends.get(email);
+    if (!f) return;
+    var who = f.name || f.email;
+    var pp = friendPromptPay(email);
+    var owe = friendBalance(email).iOwe;
+    renderFriendQr(email, who, pp, owe > 0.005 ? Math.round(owe * 100) / 100 : 0);
+    $('#payModal').hidden = false;
+  }
+
+  function renderFriendQr(email, who, pp, amount) {
+    var info = pp ? PromptPay.normalizeId(pp) : null;
+    var text = info ? PromptPay.payload(pp, amount) : '';
+    var head = '<div class="pay-to">โอนให้ <b>' + esc(who) + '</b></div>';
+
+    if (!info) {
+      $('#payBody').innerHTML = '<div class="pay-body">' + head +
+        '<p class="pay-hint">ยังไม่รู้เลขพร้อมเพย์ของ ' + esc(who) + ' — ใส่ไว้ครั้งเดียว ครั้งต่อไปกดชื่อแล้วได้ QR เลย<br>' +
+        'ถ้าเขาเคยส่งใบแจ้งหนี้พร้อม QR มาให้ แอปจะจำให้เองอัตโนมัติ</p>' +
+        '<label class="field"><span class="field-label">เลขพร้อมเพย์ของ ' + esc(who) + '</span>' +
+          '<input type="text" id="friendPpInput" inputmode="tel" maxlength="20" placeholder="เบอร์ 10 หลัก หรือเลขบัตร 13 หลัก"></label>' +
+        '<button class="btn btn-primary" type="button" id="friendPpSave">บันทึกเลขพร้อมเพย์</button>' +
+      '</div>';
+    } else {
+      $('#payBody').innerHTML = '<div class="pay-body">' +
+        (amount > 0.005 ? '<div class="pay-amount">' + fmtMoney(amount) + '</div>' : '') + head +
+        '<div class="pay-qr" aria-label="QR พร้อมเพย์ของ ' + esc(who) + '">' + qrSvg(text) + '</div>' +
+        '<div class="pay-id">' + esc(info.label) + '</div>' +
+        '<label class="field"><span class="field-label">ยอดที่จะโอน (เว้นว่าง = ให้กรอกในแอปธนาคารเอง)</span>' +
+          '<input type="number" id="friendPpAmount" inputmode="decimal" min="0" step="1" value="' +
+          (amount > 0.005 ? esc(String(amount)) : '') + '" placeholder="ไม่ระบุยอด"></label>' +
+        '<div class="row-actions">' +
+          '<button class="btn btn-primary btn-sm" type="button" id="friendQrSave">💾 บันทึกรูป QR</button>' +
+          '<button class="btn btn-ghost btn-sm" type="button" id="friendQrCopy">คัดลอกเลขพร้อมเพย์</button>' +
+          '<button class="btn btn-ghost btn-sm" type="button" id="friendPpEdit">แก้เลข</button>' +
+        '</div>' +
+        '<p class="pay-hint">บันทึกรูปแล้วเปิดแอปธนาคาร → สแกน → เลือกรูปจากอัลบั้ม' +
+          (amount > 0.005 ? ' ยอดเงินจะถูกใส่ให้อัตโนมัติ' : '') + '</p>' +
+      '</div>';
+    }
+    wireFriendQr(email, who, pp, amount, info, text);
+  }
+
+  function wireFriendQr(email, who, pp, amount, info, text) {
+    var saveBtn = $('#friendPpSave');
+    if (saveBtn) {
+      var apply = function () {
+        var v = $('#friendPpInput').value.trim();
+        if (!v) { toast('ใส่เลขพร้อมเพย์ก่อน'); return; }
+        if (!PromptPay.normalizeId(v)) { toast('พร้อมเพย์ไม่ถูกต้อง — ใส่เบอร์ 10 หลัก หรือเลขบัตร 13 หลัก'); return; }
+        ExpenseStore.friends.setPromptPay(email, v);
+        toast('บันทึกพร้อมเพย์ของ ' + who + ' แล้ว');
+        renderFriendQr(email, who, v, amount);
+      };
+      saveBtn.addEventListener('click', apply);
+      $('#friendPpInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') apply(); });
+      setTimeout(function () { var el = $('#friendPpInput'); if (el) el.focus(); }, 60);
+      return;
+    }
+    $('#friendPpEdit').addEventListener('click', function () { renderFriendQr(email, who, '', amount); });
+    $('#friendPpAmount').addEventListener('change', function () {
+      var v = ReceiptParser.toNumber(this.value);
+      renderFriendQr(email, who, pp, v > 0 ? v : 0);
+    });
+    $('#friendQrCopy').addEventListener('click', function () {
+      var digits = info.type === '01' ? '0' + info.value.slice(4) : info.value;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(digits).then(function () { toast('คัดลอก ' + digits + ' แล้ว'); });
+      } else prompt('เลขพร้อมเพย์ของ ' + who, digits);
+    });
+    $('#friendQrSave').addEventListener('click', function () {
+      saveQrImage(text, 'promptpay-' + (amount > 0.005 ? Math.round(amount) : 'any') + '.png',
+        'QR พร้อมเพย์ของ ' + who + (amount > 0.005 ? ' ' + fmtMoney(amount) : ''));
+    });
+  }
+
   function renderFriendList() {
     var list = ExpenseStore.friends.all();
     $('#friendCount').textContent = list.length ? list.length + ' คน' : '';
@@ -296,10 +391,15 @@
       var bits = [];
       if (bal.theyOwe > 0.005) bits.push('<span class="friend-owed">ค้างเรา ' + esc(fmtMoney(bal.theyOwe)) + '</span>');
       if (bal.iOwe > 0.005) bits.push('<span class="friend-owe">เราค้าง ' + esc(fmtMoney(bal.iOwe)) + '</span>');
-      return '<div class="book-row friend-row" data-email="' + esc(f.email) + '">' +
+      /* ทั้งแถวกดได้ = ขอ QR พร้อมเพย์ของเพื่อนคนนั้น จึงต้องบอกเครื่องอ่านหน้าจอด้วยว่าเป็นปุ่ม */
+      var known = !!(f.promptpay && PromptPay.normalizeId(f.promptpay)) || !!promptPayFromClaims(f.email);
+      return '<div class="book-row friend-row" data-email="' + esc(f.email) + '"' +
+          ' role="button" tabindex="0" title="ดู QR พร้อมเพย์ของ ' + esc(f.name || f.email) + '"' +
+          ' aria-label="' + esc(f.name || f.email) + ' — ดู QR พร้อมเพย์">' +
         '<div class="book-info">' +
           '<span class="book-name">' + esc(f.name || f.email) + '</span>' +
-          '<span class="book-count"><span>' + esc(f.email) + '</span>' + bits.join('') + '</span>' +
+          '<span class="book-count"><span>' + esc(f.email) + '</span>' + bits.join('') +
+            '<span class="friend-qr-hint">' + (known ? '💳 QR พร้อมเพย์' : '💳 ใส่พร้อมเพย์') + '</span></span>' +
         '</div>' +
         '<button class="btn btn-ghost btn-sm" data-friend="rename">เปลี่ยนชื่อ</button>' +
         '<button class="btn btn-ghost btn-sm btn-danger" data-friend="del">ลบ</button>' +
@@ -364,7 +464,12 @@
 
   $('#friendList').addEventListener('click', function (ev) {
     var btn = ev.target.closest('[data-friend]');
-    if (!btn) return;
+    if (!btn) {
+      /* กดที่ตัวแถว = ขอ QR พร้อมเพย์ของเพื่อนคนนั้น ไว้โอนเงินให้เขา */
+      var open = ev.target.closest('.friend-row');
+      if (open) openFriendQr(open.dataset.email);
+      return;
+    }
     var row = btn.closest('.friend-row');
     var email = row ? row.dataset.email : '';
     if (btn.dataset.friend === 'rename') {
@@ -378,6 +483,14 @@
       ExpenseStore.friends.remove(email);
       renderFriendList();
     }
+  });
+
+  $('#friendList').addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    var row = ev.target.closest && ev.target.closest('.friend-row');
+    if (!row || ev.target.closest('[data-friend]')) return;
+    ev.preventDefault();
+    openFriendQr(row.dataset.email);
   });
 
   $('#friendsBtn').addEventListener('click', function () {

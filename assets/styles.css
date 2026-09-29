@@ -1088,7 +1088,16 @@ body.has-bg .img-modal { background: rgba(8, 7, 12, .86); }
   .me-info .field { max-width: none; }
   .me-qr { width: 200px; height: 200px; }
 }
-.friend-row .book-count { display: flex; gap: 8px; flex-wrap: wrap; }
+.friend-row .book-count { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* ทั้งแถวกดได้เพื่อขอ QR พร้อมเพย์ — ต้องดูออกว่ากดได้ ไม่ใช่ข้อความเฉยๆ */
+.friend-row { cursor: pointer; transition: background-color .18s var(--ease), border-color .18s var(--ease); }
+.friend-row:hover { background: var(--surface-2); border-color: var(--border); }
+.friend-row:active { transform: scale(.995); }
+.friend-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.friend-qr-hint {
+  font-size: 11.5px; font-weight: 600; color: var(--accent-ink);
+  background: var(--accent-soft); border-radius: 999px; padding: 1px 8px; white-space: nowrap;
+}
 .friend-owe { color: var(--warn-ink); font-weight: 600; }
 .friend-owed { color: var(--ok-ink); font-weight: 600; }
 
