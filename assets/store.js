@@ -502,28 +502,47 @@ window.ExpenseStore = (function () {
         var key = String(email || '').trim().toLowerCase();
         return this.all().filter(function (f) { return f.email === key; })[0] || null;
       },
-      save: function (email, name) {
+      save: function (email, name, promptpay) {
         var key = String(email || '').trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(key)) return { ok: false, error: 'อีเมลไม่ถูกต้อง' };
         var list = readJSON(FRIENDS_KEY, []).slice();
         var now = Date.now();
         var found = false;
         var saved = String(name || '').trim().slice(0, 60);
+        var pp = String(promptpay || '').trim().slice(0, 40);
         list = list.map(function (f) {
           if (f.email !== key) return f;
           found = true;
-          /* เพิ่มคนเดิมซ้ำโดยไม่ใส่ชื่อ = เก็บชื่อเล่นเดิมไว้ ไม่ใช่ล้างทิ้ง */
+          /* เพิ่มคนเดิมซ้ำโดยไม่ใส่ชื่อ = เก็บชื่อเล่นเดิมไว้ ไม่ใช่ล้างทิ้ง (พร้อมเพย์ก็เหมือนกัน) */
           saved = String(name || f.name || '').trim().slice(0, 60);
-          return { email: key, name: saved, deleted: false,
+          pp = String(promptpay || f.promptpay || '').trim().slice(0, 40);
+          return { email: key, name: saved, promptpay: pp, deleted: false,
                    createdAt: f.createdAt || now, updatedAt: now };
         });
-        if (!found) list.push({ email: key, name: saved, deleted: false,
+        if (!found) list.push({ email: key, name: saved, promptpay: pp, deleted: false,
                                 createdAt: now, updatedAt: now });
         writeJSON(FRIENDS_KEY, list);
         markFriendDirty(key);
         notify();
         /* คืนชื่อที่เก็บจริง ไม่ใช่ชื่อที่เพิ่งพิมพ์มา ข้อความยืนยันจะได้เรียกชื่อเขาถูก */
-        return { ok: true, friend: { email: key, name: saved }, existed: found };
+        return { ok: true, friend: { email: key, name: saved, promptpay: pp }, existed: found };
+      },
+      /* เลขพร้อมเพย์ของเพื่อน เก็บในเครื่องอย่างเดียว ไม่ได้ส่งขึ้นเซิร์ฟเวอร์
+         (ตาราง friends ไม่มีคอลัมน์นี้ และมันเป็นข้อมูลของคนอื่น ไม่ควรกระจายต่อ)
+         จึงต้องกันไม่ให้ถูกทับตอนซิงก์ดึงแถวจากเซิร์ฟเวอร์มาเขียนทับ */
+      setPromptPay: function (email, value) {
+        var key = String(email || '').trim().toLowerCase();
+        var list = readJSON(FRIENDS_KEY, []).slice();
+        var hit = false;
+        list = list.map(function (f) {
+          if (f.email !== key) return f;
+          hit = true;
+          return Object.assign({}, f, { promptpay: String(value || '').trim().slice(0, 40) });
+        });
+        if (!hit) return false;
+        writeJSON(FRIENDS_KEY, list);
+        notify();
+        return true;
       },
       remove: function (email) {
         var key = String(email || '').trim().toLowerCase();
@@ -553,7 +572,10 @@ window.ExpenseStore = (function () {
         (rows || []).forEach(function (row) {
           var i = by[row.email];
           if (i === undefined) { list.push(row); by[row.email] = list.length - 1; }
-          else if ((row.updatedAt || 0) >= (list[i].updatedAt || 0)) list[i] = row;
+          /* แถวจากเซิร์ฟเวอร์ไม่มีคอลัมน์พร้อมเพย์ ถ้าทับทั้งแถวค่าที่เก็บในเครื่องจะหายทุกครั้งที่ซิงก์ */
+          else if ((row.updatedAt || 0) >= (list[i].updatedAt || 0)) {
+            list[i] = Object.assign({}, row, { promptpay: list[i].promptpay || '' });
+          }
         });
         writeJSON(FRIENDS_KEY, list);
         notify();
@@ -576,7 +598,8 @@ window.ExpenseStore = (function () {
             return;
           }
           if (cur && cur.deleted && (cur.updatedAt || 0) >= (row.updatedAt || 0)) return;
-          var f = { email: email, name: String(row.name || '').trim().slice(0, 60), deleted: false,
+          var f = { email: email, name: String(row.name || '').trim().slice(0, 60),
+                    promptpay: (cur && cur.promptpay) || '', deleted: false,
                     createdAt: cur ? cur.createdAt || now : now, updatedAt: now };
           if (cur) list[i] = f; else { list.push(f); by[email] = list.length - 1; }
           markFriendDirty(email);
